@@ -111,3 +111,18 @@ fn thai_months_and_contexts() {
     assert_ne!(tr_ctx(th, "signature pad", "Type"), "Type");
     assert_ne!(tr_ctx(th, "comment menu", "Edit"), "Edit");
 }
+
+#[test]
+fn calendar_day_tooltip_uses_the_buddhist_era_in_thai() {
+    let th = Lang::from_code("th").expect("th registered");
+    assert_eq!(crate::forms_ui::day_tooltip_in(th, 2026, 10, 17), "17 ตุลาคม 2569");
+    assert_eq!(crate::forms_ui::day_tooltip_in(Lang::EN, 2026, 10, 17), "October 17, 2026");
+}
+
+#[test]
+fn thai_keeps_self_signed_apart_from_signing_yourself() {
+    let th = Lang::from_code("th").expect("th registered");
+    let yourself = tr(th, "Sign yourself");
+    assert_ne!(tr(th, "Self-signed"), yourself, "a certificate's trust is not the act of signing");
+    assert_ne!(tr_ctx(th, "certificate", "Self-signed"), yourself);
+}

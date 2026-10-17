@@ -22,7 +22,7 @@
 	Reason: 	เหตุผล: 
 	Location: 	สถานที่: 
 	Date: 	วันที่: 
-	The labels are in English: the signature's font can't draw them in this language.	ป้ายกำกับแสดงเป็นภาษาอังกฤษ เพราะฟอนต์ของลายเซ็นแสดงภาษานี้ไม่ได้
+	The labels are in English: the signature's font can't draw them in this language.	ป้ายกำกับแสดงเป็นภาษาอังกฤษ เพราะแบบอักษรของลายเซ็นแสดงภาษานี้ไม่ได้
 @plural	{n} page|{n} pages	{n} หน้า
 key	Ctrl	Ctrl
 key	Shift	Shift
@@ -43,7 +43,7 @@ key	Space	Space
 	Side panels	แผงด้านข้าง
 	Preferences	การตั้งค่า
 	Preferences…	การตั้งค่า…
-	Interface size	ขนาดหน้าจอ
+	Interface size	ขนาดอินเทอร์เฟซ
 	Auto ({percent}%)	อัตโนมัติ ({percent}%)
 	Identity	ข้อมูลประจำตัว
 	Name on new comments	ชื่อบนความคิดเห็นใหม่
@@ -62,7 +62,7 @@ key	Space	Space
 	Combine files…	รวมไฟล์…
 	Close file	ปิดไฟล์
 	Close all	ปิดทั้งหมด
-	Revert	ย้อนกลับเป็นฉบับที่บันทึกไว้
+	Revert	คืนเป็นฉบับที่บันทึก
 	Print…	พิมพ์…
 	Document properties…	คุณสมบัติเอกสาร…
 	Find…	ค้นหา…
@@ -290,8 +290,8 @@ theme	Appearance	รูปลักษณ์
 	Angle	มุม
 	Animation effects	เอฟเฟกต์ภาพเคลื่อนไหว
 	Annotations, form fill-in, and digital signatures	คำอธิบายประกอบ การกรอกฟอร์ม และลายเซ็นดิจิทัล
-	Any	ใดก็ได้
-	Any except extracting pages	ใดก็ได้ ยกเว้นการแยกหน้าออก
+	Any	ทุกอย่าง
+	Any except extracting pages	ทุกอย่าง ยกเว้นการแยกหน้า
 	Anyone opening the document will need this password. It's applied when you save.	ทุกคนที่เปิดเอกสารจะต้องใช้รหัสผ่านนี้ ระบบจะใช้รหัสผ่านเมื่อคุณบันทึก
 	Appear behind page	แสดงอยู่หลังหน้า
 	Appear on top of page	แสดงอยู่บนหน้า
@@ -299,9 +299,9 @@ theme	Appearance	รูปลักษณ์
 	Appearance settings…	การตั้งค่าลักษณะที่ปรากฏ…
 	Applies to 1 page	ใช้กับ 1 หน้า
 	Applies to {n} pages	ใช้กับ {n} หน้า
-	Apply redactions	ใช้การปกปิดข้อมูล
+	Apply redactions	ลบข้อมูลที่ปกปิดถาวร
 	Apply scale	ใช้มาตราส่วน
-	Asks GitHub for the latest release. Nothing is downloaded or installed automatically.	ถาม GitHub หารุ่นล่าสุด ไม่มีการดาวน์โหลดหรือติดตั้งใดโดยอัตโนมัติ
+	Asks GitHub for the latest release. Nothing is downloaded or installed automatically.	ตรวจหารุ่นล่าสุดจาก GitHub ไม่มีการดาวน์โหลดหรือติดตั้งใด ๆ โดยอัตโนมัติ
 	At most	ไม่เกิน
 	Attachments	ไฟล์แนบ
 	Attachments Panel and Page	แผงไฟล์แนบและหน้า
@@ -362,7 +362,7 @@ theme	Appearance	รูปลักษณ์
 	Check the pages of {name}: {why}	ตรวจสอบหน้าของ {name}: {why}
 	Checking Options ({on} of 32 in all categories)	ตัวเลือกการตรวจสอบ ({on} จาก 32 ในทุกหมวด)
 	Checking for a newer version…	กำลังตรวจหารุ่นที่ใหม่กว่า…
-	Choose a PNG or JPEG image (up to 4 MiB). Transparency is preserved.	เลือกรูป PNG หรือ JPEG (ไม่เกิน 4 MiB) ความโปร่งใสจะคงไว้
+	Choose a PNG or JPEG image (up to 4 MiB). Transparency is preserved.	เลือกรูป PNG หรือ JPEG (ไม่เกิน 4 MiB) โดยคงความโปร่งใสไว้
 	Choose a folder for the exported files	เลือกโฟลเดอร์สำหรับไฟล์ที่ส่งออก
 	Choose a folder for the extracted pages	เลือกโฟลเดอร์สำหรับหน้าที่แยกออก
 	Choose a folder for the results	เลือกโฟลเดอร์สำหรับผลลัพธ์
@@ -402,7 +402,7 @@ theme	Appearance	รูปลักษณ์
 	Comb of	ช่องแบ่งอักขระจำนวน
 	Combine the rest	รวมส่วนที่เหลือ
 	Combined {n} files	รวม {n} ไฟล์แล้ว
-	Coming in milestone	จะมาในหลักไมล์
+	Coming in milestone	จะมาในรุ่น
 	Comment and form data	ความคิดเห็นและข้อมูลฟอร์ม
 	Commenting, filling in form fields, and signing existing signature fields	การแสดงความคิดเห็น การกรอกช่องฟอร์ม และการลงนามในช่องลายเซ็นที่มีอยู่
 	Comments & Forms	ความคิดเห็นและฟอร์ม
@@ -431,7 +431,7 @@ theme	Appearance	รูปลักษณ์
 	Create PDF Comment Summary	สร้างสรุปความคิดเห็นเป็น PDF
 	Create PDF comment summary…	สร้างสรุปความคิดเห็นเป็น PDF…
 	Create PDF from images	สร้าง PDF จากรูปภาพ
-	Create a new Digital ID (self-signed, saved to a password-protected file)	สร้าง Digital ID ใหม่ (ลงนามด้วยตนเอง บันทึกในไฟล์ที่มีรหัสผ่าน)
+	Create a new Digital ID (self-signed, saved to a password-protected file)	สร้าง Digital ID ใหม่ (ลงนามรับรองตนเอง บันทึกในไฟล์ที่มีรหัสผ่าน)
 	Create accessibility report	สร้างรายงานการช่วยการเข้าถึง
 	Create custom stamp…	สร้างตราประทับเอง…
 	Create {what}	สร้าง{what}
@@ -598,7 +598,7 @@ theme	Appearance	รูปลักษณ์
 	Fix	แก้ไข
 	Fixed what could be fixed; 1 problem remains	แก้ไขส่วนที่แก้ได้แล้ว ยังเหลือ 1 ปัญหา
 	Fixed what could be fixed; {n} problems remain	แก้ไขส่วนที่แก้ได้แล้ว ยังเหลือ {n} ปัญหา
-	Flatten Fill & Sign when saving	ทำให้กรอกและลงนามแบนราบเมื่อบันทึก
+	Flatten Fill & Sign when saving	รวมกรอกและลงนามเข้ากับหน้าเมื่อบันทึก
 	Flip Horizontal	พลิกแนวนอน
 	Flip Vertical	พลิกแนวตั้ง
 	Flip horizontal	พลิกแนวนอน
@@ -608,14 +608,14 @@ theme	Appearance	รูปลักษณ์
 	Folders	โฟลเดอร์
 	Font Size:	ขนาดอักษร:
 	Font colour:	สีแบบอักษร:
-	Font size 0 uses automatic sizing.	ขนาดแบบอักษร 0 จะปรับขนาดอัตโนมัติ
+	Font size 0 uses automatic sizing.	ขนาดอักษร 0 จะปรับขนาดอัตโนมัติ
 	Font size:	ขนาดอักษร:
 	Font:	แบบอักษร:
 	Font: Helvetica	แบบอักษร: Helvetica
 	Fonts	แบบอักษร
 	For page sizes and margins.	สำหรับขนาดหน้าและระยะขอบ
 	Form data and PDF forms	ข้อมูลฟอร์มและฟอร์ม PDF
-	Form fields are flattened: their values stay visible. Saving rewrites the whole file.	ช่องฟอร์มถูกทำให้แบนราบ ค่าจะยังคงมองเห็นได้ การบันทึกจะเขียนไฟล์ใหม่ทั้งไฟล์
+	Form fields are flattened: their values stay visible. Saving rewrites the whole file.	ช่องฟอร์มถูกรวมเข้ากับหน้า ค่าจะยังคงมองเห็นได้ การบันทึกจะเขียนไฟล์ใหม่ทั้งไฟล์
 	Form fields only	ช่องฟอร์มเท่านั้น
 	Form fill-in and digital signatures	การกรอกฟอร์มและลายเซ็นดิจิทัล
 	Format	รูปแบบ
@@ -674,7 +674,7 @@ theme	Appearance	รูปลักษณ์
 	Italic	ตัวเอียง
 	Item List	รายการตัวเลือก
 	Item:	รายการ:
-	Items marked Ready work today.	รายการที่ทำเครื่องหมายว่าพร้อมใช้งานได้แล้ววันนี้
+	Items marked Ready work today.	รายการที่มีป้าย “พร้อม” ใช้งานได้แล้วตอนนี้
 	Its security settings don't allow copying pages	การตั้งค่าความปลอดภัยไม่อนุญาตให้คัดลอกหน้า
 	JavaScript Console	คอนโซล JavaScript
 	JavaScript is turned off (Preferences ▸ JavaScript).	JavaScript ถูกปิดอยู่ (การตั้งค่า ▸ JavaScript)
@@ -788,7 +788,7 @@ theme	Appearance	รูปลักษณ์
 	No photo chosen	ยังไม่ได้เลือกรูปถ่าย
 	No preview	ไม่มีตัวอย่าง
 	No problems found: the document conforms to {level}.	ไม่พบปัญหา: เอกสารสอดคล้องกับ {level}
-	No security	ไม่มีการรักษาความปลอดภัย
+	No security	ไม่ป้องกัน
 	No sheets	ไม่มีแผ่น
 	No signature was found in the frame. Move the frame over the signature or raise the ink sensitivity.	ไม่พบลายเซ็นในกรอบ ย้ายกรอบไปทับลายเซ็นหรือเพิ่มความไวของหมึก
 	No status has been set.	ยังไม่ได้ตั้งสถานะ
@@ -897,7 +897,7 @@ theme	Appearance	รูปลักษณ์
 	Pin a folder…	ปักหมุดโฟลเดอร์…
 	Plain text in reading order; pages are separated by form feeds.	ข้อความล้วนตามลำดับการอ่าน แต่ละหน้าคั่นด้วยอักขระขึ้นหน้าใหม่
 	Planned	วางแผนไว้แล้ว
-	Planned for milestone	วางแผนไว้สำหรับหลักไมล์
+	Planned for milestone	วางแผนไว้สำหรับรุ่น
 	Points from the page's bottom-left corner.	จุดนับจากมุมล่างซ้ายของหน้า
 	Portrait	แนวตั้ง
 	Portrait Pages	หน้าแนวตั้ง
@@ -1002,7 +1002,7 @@ theme	Appearance	รูปลักษณ์
 	Rotation:	การหมุน:
 	Running action… file {d} of {t}	กำลังเรียกใช้การดำเนินการ… ไฟล์ {d} จาก {t}
 	Same as interface ({language})	เหมือนภาษาหน้าจอ ({language})
-	Sanitizing removes hidden information from the document: metadata, file attachments, comments, form fields (flattened), hidden text and layers, bookmarks, links, actions and scripts, and private application data.	การทำให้สะอาดจะนำข้อมูลที่ซ่อนอยู่ออกจากเอกสาร ได้แก่ เมทาดาทา ไฟล์แนบ ความคิดเห็น ช่องฟอร์ม (ทำให้แบนราบ) ข้อความและเลเยอร์ที่ซ่อน บุ๊กมาร์ก ลิงก์ การดำเนินการและสคริปต์ และข้อมูลส่วนตัวของแอปพลิเคชัน
+	Sanitizing removes hidden information from the document: metadata, file attachments, comments, form fields (flattened), hidden text and layers, bookmarks, links, actions and scripts, and private application data.	การล้างข้อมูลแฝงจะนำข้อมูลที่ซ่อนอยู่ออกจากเอกสาร ได้แก่ เมทาดาทา ไฟล์แนบ ความคิดเห็น ช่องฟอร์ม (รวมเข้ากับหน้า) ข้อความและเลเยอร์ที่ซ่อน บุ๊กมาร์ก ลิงก์ การดำเนินการและสคริปต์ และข้อมูลส่วนตัวของแอปพลิเคชัน
 	Save & Close	บันทึกและปิด
 	Save ({key})	บันทึก ({key})
 	Save Image As…	บันทึกรูปภาพเป็น…
@@ -1123,7 +1123,7 @@ theme	Appearance	รูปลักษณ์
 	Start page number	เลขหน้าเริ่มต้น
 	Status	สถานะ
 	Steps	ขั้นตอน
-	Strength: {s}	ความแข็งแรง: {s}
+	Strength: {s}	ความรัดกุม: {s}
 	Style	รูปแบบ
 	Subject	เรื่อง
 	Subset	ชุดย่อย
@@ -1177,10 +1177,10 @@ theme	Appearance	รูปลักษณ์
 	This comment's appearance can't be changed yet.	ยังเปลี่ยนลักษณะที่ปรากฏของความคิดเห็นนี้ไม่ได้
 	This dialog shows the details of a certificate and its chain.	กล่องโต้ตอบนี้แสดงรายละเอียดของใบรับรองและสายใบรับรอง
 	This document contains {n} interactive form fields.	เอกสารนี้มีช่องฟอร์มแบบโต้ตอบ {n} ช่อง
-	This document has no comments to flatten	เอกสารนี้ไม่มีความคิดเห็นให้ทำให้แบนราบ
+	This document has no comments to flatten	เอกสารนี้ไม่มีความคิดเห็นที่จะรวมเข้ากับหน้า
 	This document has no document-level scripts.	เอกสารนี้ไม่มีสคริปต์ระดับเอกสาร
 	This document has no editable structure tags.	เอกสารนี้ไม่มีแท็กโครงสร้างที่แก้ไขได้
-	This document has no form fields to flatten	เอกสารนี้ไม่มีช่องฟอร์มให้ทำให้แบนราบ
+	This document has no form fields to flatten	เอกสารนี้ไม่มีช่องฟอร์มที่จะรวมเข้ากับหน้า
 	This document has no form fields you can fill in	เอกสารนี้ไม่มีช่องฟอร์มที่กรอกได้
 	This document has no pages.	เอกสารนี้ไม่มีหน้า
 	This document has no restrictions to lift	เอกสารนี้ไม่มีข้อจำกัดให้ยกเลิก
@@ -1204,7 +1204,7 @@ theme	Appearance	รูปลักษณ์
 	This printer's driver doesn't take two-sided settings from other programs, so its own setting applies. Change it in Properties…	ไดรเวอร์ของเครื่องพิมพ์นี้ไม่รับการตั้งค่าพิมพ์สองด้านจากโปรแกรมอื่น จึงใช้ค่าของไดรเวอร์เอง เปลี่ยนได้ในคุณสมบัติ…
 	This web address mixes letters from different alphabets, a common way to imitate another site's name.	ที่อยู่เว็บนี้ผสมตัวอักษรจากหลายชุดอักษร ซึ่งเป็นวิธีที่มักใช้ปลอมชื่อเว็บไซต์อื่น
 	This web address uses letters from another alphabet, which can look like familiar ones.	ที่อยู่เว็บนี้ใช้ตัวอักษรจากชุดอักษรอื่นที่อาจดูเหมือนตัวอักษรที่คุ้นเคย
-	Tile scale:	มาตราส่วนการปูกระเบื้อง:
+	Tile scale:	มาตราส่วนการแบ่งแผ่น:
 	Time	เวลา
 	Title	ชื่อเรื่อง
 	To change locked fields, also set Locked to No.	หากต้องการเปลี่ยนช่องที่ล็อก ให้ตั้งล็อกเป็นไม่ด้วย
@@ -1255,7 +1255,7 @@ theme	Appearance	รูปลักษณ์
 	Used when opening PDFs. An explicit launch or control mode takes precedence for the session.	ใช้เมื่อเปิด PDF การกำหนดโหมดตอนเปิดหรือโหมดควบคุมจะมีผลเหนือกว่าในเซสชันนั้น
 	User Interface Options	ตัวเลือกส่วนติดต่อผู้ใช้
 	User password	รหัสผ่านผู้ใช้
-	Valid for 5 years, for digital signatures. Self-signed IDs are usually not trusted by others.	ใช้ได้ 5 ปี สำหรับลายเซ็นดิจิทัล ID ที่ลงนามด้วยตนเองมักไม่ได้รับความเชื่อถือจากผู้อื่น
+	Valid for 5 years, for digital signatures. Self-signed IDs are usually not trusted by others.	ใช้ได้ 5 ปี สำหรับลายเซ็นดิจิทัล ID ที่ลงนามรับรองตนเองมักไม่ได้รับความเชื่อถือจากผู้อื่น
 	Validate all	ตรวจสอบทั้งหมด
 	Value is not calculated	ค่าไม่ได้คำนวณ
 	Value is the	ค่าเป็น
@@ -1317,7 +1317,7 @@ theme	Appearance	รูปลักษณ์
 	Actions list	รายการการดำเนินการ
 	Add Bates numbering…	เพิ่มเลข Bates…
 	Add a button	เพิ่มปุ่ม
-	Add a callout	เพิ่มคำบรรยายภาพชี้
+	Add a callout	เพิ่มกล่องข้อความชี้
 	Add a checkbox	เพิ่มช่องทำเครื่องหมาย
 	Add a date field	เพิ่มช่องวันที่
 	Add a digital signature field	เพิ่มช่องลายเซ็นดิจิทัล
@@ -1346,7 +1346,7 @@ theme	Appearance	รูปลักษณ์
 	Advanced optimization	การปรับให้เหมาะสมขั้นสูง
 	Advanced options	ตัวเลือกขั้นสูง
 	Apply PDF standards	ใช้มาตรฐาน PDF
-	Apply redactions…	ใช้การปกปิดข้อมูล…
+	Apply redactions…	ลบข้อมูลที่ปกปิดถาวร…
 	Archive documents	เก็บถาวรเอกสาร
 	Area	พื้นที่
 	Arrow	ลูกศร
@@ -1460,8 +1460,8 @@ theme	Appearance	รูปลักษณ์
 	Fit visible	พอดีส่วนที่มองเห็น
 	Fix hairlines	แก้ไขเส้นบางเกินไป
 	Fix reading order	แก้ไขลำดับการอ่าน
-	Flatten comments	ทำให้ความคิดเห็นแบนราบ
-	Flatten form fields	ทำให้ช่องฟอร์มแบนราบ
+	Flatten comments	รวมความคิดเห็นเข้ากับหน้า
+	Flatten form fields	รวมช่องฟอร์มเข้ากับหน้า
 	Form fields panel	แผงช่องฟอร์ม
 	Geospatial location	ตำแหน่งทางภูมิศาสตร์
 	Go to page…	ไปยังหน้า…
@@ -1555,8 +1555,8 @@ theme	Appearance	รูปลักษณ์
 	Rotate pages	หมุนหน้า
 	Rotate pages clockwise	หมุนหน้าตามเข็มนาฬิกา
 	Rotate pages counterclockwise	หมุนหน้าทวนเข็มนาฬิกา
-	Sanitize document	ทำให้เอกสารสะอาด
-	Sanitize document…	ทำให้เอกสารสะอาด…
+	Sanitize document	ล้างข้อมูลแฝงในเอกสาร
+	Sanitize document…	ล้างข้อมูลแฝงในเอกสาร…
 	Save as PDF/A	บันทึกเป็น PDF/A
 	Save as PDF/UA	บันทึกเป็น PDF/UA
 	Save as PDF/X	บันทึกเป็น PDF/X
@@ -1652,7 +1652,7 @@ theme	Appearance	รูปลักษณ์
 	Every PDF in the folder and the folders inside it	PDF ทุกไฟล์ในโฟลเดอร์และโฟลเดอร์ย่อย
 	Field "{}" on page {p} has no description (tooltip)	ช่อง "{}" ในหน้า {p} ไม่มีคำอธิบาย (คำแนะนำเครื่องมือ)
 	Filename	ชื่อไฟล์
-	Flatten Fill & Sign	ทำให้กรอกและลงนามแบนราบ
+	Flatten Fill & Sign	รวมกรอกและลงนามเข้ากับหน้า
 	Font (unnamed) on page {p} doesn't map its characters to Unicode	แบบอักษร (ไม่มีชื่อ) ในหน้า {p} ไม่ได้จับคู่อักขระกับ Unicode
 	Font {} on page {p} doesn't map its characters to Unicode	แบบอักษร {} ในหน้า {p} ไม่ได้จับคู่อักขระกับ Unicode
 	Form field on page {p} isn't tagged	ช่องฟอร์มในหน้า {p} ไม่ได้ติดแท็ก
@@ -1822,7 +1822,7 @@ comment menu	Edit	แก้ไข
 	Add arrow	เพิ่มลูกศร
 	Add background	เพิ่มพื้นหลัง
 	Add bookmark	เพิ่มบุ๊กมาร์ก
-	Add callout	เพิ่มคำบรรยายภาพชี้
+	Add callout	เพิ่มกล่องข้อความชี้
 	Add checkmark	เพิ่มเครื่องหมายถูก
 	Add cloud	เพิ่มรูปเมฆ
 	Add connected lines	เพิ่มเส้นต่อกัน
@@ -1894,7 +1894,7 @@ comment menu	Edit	แก้ไข
 	Button Properties	คุณสมบัติปุ่ม
 	Button Style:	รูปแบบปุ่ม:
 	Calculate	คำนวณ
-	Callout	คำบรรยายภาพชี้
+	Callout	กล่องข้อความชี้
 	Cancelled	ยกเลิกแล้ว
 	Center Footer Text	ข้อความท้ายกระดาษตรงกลาง
 	Center Header Text	ข้อความหัวกระดาษตรงกลาง
@@ -1927,7 +1927,7 @@ comment menu	Edit	แก้ไข
 	Color contrast	ความต่างของสี
 	Comb of characters	ช่องแบ่งอักขระ
 	Combo	คอมโบ
-	Coming in milestone {m}. Items marked Ready work today.	จะมาในหลักไมล์ {m} รายการที่ทำเครื่องหมายว่าพร้อมใช้งานได้แล้ววันนี้
+	Coming in milestone {m}. Items marked Ready work today.	จะมีในรุ่น {m} รายการที่มีป้าย “พร้อม” ใช้งานได้แล้วตอนนี้
 	Command	คำสั่ง
 	Commenting	การแสดงความคิดเห็น
 	Comments and markups	ความคิดเห็นและมาร์กอัป
@@ -2014,7 +2014,7 @@ comment menu	Edit	แก้ไข
 	Document has appropriate color contrast	เอกสารมีความต่างของสีที่เหมาะสม
 	Document is not image-only PDF	เอกสารไม่ใช่ PDF ที่มีแต่รูปภาพ
 	Document is tagged PDF	เอกสารเป็น PDF ที่ติดแท็ก
-	Document sanitized. Save to finish: saving rewrites the whole file.	ทำให้เอกสารสะอาดแล้ว บันทึกเพื่อให้เสร็จ การบันทึกจะเขียนไฟล์ใหม่ทั้งไฟล์
+	Document sanitized. Save to finish: saving rewrites the whole file.	ล้างข้อมูลแฝงในเอกสารแล้ว บันทึกเพื่อให้เสร็จ การบันทึกจะเขียนไฟล์ใหม่ทั้งไฟล์
 	Document structure provides a logical reading order	โครงสร้างเอกสารให้ลำดับการอ่านที่สมเหตุสมผล
 	Document title is showing in title bar	ชื่อเรื่องของเอกสารแสดงในแถบชื่อเรื่อง
 	Documents of more than 20 pages need bookmarks for navigation. Add bookmarks for the main sections.	เอกสารที่ยาวเกิน 20 หน้าต้องมีบุ๊กมาร์กเพื่อการนำทาง เพิ่มบุ๊กมาร์กสำหรับส่วนหลัก
@@ -2058,7 +2058,7 @@ comment menu	Edit	แก้ไข
 	Files are combined in this order. Leave Pages empty to take every page.	ไฟล์จะรวมตามลำดับนี้ เว้นช่องหน้าว่างไว้เพื่อใช้ทุกหน้า
 	Fill in {name}	กรอก {name}
 	Filling of form fields	การกรอกช่องฟอร์ม
-	Flatten	ทำให้แบนราบ
+	Flatten	รวมเข้ากับหน้า
 	Flip image	พลิกรูปภาพ
 	Fonts must map their characters to Unicode so text can be read and copied. Fix the fonts or recreate the PDF.	แบบอักษรต้องจับคู่อักขระกับ Unicode เพื่อให้อ่านและคัดลอกข้อความได้ แก้ไขแบบอักษรหรือสร้าง PDF ใหม่
 	Form fields must be in the tag tree (Form tags) to be announced. Tag the form fields.	ช่องฟอร์มต้องอยู่ในต้นไม้แท็ก (แท็ก Form) จึงจะถูกอ่านออกเสียง ให้ติดแท็กช่องฟอร์ม
@@ -2192,7 +2192,7 @@ comment menu	Edit	แก้ไข
 	Pinned folders need the desktop app	การปักหมุดโฟลเดอร์ต้องใช้แอปเดสก์ท็อป
 	Pinned {folder} to Home	ปักหมุด {folder} ไว้ที่หน้าแรกแล้ว
 	Place saved {what}	วาง{what}ที่บันทึกไว้
-	Planned for milestone {m} — open to see what it will include	วางแผนไว้สำหรับหลักไมล์ {m} เปิดเพื่อดูว่าจะมีอะไรบ้าง
+	Planned for milestone {m} — open to see what it will include	วางแผนไว้สำหรับรุ่น {m} เปิดเพื่อดูว่าจะมีอะไรบ้าง
 	Planned · {m}	วางแผนไว้ · {m}
 	Polygon	รูปหลายเหลี่ยม
 	Polyline	เส้นหลายส่วน
@@ -2217,7 +2217,7 @@ comment menu	Edit	แก้ไข
 	Regularity	ความสม่ำเสมอ
 	Rejected	ปฏิเสธแล้ว
 	Reliable character encoding is provided	มีการเข้ารหัสอักขระที่เชื่อถือได้
-	Remove hidden information and flatten comments and form fields, so recipients see only the pages.	นำข้อมูลที่ซ่อนอยู่ออก และทำให้ความคิดเห็นและช่องฟอร์มแบนราบ ผู้รับจะเห็นเฉพาะหน้าเอกสาร
+	Remove hidden information and flatten comments and form fields, so recipients see only the pages.	นำข้อมูลที่ซ่อนอยู่ออก และรวมความคิดเห็นและช่องฟอร์มเข้ากับหน้า ผู้รับจะเห็นเฉพาะหน้าเอกสาร
 	Remove hidden information, metadata, scripts and embedded content, and rewrite the files.	นำข้อมูลที่ซ่อนอยู่ เมทาดาทา สคริปต์ และเนื้อหาที่ฝังไว้ออก แล้วเขียนไฟล์ใหม่
 	Remove redaction marks	นำเครื่องหมายปกปิดออก
 	Remove saved {what}	นำ{what}ที่บันทึกไว้ออก
@@ -2253,8 +2253,8 @@ comment menu	Edit	แก้ไข
 	Run form script	เรียกใช้สคริปต์ของฟอร์ม
 	SHA-1 digest	ไดเจสต์ SHA-1
 	SHA-256 digest	ไดเจสต์ SHA-256
-	Sanitize	ทำให้สะอาด
-	Sanitize Documents	ทำให้เอกสารสะอาด
+	Sanitize	ล้างข้อมูลแฝง
+	Sanitize Documents	ล้างข้อมูลแฝงในเอกสาร
 	Save as PDF/A-1b	บันทึกเป็น PDF/A-1b
 	Save as PDF/A-2b	บันทึกเป็น PDF/A-2b
 	Save as PDF/A-3b	บันทึกเป็น PDF/A-3b
@@ -2273,7 +2273,7 @@ comment menu	Edit	แก้ไข
 	Security method	วิธีการรักษาความปลอดภัย
 	Security settings must allow assistive technology to read the content ("Enable text access for screen reader devices"). Change the document's security to allow it.	การตั้งค่าความปลอดภัยต้องอนุญาตให้เทคโนโลยีช่วยเหลืออ่านเนื้อหาได้ ("อนุญาตให้โปรแกรมอ่านหน้าจอเข้าถึงข้อความ") เปลี่ยนความปลอดภัยของเอกสารเพื่ออนุญาต
 	Security will be removed when you save	การรักษาความปลอดภัยจะถูกนำออกเมื่อคุณบันทึก
-	Self-signed	ลงนามด้วยตนเอง
+	Self-signed	ลงนามรับรองตนเอง
 	Serial number	หมายเลขประจำ
 	Set alternate text	ตั้งข้อความแทนภาพ
 	Set bookmark destination	ตั้งปลายทางของบุ๊กมาร์ก
@@ -2489,7 +2489,7 @@ certificate	Validity ends	สิ้นสุดอายุ
 certificate	Public key	คีย์สาธารณะ
 certificate	Basic constraints	ข้อจำกัดพื้นฐาน
 certificate	Key usage	การใช้คีย์
-certificate	Self-signed	ลงนามด้วยตนเอง
+certificate	Self-signed	ลงนามรับรองตนเอง
 certificate	SHA-1 digest	ไดเจสต์ SHA-1
 certificate	SHA-256 digest	ไดเจสต์ SHA-256
 	Certificate authority	ผู้ออกใบรับรอง
@@ -2539,7 +2539,7 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 	of {pages}	ของ {pages}
 	on page {label}	ในหน้า {label}
 	open to see what it will include	เปิดเพื่อดูว่าจะมีอะไรบ้าง
-	ships in milestone {m}	มาในหลักไมล์ {m}
+	ships in milestone {m}	มาในรุ่น {m}
 	signature	ลายเซ็น
 	sorted ascending	เรียงจากน้อยไปมาก
 	sorted descending	เรียงจากมากไปน้อย
@@ -2605,7 +2605,7 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 	Move tag later	ย้ายแท็กไปภายหลัง
 	Tag form fields	ติดแท็กช่องฟอร์ม
 	Remove "{name}" from this list? The file itself is not deleted.	นำ "{name}" ออกจากรายการนี้หรือไม่? ตัวไฟล์จะไม่ถูกลบ
-	Minimize	ย่อ
+	Minimize	ย่อเล็กสุด
 	Maximize	ขยายเต็ม
 	Restore	คืนขนาด
 	Use system title bar	ใช้แถบชื่อเรื่องของระบบ
@@ -2641,7 +2641,7 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 	New file: {name}	ไฟล์ใหม่: {name}
 	Next tab	แท็บถัดไป
 	No printers were found. Check that the printer is installed and the print spooler is running, then open Print again.	ไม่พบเครื่องพิมพ์ ตรวจสอบว่าติดตั้งเครื่องพิมพ์แล้วและบริการ print spooler ทำงานอยู่ แล้วเปิดพิมพ์อีกครั้ง
-	Not now	ไม่ใช่ตอนนี้
+	Not now	ไว้ภายหลัง
 	Old file: {name}	ไฟล์เก่า: {name}
 	Opacity:	ความทึบ:
 	Open in Full Screen mode?	เปิดในโหมดเต็มหน้าจอหรือไม่?
@@ -2656,7 +2656,7 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 	Remove Crop	นำการครอบตัดออก
 	Remove this leaf tag from reading order and mark its direct content as an artifact	นำแท็กปลายนี้ออกจากลำดับการอ่าน และทำเครื่องหมายเนื้อหาโดยตรงเป็นส่วนตกแต่ง
 	Resolution:	ความละเอียด:
-	Save anyway	บันทึกต่อไป
+	Save anyway	บันทึกเลย
 	Save over the changed file?	บันทึกทับไฟล์ที่เปลี่ยนแปลงไปแล้วหรือไม่?
 	Scroll speed (mouse wheel and arrow keys)	ความเร็วการเลื่อน (ล้อเมาส์และปุ่มลูกศร)
 	Set page transitions	ตั้งการเปลี่ยนหน้า
