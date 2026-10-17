@@ -4249,3 +4249,14 @@ fn japanese_paragraphs_wrap_between_characters_without_closing_marks_at_a_row_st
         }
     }
 }
+
+#[test]
+fn invisible_unicode_layer_extracts_as_thai() {
+    let mut doc = text_page("");
+    let content = b"/OCR BMC\nBT\n3 Tr\n/PCOcrU1 1 Tf\n10 0 0 10 50 700 Tm <010203> Tj\nET\nEMC\n".to_vec();
+    stamp_with_fonts(&mut doc, 0, "OCR", content, &[("PCOcrU1".into(), vec!['น', '้', 'ำ'])]).unwrap();
+    let doc = reopen(&doc);
+    let blocks = text::text_blocks(&doc, 0).unwrap();
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].text.trim(), "น้ำ");
+}

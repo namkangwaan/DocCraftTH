@@ -2490,7 +2490,13 @@ fn run_edit(doc: &mut pdfcraft_cos::Document, edit: &Edit, cx: &mut EditCtx) -> 
         }
         Edit::SetDocumentScript { name, script } => pdfcraft_forms::set_document_script(doc, name, script.as_deref())?,
         Edit::AddOcrText { page, words } => {
-            pdfcraft_edit::stamp(doc, *page, "OCR", pdfcraft_ocr::text_layer(words))?;
+            if words.iter().all(|w| pdfcraft_fonts::first_undrawable(&w.text).is_none()) {
+                pdfcraft_edit::stamp(doc, *page, "OCR", pdfcraft_ocr::text_layer(words))?;
+            } else {
+                let (content, fonts) = pdfcraft_ocr::unicode_text_layer(words);
+                let fonts: Vec<(String, Vec<char>)> = fonts.into_iter().map(|f| (f.name, f.chars)).collect();
+                pdfcraft_edit::stamp_with_fonts(doc, *page, "OCR", content, &fonts)?;
+            }
         }
         Edit::EditPageImage { page, index, change } => {
             let img = pdfcraft_edit::page_images(doc, *page)?

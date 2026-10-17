@@ -383,9 +383,26 @@ fn place_tagged(doc: &mut Document, page: &pdfcraft_model::Page, tag: &str, cont
 /// available as `/PCHelv`. The stream is tagged `tag` (not a mark kind, so Remove never takes
 /// it away); the original content is wrapped in q/Q first. Used for applied redaction boxes.
 pub fn stamp(doc: &mut Document, page: usize, tag: &str, content: Vec<u8>) -> Result<(), EditError> {
+    stamp_with_fonts(doc, page, tag, content, &[])
+}
+
+/// Like [`stamp`], and also adds each `(name, chars)` entry to the page's `/Resources /Font` as an
+/// empty-glyph Type 3 font with a `ToUnicode` CMap (for invisible Unicode OCR text).
+pub fn stamp_with_fonts(doc: &mut Document, page: usize, tag: &str, content: Vec<u8>, fonts: &[(String, Vec<char>)]) -> Result<(), EditError> {
     let all = page_list(doc);
     check(&[page], all.len())?;
     add_resources(doc, &all[page], None, Some(&content))?;
+    if !fonts.is_empty() {
+        let current = &page_list(doc)[page];
+        let mut res = current.dict.get(b"Resources").map(|r| doc.resolve(r)).and_then(|r| r.as_dict().cloned()).unwrap_or_default();
+        let mut font_dict = res.get(b"Font").map(|f| doc.resolve(f)).and_then(|f| f.as_dict().cloned()).unwrap_or_default();
+        for (name, chars) in fonts {
+            let font_ref = invisible_font::add_invisible_font(doc, chars);
+            font_dict.set(name.as_bytes().to_vec(), Object::Ref(font_ref));
+        }
+        res.set(b"Font".to_vec(), Object::Dict(font_dict));
+        doc.update_dict(current.obj, |d| d.set(b"Resources".to_vec(), Object::Dict(res)))?;
+    }
     let p = page_list(doc).swap_remove(page);
     place_tagged(doc, &p, tag, content, false)
 }
@@ -653,6 +670,7 @@ pub mod images;
 pub use images::{ImageChange, PageImage, change_image, page_images, reading_images, rect_to_rect, turn_about_centre};
 pub mod bidi;
 pub mod indic;
+mod invisible_font;
 mod linebreak;
 pub mod text;
 pub use text::{

@@ -241,6 +241,96 @@ pub fn text_layer(words: &[PlacedWord]) -> Vec<u8> {
     out
 }
 
+/// One generated font of an invisible Unicode OCR layer: its resource name (`PCOcrU1`, `PCOcrU2`, …)
+/// and the characters mapped to codes `1..=chars.len()` (at most 255).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LayerFont {
+    pub name: String,
+    pub chars: Vec<char>,
+}
+
+/// Combining marks that sit on the preceding base character and advance the pen by 0.
+/// Kept in sync with `pdfcraft_edit::invisible_font::is_zero_width`.
+fn is_zero_width(c: char) -> bool {
+    matches!(u32::from(c), 0x0300..=0x036F | 0x0E31 | 0x0E34..=0x0E3A | 0x0E47..=0x0E4E)
+}
+
+/// Page content that writes `words` as invisible text in generated 1-byte fonts (`PCOcrU1`, …),
+/// so scripts outside WinAnsiEncoding keep their Unicode text for search and copy.
+pub fn unicode_text_layer(words: &[PlacedWord]) -> (Vec<u8>, Vec<LayerFont>) {
+    const PER_FONT: usize = 255;
+    let mut fonts: Vec<LayerFont> = Vec::new();
+    let mut map: std::collections::HashMap<char, (usize, u8)> = std::collections::HashMap::new();
+    for w in words {
+        for ch in w.text.chars() {
+            if map.contains_key(&ch) {
+                continue;
+            }
+            let need_new = fonts.last().is_none_or(|f| f.chars.len() >= PER_FONT);
+            if need_new {
+                let n = fonts.len().saturating_add(1);
+                fonts.push(LayerFont { name: format!("PCOcrU{n}"), chars: Vec::new() });
+            }
+            let font_idx = fonts.len().saturating_sub(1);
+            if let Some(font) = fonts.get_mut(font_idx) {
+                font.chars.push(ch);
+                let code = u8::try_from(font.chars.len()).unwrap_or(255);
+                map.insert(ch, (font_idx, code));
+            }
+        }
+    }
+
+    let mut out = b"/OCR BMC\nBT\n3 Tr\n".to_vec();
+    let mut current_font: Option<usize> = None;
+    let (top, bottom) = (BOX_EM - DESCENT, -DESCENT);
+    for w in words {
+        let base_count = w.text.chars().filter(|c| !is_zero_width(*c)).count();
+        let width = (base_count.max(1) as f64) * 0.5;
+        let height = w.up[0].hypot(w.up[1]);
+        if width <= 0.0 || height <= 0.0 || w.text.is_empty() {
+            continue;
+        }
+        let em = [w.up[0] / (top - bottom), w.up[1] / (top - bottom)];
+        let ax = [w.across[0] / width, w.across[1] / width];
+        let base_origin = [w.origin[0] - em[0] * bottom, w.origin[1] - em[1] * bottom];
+
+        let mut runs: Vec<(usize, Vec<u8>, usize)> = Vec::new();
+        for ch in w.text.chars() {
+            let Some(&(font_idx, code)) = map.get(&ch) else { continue };
+            let adv = usize::from(!is_zero_width(ch));
+            match runs.last_mut() {
+                Some((last_font, codes, count)) if *last_font == font_idx => {
+                    codes.push(code);
+                    *count = count.saturating_add(adv);
+                }
+                _ => runs.push((font_idx, vec![code], adv)),
+            }
+        }
+
+        let mut advance_em = 0.0;
+        for (font_idx, codes, run_bases) in runs {
+            if current_font != Some(font_idx) {
+                if let Some(font) = fonts.get(font_idx) {
+                    out.extend_from_slice(format!("/{} 1 Tf\n", font.name).as_bytes());
+                }
+                current_font = Some(font_idx);
+            }
+            let o = [base_origin[0] + ax[0] * advance_em, base_origin[1] + ax[1] * advance_em];
+            let m = [ax[0], ax[1], em[0], em[1], o[0], o[1]];
+            let nums: Vec<String> = m.iter().map(|v| num(*v)).collect();
+            out.extend_from_slice(nums.join(" ").as_bytes());
+            out.extend_from_slice(b" Tm <");
+            for code in codes {
+                out.extend_from_slice(format!("{code:02X}").as_bytes());
+            }
+            out.extend_from_slice(b"> Tj\n");
+            advance_em += (run_bases as f64) * 0.5;
+        }
+    }
+    out.extend_from_slice(b"ET\nEMC\n");
+    (out, fonts)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,12 +345,37 @@ mod tests {
         assert_eq!(w.up, [0.0, 20.0]);
     }
 
-    /// The text layer is Helvetica in WinAnsiEncoding: every character the model can recognise
-    /// must be one it can hold, or recognised text would be saved as `?`. A model with a wider
-    /// alphabet (Chinese, for example) needs a text layer in another font first.
+    /// The Latin text layer is Helvetica in WinAnsiEncoding: every character the Latin model can
+    /// recognise must be one it can hold, or recognised text on that path would be saved as `?`.
+    /// Models for other scripts use [`unicode_text_layer`] instead.
     #[test]
     fn the_model_alphabet_fits_the_text_layer_font() {
         assert_eq!(pdfcraft_fonts::first_undrawable(ALPHABET), None);
+    }
+
+    #[test]
+    fn unicode_layer_mixes_scripts() {
+        let w = |t: &str, x: f64| PlacedWord { text: t.into(), origin: [x, 100.0], across: [40.0, 0.0], up: [0.0, 12.0] };
+        let (content, fonts) = unicode_text_layer(&[w("ใบแจ้งหนี้", 10.0), w("No.", 60.0), w("2569/001", 90.0)]);
+        let s = String::from_utf8_lossy(&content);
+        assert!(s.starts_with("/OCR BMC") && s.contains("3 Tr") && s.contains("/PCOcrU1 1 Tf"), "{s}");
+        assert_eq!(fonts.len(), 1);
+        let all: String = fonts[0].chars.iter().collect();
+        for c in "ใบแจ้งหนี้No.2569/01".chars() {
+            assert!(all.contains(c), "{c} missing from {all}");
+        }
+        assert_eq!(fonts[0].chars.iter().filter(|&&c| c == 'น').count(), 1, "each char gets one code");
+    }
+
+    #[test]
+    fn unicode_layer_splits_fonts_past_255_codes() {
+        let text: String = (0x4E00u32..0x4E00 + 300).filter_map(char::from_u32).collect();
+        let w = PlacedWord { text, origin: [0.0, 0.0], across: [500.0, 0.0], up: [0.0, 10.0] };
+        let (content, fonts) = unicode_text_layer(&[w]);
+        assert_eq!(fonts.len(), 2);
+        assert_eq!(fonts[0].chars.len(), 255);
+        assert_eq!(fonts[1].chars.len(), 45);
+        assert!(String::from_utf8_lossy(&content).contains("/PCOcrU2 1 Tf"));
     }
 
     #[test]
