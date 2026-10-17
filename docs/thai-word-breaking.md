@@ -61,6 +61,7 @@ pythainlp 5.4.0, `th.tsv` at `1d0a35bc`, `break_offsets` at `d802ee7c`, 2,464 un
 
 - A guard against breaks before ะ า ำ ๅ ๆ ฯ and after เ แ โ ใ ไ catches 104 of the 191 cluster splits and none of the mid-word breaks. It is a safety net, not a fix.
 - A supplementary word list hides the known triggers but not the desync. The next loanword sets it off again.
+- icu_segmenter 2.3.0 is the newest release on crates.io (checked 2026-10-17), so an upgrade does not fix it.
 - `LineSegmenter::new_lstm` (icu_segmenter feature `lstm`) has no cluster splits on this catalog. Its wasm cost is not measured yet; measure it against the 2 MiB budget before switching.
 
 ### Rerunning the oracle
