@@ -296,7 +296,10 @@ fn card(
                 let author = a.author.as_deref().map_or_else(|| tl!("Unknown author").into(), crate::bidi::visual_auto);
                 ui.label(egui::RichText::new(author).font(theme::semibold(12.5)).color(t.text));
                 if let Some(m) = &a.modified {
-                    ui.add(egui::Label::new(egui::RichText::new(m).font(theme::regular(11.0)).color(t.text_faint)).truncate());
+                    ui.add(
+                        egui::Label::new(egui::RichText::new(crate::i18n::local_pdf_date(m)).font(theme::regular(11.0)).color(t.text_faint))
+                            .truncate(),
+                    );
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if selected && allowed {
@@ -372,7 +375,12 @@ fn card(
                             let author = r.author.as_deref().map_or_else(|| tl!("Reply").into(), crate::bidi::visual_auto);
                             ui.label(egui::RichText::new(author).font(theme::semibold(12.0)));
                             if let Some(m) = &r.modified {
-                                ui.add(egui::Label::new(egui::RichText::new(m).font(theme::regular(11.0)).color(t.text_faint)).truncate());
+                                ui.add(
+                                    egui::Label::new(
+                                        egui::RichText::new(crate::i18n::local_pdf_date(m)).font(theme::regular(11.0)).color(t.text_faint),
+                                    )
+                                    .truncate(),
+                                );
                             }
                         });
                         widgets::wrapped_text(ui, r.contents.as_deref().unwrap_or(""), theme::regular(12.5), t.text, false);

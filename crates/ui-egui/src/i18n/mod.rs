@@ -147,7 +147,7 @@ fn plural_sl(n: u64) -> usize {
 }
 
 /// The registry. English first: it is the fallback and the source language.
-pub static LANGUAGES: [LangInfo; 23] = [
+pub static LANGUAGES: [LangInfo; 24] = [
     LangInfo { code: "en", name: "English", source: "", plural: plural_one_other, rtl: false, catalog: OnceLock::new() },
     LangInfo { code: "ja", name: "日本語", source: include_str!("ja.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
     // Simplified Chinese; `zh`, `zh-CN`, `zh-SG` and `zh-Hans-*` locales resolve here (see `candidates`).
@@ -210,6 +210,9 @@ pub static LANGUAGES: [LangInfo; 23] = [
     // Vietnamese; every `vi-*` locale (`vi-VN`, `vi_VN.UTF-8`) resolves here. CLDR `vi` counts have
     // one form ("other"), so `@plural` entries list a single form.
     LangInfo { code: "vi", name: "Tiếng Việt", source: include_str!("vi.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
+    // Thai; every `th-*` locale (`th-TH`, `th_TH.UTF-8`) resolves here. CLDR `th` counts have one
+    // form, so `@plural` entries list a single form. Years show in the Buddhist Era (dates::era_year).
+    LangInfo { code: "th", name: "ไทย", source: include_str!("th.tsv"), plural: plural_none, rtl: false, catalog: OnceLock::new() },
 ];
 
 impl LangInfo {
@@ -484,6 +487,28 @@ pub fn fmt(template: &str, args: &[(&str, &str)]) -> String {
     }
     out.push_str(rest);
     out
+}
+
+/// `y` (Common Era) as the current interface language counts years: Buddhist Era for Thai.
+pub fn local_year(y: i64) -> i64 {
+    pdfcraft_engine::dates::era_year(current().code(), y)
+}
+
+/// A PDF date shown as [`pdfcraft_render::pretty_date`] does (`2026-09-30 10:45`), with the year
+/// in `lang`'s era. Strings that aren't such a date come back unchanged.
+pub fn local_pdf_date_in(lang: Lang, s: &str) -> String {
+    let pretty = pdfcraft_render::pretty_date(s);
+    let offset = pdfcraft_engine::dates::era_year(lang.code(), 0);
+    let year = pretty.get(..4).filter(|y| y.bytes().all(|b| b.is_ascii_digit())).and_then(|y| y.parse::<i64>().ok());
+    match (year, pretty.get(4..)) {
+        (Some(y), Some(rest)) if offset != 0 && rest.starts_with('-') => format!("{}{rest}", y.saturating_add(offset)),
+        _ => pretty,
+    }
+}
+
+/// [`local_pdf_date_in`] for the current interface language.
+pub fn local_pdf_date(s: &str) -> String {
+    local_pdf_date_in(current(), s)
 }
 
 /// A generated history label (the action part of "Undo …") in the current language. Captured
@@ -871,7 +896,7 @@ mod tests {
     }
 
     // Lithuanian also checks direct lookup calls and multiline literal arguments.
-    fn scan_ui_literals(expanded: bool) -> std::collections::BTreeSet<String> {
+    pub(super) fn scan_ui_literals(expanded: bool) -> std::collections::BTreeSet<String> {
         let mut stack = vec![std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src")];
         let mut literals = std::collections::BTreeSet::new();
         while let Some(dir) = stack.pop() {
@@ -3352,3 +3377,6 @@ mod tests {
         assert_eq!(dates, interface);
     }
 }
+
+#[cfg(test)]
+mod th_tests;

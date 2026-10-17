@@ -56,7 +56,7 @@ const AR_DAYS: [&str; 7] = ["الأحد", "الاثنين", "الثلاثاء", 
 
 /// The languages month and weekday names can be written in (Preferences ▸ Date format ▸ Language):
 /// the interface languages, in the same order and with the same names.
-pub static DATE_LANGUAGES: [DateLanguage; 23] = [
+pub static DATE_LANGUAGES: [DateLanguage; 24] = [
     DateLanguage {
         code: "en",
         name: "English",
@@ -398,11 +398,31 @@ pub static DATE_LANGUAGES: [DateLanguage; 23] = [
         days: ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"],
         days_short: ["CN", "T2", "T3", "T4", "T5", "T6", "T7"],
     },
+    // Thai: Buddhist Era years (see `era_year`); no separate month form after a day.
+    // Fill & Sign refuses formats with Thai letters (not WinAnsi); `dd.mm.yyyy` stays writable.
+    DateLanguage {
+        code: "th",
+        name: "ไทย",
+        months: ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"],
+        months_with_day: None,
+        months_short: ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."],
+        days: ["วันอาทิตย์", "วันจันทร์", "วันอังคาร", "วันพุธ", "วันพฤหัสบดี", "วันศุกร์", "วันเสาร์"],
+        days_short: ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."],
+    },
 ];
 
 /// The date language for `code` (any case), or `None` when there's none.
 pub fn date_language(code: &str) -> Option<&'static DateLanguage> {
     DATE_LANGUAGES.iter().find(|l| l.code.eq_ignore_ascii_case(code.trim()))
+}
+
+/// Years between the Buddhist Era (พ.ศ.) and the Common Era.
+const BUDDHIST_ERA_OFFSET: i64 = 543;
+
+/// `year` (Common Era) in the era the date language `code` counts in: Buddhist Era for Thai,
+/// unchanged for every other language.
+pub fn era_year(code: &str, year: i64) -> i64 {
+    if code.trim().eq_ignore_ascii_case("th") { year.saturating_add(BUDDHIST_ERA_OFFSET) } else { year }
 }
 
 /// The characters of `text` that Fill & Sign can't write into a PDF yet, each once. Its text is
@@ -476,12 +496,13 @@ pub fn format_day(fmt: &str, (y, m, d): (i64, u32, u32), lang: &DateLanguage) ->
     let with_day = runs.iter().any(|&(c, n, escaped)| !escaped && c == 'd' && n <= 2);
     let month = (m as usize).checked_sub(1);
     let weekday = weekday(y, m, d);
+    let year = era_year(lang.code, y);
     let mut out = String::new();
     for (c, n, escaped) in runs {
         match (c, n) {
             _ if escaped => out.push(c),
-            ('y', 4..) => out.push_str(&format!("{:04}", y.clamp(0, 9999))),
-            ('y', _) => out.push_str(&format!("{:02}", y.rem_euclid(100))),
+            ('y', 4..) => out.push_str(&format!("{:04}", year.clamp(0, 9999))),
+            ('y', _) => out.push_str(&format!("{:02}", year.rem_euclid(100))),
             ('m', 3..) => {
                 let names = if n >= 4 { lang.months_with_day.filter(|_| with_day).unwrap_or(lang.months) } else { lang.months_short };
                 match month.and_then(|i| names.get(i)) {
@@ -773,5 +794,27 @@ mod tests {
         assert!(e.contains("火曜日") && e.contains("can't be written into the PDF yet"), "{e}");
         assert!(s.today_text_for_pdf(Some("dd.mm.yyyy"), Some("ja")).is_ok(), "numbers are fine in any language");
         assert!(s.today_text_for_pdf(Some("yyyy\\年mm\\月"), Some("ja")).unwrap_err().contains("年月"));
+    }
+
+    #[test]
+    fn thai_dates_use_buddhist_era() {
+        let th = date_language("th").expect("th registered");
+        assert_eq!(th.name, "ไทย");
+        assert_eq!(era_year("th", 2023), 2566);
+        assert_eq!(era_year("TH", 2023), 2566);
+        assert_eq!(era_year("en", 2023), 2023);
+        assert_eq!(era_year("th", i64::MAX), i64::MAX, "saturates");
+        let mut s = Session::new().with_clock(|| 1_700_000_000);
+        s.set_date_language(Some("th")).unwrap();
+        s.set_date_format("d mmmm yyyy").unwrap();
+        assert_eq!(s.today_text(None, None).as_deref(), Ok("14 พฤศจิกายน 2566"));
+        assert_eq!(s.today_text(Some("dddd d mmm yy"), None).as_deref(), Ok("วันอังคาร 14 พ.ย. 66"));
+        assert_eq!(s.today_text(Some("dd/mm/yyyy"), None).as_deref(), Ok("14/11/2566"));
+        // English (en-GB, en-US) keeps Common Era even when the interface is Thai.
+        assert_eq!(s.today_text(Some("dd/mm/yyyy"), Some("en")).as_deref(), Ok("14/11/2023"));
+        // Thai letters can't be written by Fill & Sign yet; numeric Buddhist Era dates can.
+        assert_eq!(s.today_text_for_pdf(Some("dd.mm.yyyy"), Some("th")).as_deref(), Ok("14.11.2566"));
+        assert!(s.today_text_for_pdf(Some("d mmmm yyyy"), Some("th")).is_err());
+        assert_eq!(format_day("yyyy", (9999, 1, 1), th), "9999", "the four-digit clamp still applies");
     }
 }
