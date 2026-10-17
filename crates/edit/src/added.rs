@@ -277,8 +277,9 @@ fn wrapped(t: &AddedText) -> Vec<(String, bool)> {
     out
 }
 
-/// Thai wrapping at shaped cluster boundaries never detaches a tone/vowel mark from its base.
-/// This is glyph-safe wrapping, not dictionary-based Thai word segmentation.
+/// Thai wrapping between words ([`pdfcraft_fonts::thai::break_offsets`], a dictionary) and at
+/// spaces. A word wider than the row breaks at shaped cluster boundaries, which never detach a
+/// tone/vowel mark from its base.
 fn thai_lines(t: &AddedText, para: &str, width: f64) -> Result<Vec<String>, EditError> {
     let (pieces, _) = shaped_layout(t, para, false)?;
     let mut atoms = Vec::new();
@@ -292,15 +293,37 @@ fn thai_lines(t: &AddedText, para: &str, width: f64) -> Result<Vec<String>, Edit
             })),
         }
     }
+    // Clusters grouped into words: a word starts at a dictionary break or after a space. Breaks
+    // are only looked up at cluster boundaries, so none can split a cluster.
+    let breaks = pdfcraft_fonts::thai::break_offsets(para);
+    let mut words: Vec<Vec<(String, f64)>> = Vec::new();
+    let (mut at, mut after_space) = (0usize, true);
+    for (text, advance) in atoms {
+        if after_space || breaks.binary_search(&at).is_ok() {
+            words.push(Vec::new());
+        }
+        at = at.saturating_add(text.len());
+        after_space = text.chars().all(char::is_whitespace);
+        if let Some(word) = words.last_mut() {
+            word.push((text, advance));
+        }
+    }
     let mut lines = Vec::new();
     let (mut line, mut used) = (String::new(), 0.0);
-    for (text, advance) in atoms {
-        if !line.is_empty() && used + advance > width {
+    for word in words {
+        let word_width: f64 = word.iter().map(|(_, advance)| advance).sum();
+        if !line.is_empty() && used + word_width > width {
             lines.push(std::mem::take(&mut line));
             used = 0.0;
         }
-        line.push_str(&text);
-        used += advance;
+        for (text, advance) in word {
+            if !line.is_empty() && used + advance > width {
+                lines.push(std::mem::take(&mut line));
+                used = 0.0;
+            }
+            line.push_str(&text);
+            used += advance;
+        }
     }
     lines.push(line);
     Ok(lines)
