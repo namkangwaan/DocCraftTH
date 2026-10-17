@@ -1,0 +1,33 @@
+# Thai (th) catalog. Columns, separated by a TAB: context <TAB> source <TAB> translation
+#
+# Clean-room translations from PdfCraft's English UI labels, written for the DocCraftTH fork.
+# Product and format names (PdfCraft, PDF, PDF/A, OCR, XFA, Word…) stay as names.
+# Plural rule: `plural_none` — every @plural row lists exactly one form.
+# Glossary: File ไฟล์ · Open เปิด · Save บันทึก · Save as บันทึกเป็น · Export ส่งออก · Page หน้า ·
+#   Comment ความคิดเห็น · Annotation คำอธิบายประกอบ · Signature ลายเซ็น · Form ฟอร์ม · Field ช่อง ·
+#   Redact ปกปิดข้อมูล (permanent removal) · Bookmark บุ๊กมาร์ก · Tool เครื่องมือ · Preferences การตั้งค่า
+#
+	File	ไฟล์
+	Edit	แก้ไข
+	Save	บันทึก
+	Save as…	บันทึกเป็น…
+	Interface language	ภาษาของหน้าจอ
+	Open this local PDF?	เปิด PDF ในเครื่องนี้หรือไม่?
+	This document is trying to open a local file:	เอกสารนี้กำลังพยายามเปิดไฟล์ในเครื่อง:
+	Only allow this if you trust the source document.	อนุญาตเฉพาะเมื่อคุณเชื่อถือเอกสารต้นทาง
+	Allow	อนุญาต
+	Cancel	ยกเลิก
+	Digitally signed by	ลงนามแบบดิจิทัลโดย
+	DN: 	ชื่อเฉพาะ (DN): 
+	Reason: 	เหตุผล: 
+	Location: 	สถานที่: 
+	Date: 	วันที่: 
+	The labels are in English: the signature's font can't draw them in this language.	ป้ายกำกับแสดงเป็นภาษาอังกฤษ เพราะฟอนต์ของลายเซ็นแสดงภาษานี้ไม่ได้
+@plural	{n} page|{n} pages	{n} หน้า
+key	Ctrl	Ctrl
+key	Shift	Shift
+key	Delete	Delete
+key	Esc	Esc
+key	Home	Home
+key	End	End
+key	Space	Space
