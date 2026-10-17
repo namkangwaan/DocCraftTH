@@ -1,6 +1,6 @@
 # Thai recognition model
 
-Checked 2026-10-17. Path B from the Thai OCR plan. The official weights load in rten after conversion. No character-error measurement yet.
+Checked 2026-10-17. Path B from the Thai OCR plan (`Thai recognizer = B`). The official weights load in rten after conversion and pass the 0.05 mean CER gate (mean CER `0.0136`).
 
 ## Candidate
 
@@ -37,22 +37,32 @@ The export is opset 9. Its eight `Slice` nodes store `axes`, `starts`, and `ends
 | --- | --- |
 | `th_PP-OCRv5_mobile_rec.onnx` (opset 9, constant-folded, 577 nodes) | `10187bf5af9ce592c2c6d2c898efed5cab222715e823e5b6b964b72154c0e56c` |
 | `th_PP-OCRv5_mobile_rec_opset11.onnx` | `9d323430ec82b04f09c347a1de4159d19a0e3b7cf170881335116341bd5cc298` |
-| `th_PP-OCRv5_mobile_rec.rten` | `8b70e6d18967e93fccb32e045e0f80ee3859efe7ccdd67586a9d136a284e834a` |
+| `th_PP-OCRv5_mobile_rec.rten` (`text-recognition-th.rten`) | `8b70e6d18967e93fccb32e045e0f80ee3859efe7ccdd67586a9d136a284e834a` |
 
-The derived files stay in `K:\tmp\thai-ocr-model`. They are not repository assets and have no `[[fetched]]` entry.
+## Load check and class map
 
-## Load check
+A scratch program outside the repository, `K:\tmp\thai-ocr-probe`, loads `th_PP-OCRv5_mobile_rec.rten` with `rten` 0.26.0, feature `rten_format` only.
 
-A scratch program outside the repository, `K:\tmp\thai-ocr-probe`, loads `th_PP-OCRv5_mobile_rec.rten` with `rten` 0.26.0, feature `rten_format` only. `cargo check` finished, then one `cargo run`.
-
-- Input `x` shape is `["DynamicDimension.0", 3, 48, "DynamicDimension.1"]`.
+- Input `x` shape is `["DynamicDimension.0", 3, 48, "DynamicDimension.1"]` (BGR channels normalized with `(pixel / 255.0 - 0.5) / 0.5`, height 48 px, minimum padded width 160 px).
 - Output `fetch_name_0` shape is `["DynamicDimension.0", "unknown_2", 526]`.
 - A zero tensor `[1, 3, 48, 160]` runs and returns `[1, 20, 526]`.
+- Class `0` is the CTC blank, classes `1..=524` map to the 524 lines of `ppocrv5_th_dict.txt` (`dict-th.txt`), and class `525` is the space character (`' '`, from PaddleOCR's `use_space_char: true`).
 
-The output depth is 526. The dictionary has 524 entries, so the depth is the dictionary length plus two, not plus one. The class index map is still open. Greedy CTC decoding has not been written.
+## Detection and CER gate (`crates/engine/tests/thai_ocr.rs`)
+
+Detected line bounding boxes from `ocrs` are padded by 25 % of box height above and 15 % below (plus `max(0.15 * height, 2.0)` horizontally) so Thai combining marks above and below the base line are not clipped.
+
+Measured at 300 dpi with `CRAFT_FONTS_DIR=K:\src\craft-fonts` (Noto Sans Thai):
+
+| Sentence | CER |
+| --- | --- |
+| `รายงานประจำปี ๒๕๖๙` | `0.0000` |
+| `ใบแจ้งหนี้ No. 2569/001` | `0.0000` |
+| `น้ำใจ ปฏิบัติ ฤๅษี ฎีกา` | `0.0435` |
+| `กรุณาลงนามและส่งคืนภายในวันที่ 30 กันยายน` | `0.0000` |
+| `ข้อมูลส่วนบุคคลได้รับการคุ้มครองตามกฎหมาย` | `0.0244` |
+| **Mean** | **`0.0136`** (gate ≤ `0.05`) |
 
 ## Ruling
 
-The recognizer loads. There is no character-error rate, because detection boxes and CTC decoding are not wired, and the synthetic pages still have no Thai face (`pdfcraft_fonts::document_thai_font()` is empty without `CRAFT_FONTS_DIR`). No `[[fetched]]` entry until the 0.05 mean CER gate is measured.
-
-Path A, training an ocrs-format model, is not started.
+`Thai recognizer = B` (`text-recognition-th.rten` + `dict-th.txt`, Apache-2.0). Mean CER is `0.0136`, well within the `0.05` gate. Path A (training an ocrs-format model) is not needed.

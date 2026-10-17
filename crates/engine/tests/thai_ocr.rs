@@ -9,9 +9,9 @@ const SENTENCES: &[&str] =
 /// Mean CER allowed on clean 300 dpi synthetic pages (Task 10's decision gate).
 const GATE: f64 = 0.05;
 
-/// Task 11 replaces this with `pdfcraft_engine::ocr::available_for("th")`.
+/// Whether the Thai recognition models are installed.
 fn thai_models_ready() -> bool {
-    false
+    pdfcraft_engine::ocr::available_for("th")
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn cer_of_sentence(sentence: &str) -> f64 {
     let shot =
         PageRenderer::new(doc.bytes.clone(), Default::default()).render(RenderRequest { page: 0, scale: 300.0_f32 / 72.0, ..Default::default() });
     assert!(shot.error.is_none(), "{:?}", shot.error);
-    let ocr = pdfcraft_ocr::Ocr::find().expect("recognition models");
+    let ocr = pdfcraft_ocr::Ocr::load_for("th").expect("Thai recognition models");
     let lines = ocr.recognize(&shot.rgba, shot.width, shot.height).expect("recognize");
     let got = lines.iter().map(|line| line.text()).collect::<Vec<_>>().join(" ");
     pdfcraft_ocr::metrics::cer(sentence, &got)

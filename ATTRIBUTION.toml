@@ -3310,6 +3310,32 @@ kind = "model"
 usage = "Scan & OCR: reads the words it finds (cargo xtask models)"
 sha256 = "e484866d4cce403175bd8d00b128feb08ab42e208de30e42cd9889d8f1735a6e"
 
+[[fetched]]
+file = "text-recognition-th.rten"
+url = "https://huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec/resolve/9e25080455925d3943f5db885fddc79db6a07ca3/inference.pdiparams"
+title = "PaddleOCR v5 mobile Thai text recognition model (converted to rten)"
+author = "PaddlePaddle Contributors (PaddleOCR team)"
+source = "https://huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec (rev 9e25080455925d3943f5db885fddc79db6a07ca3; converted via paddle2onnx + rten-convert, see docs/thai-ocr-model.md)"
+licence = "Apache-2.0"
+licence_url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+licence_sha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+kind = "model"
+usage = "Scan & OCR: reads Thai text lines (cargo xtask models)"
+sha256 = "8b70e6d18967e93fccb32e045e0f80ee3859efe7ccdd67586a9d136a284e834a"
+
+[[fetched]]
+file = "dict-th.txt"
+url = "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/main/ppocr/utils/dict/ppocrv5_th_dict.txt"
+title = "PaddleOCR v5 Thai character dictionary (ppocrv5_th_dict.txt)"
+author = "PaddlePaddle Contributors (PaddleOCR team)"
+source = "https://github.com/PaddlePaddle/PaddleOCR/blob/main/ppocr/utils/dict/ppocrv5_th_dict.txt"
+licence = "Apache-2.0"
+licence_url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+licence_sha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+kind = "model"
+usage = "Scan & OCR: character class table for text-recognition-th.rten (cargo xtask models)"
+sha256 = "57f5406f94bb6688fb7077f7be65f08bbd71cecf48c01ea26c522cb5c4836b7a"
+
 [[build_input]]
 name = "craft-fonts"
 option = "CRAFT_FONTS_DIR"

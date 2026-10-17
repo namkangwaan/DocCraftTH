@@ -6,10 +6,12 @@
 //! into page content: invisible text (rendering mode 3) over each word, so the page becomes a
 //! searchable image (Acrobat's "Searchable Image (Exact)": the image is left untouched).
 //!
-//! The models read the Latin alphabet (English and other languages written without accents).
+//! The default models read the Latin alphabet (English and other languages written without
+//! accents); Thai uses the `th_PP-OCRv5_mobile_rec` CTC recognizer over `ocrs` word detection.
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+pub mod ctc;
 pub mod metrics;
 
 use std::path::{Path, PathBuf};
@@ -19,14 +21,16 @@ pub use pdfcraft_fonts::helvetica_width;
 /// The model files, as named in ATTRIBUTION.toml.
 pub const DETECTION_MODEL: &str = "text-detection.rten";
 pub const RECOGNITION_MODEL: &str = "text-recognition.rten";
+pub const THAI_RECOGNITION_MODEL: &str = "text-recognition-th.rten";
+pub const THAI_DICT: &str = "dict-th.txt";
 
 /// The recognition model's alphabet, as it was trained (ocrs-models' `DEFAULT_ALPHABET`): its
 /// output classes follow this order. The ocrs crate's own copy has an `E` where the training had
 /// `€`, which made a scanned "€250" read as "E250".
 pub const ALPHABET: &str = " 0123456789!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~€ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
-/// The languages the models read (ISO 639-1); all use the Latin alphabet without accents.
-pub const LANGUAGES: &[(&str, &str)] = &[("en", "English")];
+/// The languages the models read (ISO 639-1).
+pub const LANGUAGES: &[(&str, &str)] = &[("en", "English"), ("th", "ไทย")];
 
 #[derive(Debug, thiserror::Error)]
 pub enum OcrError {
@@ -34,6 +38,8 @@ pub enum OcrError {
     /// `cargo xtask models`). The UI catalogs key this exact text.
     #[error("the text recognition models are not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them)")]
     NoModels,
+    #[error("the {0} text recognition model is not installed (reinstall DocCraftTH, or set PDFCRAFT_MODELS to the folder that holds it)")]
+    NoLanguageModel(String),
     #[error("loading {0}: {1}")]
     Load(String, String),
     #[error("text recognition failed: {0}")]
@@ -42,24 +48,44 @@ pub enum OcrError {
     EmptyImage,
 }
 
-/// Where the two model files are.
+/// Where the model files are.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Models {
     pub detection: PathBuf,
     pub recognition: PathBuf,
+    pub dictionary: Option<PathBuf>,
 }
 
 impl Models {
-    /// The models in `dir`, if both files are there.
+    /// The default (English/Latin) models in `dir`, if both files are there.
     pub fn in_dir(dir: &Path) -> Option<Models> {
-        let m = Models { detection: dir.join(DETECTION_MODEL), recognition: dir.join(RECOGNITION_MODEL) };
+        let m = Models { detection: dir.join(DETECTION_MODEL), recognition: dir.join(RECOGNITION_MODEL), dictionary: None };
         (m.detection.is_file() && m.recognition.is_file()).then_some(m)
     }
 
-    /// Look for the models: `$PDFCRAFT_MODELS`, then where the release packages install them
-    /// beside the executable ([`Models::dirs_beside_exe`]), then the source tree's `assets/models/`.
+    /// The models for `lang` (`"en"` or `"th"`) in `dir`, if all required files are there.
+    pub fn in_dir_for(dir: &Path, lang: &str) -> Option<Models> {
+        match lang {
+            "th" | "tha" => {
+                let detection = dir.join(DETECTION_MODEL);
+                let recognition = dir.join(THAI_RECOGNITION_MODEL);
+                let dict = dir.join(THAI_DICT);
+                (detection.is_file() && recognition.is_file() && dict.is_file()).then_some(Models { detection, recognition, dictionary: Some(dict) })
+            }
+            "en" | "eng" | "" => Self::in_dir(dir),
+            _ => None,
+        }
+    }
+
+    /// Look for the default models: `$PDFCRAFT_MODELS`, then where the release packages install
+    /// them beside the executable ([`Models::dirs_beside_exe`]), then the source tree's `assets/models/`.
     pub fn find() -> Option<Models> {
         Self::search_dirs().iter().find_map(|d| Self::in_dir(d))
+    }
+
+    /// Look for the models for `lang` across [`Models::search_dirs`].
+    pub fn find_for(lang: &str) -> Option<Models> {
+        Self::search_dirs().iter().find_map(|d| Self::in_dir_for(d, lang))
     }
 
     /// The directories [`Models::find`] looks in, in order.
@@ -105,27 +131,58 @@ impl Line {
     }
 }
 
+enum Recognizer {
+    Ocrs(ocrs::OcrEngine),
+    Ctc { detector: ocrs::OcrEngine, model: Box<rten::Model>, dict: Vec<char> },
+}
+
 /// A loaded recogniser. Loading takes a moment; keep one and reuse it.
 pub struct Ocr {
-    engine: ocrs::OcrEngine,
+    recognizer: Recognizer,
 }
+
+/// Height (in pixels) expected by the PaddleOCR v5 mobile recognizer (`[1, 3, 48, W]`).
+const CTC_HEIGHT: usize = 48;
+/// Maximum resized crop width (in pixels) to bound memory allocation on pathological boxes.
+const MAX_CTC_WIDTH: usize = 8192;
 
 impl Ocr {
     pub fn load(models: &Models) -> Result<Ocr, OcrError> {
         let load = |p: &Path| rten::Model::load_file(p).map_err(|e| OcrError::Load(p.display().to_string(), e.to_string()));
-        let params = ocrs::OcrEngineParams {
-            detection_model: Some(load(&models.detection)?),
-            recognition_model: Some(load(&models.recognition)?),
-            alphabet: Some(ALPHABET.into()),
-            ..Default::default()
-        };
-        let engine = ocrs::OcrEngine::new(params).map_err(|e| OcrError::Load("ocr engine".into(), e.to_string()))?;
-        Ok(Ocr { engine })
+        if let Some(dict_path) = &models.dictionary {
+            let detector_params =
+                ocrs::OcrEngineParams { detection_model: Some(load(&models.detection)?), recognition_model: None, ..Default::default() };
+            let detector = ocrs::OcrEngine::new(detector_params).map_err(|e| OcrError::Load("ocr detector".into(), e.to_string()))?;
+            let model = Box::new(load(&models.recognition)?);
+            let raw = std::fs::read_to_string(dict_path).map_err(|e| OcrError::Load(dict_path.display().to_string(), e.to_string()))?;
+            let mut dict: Vec<char> = raw.lines().filter_map(|line| line.chars().next()).collect();
+            // PaddleOCR's `use_space_char: true` appends the space class after the dictionary entries.
+            dict.push(' ');
+            Ok(Ocr { recognizer: Recognizer::Ctc { detector, model, dict } })
+        } else {
+            let params = ocrs::OcrEngineParams {
+                detection_model: Some(load(&models.detection)?),
+                recognition_model: Some(load(&models.recognition)?),
+                alphabet: Some(ALPHABET.into()),
+                ..Default::default()
+            };
+            let engine = ocrs::OcrEngine::new(params).map_err(|e| OcrError::Load("ocr engine".into(), e.to_string()))?;
+            Ok(Ocr { recognizer: Recognizer::Ocrs(engine) })
+        }
     }
 
-    /// Load the models found by [`Models::find`].
+    /// Load the default models found by [`Models::find`].
     pub fn find() -> Result<Ocr, OcrError> {
         Self::load(&Models::find().ok_or(OcrError::NoModels)?)
+    }
+
+    /// Load the models for `lang` found by [`Models::find_for`].
+    pub fn load_for(lang: &str) -> Result<Ocr, OcrError> {
+        let models = match lang {
+            "en" | "eng" | "" => Models::find().ok_or(OcrError::NoModels)?,
+            other => Models::find_for(other).ok_or_else(|| OcrError::NoLanguageModel(other.into()))?,
+        };
+        Self::load(&models)
     }
 
     /// Recognise the text in an RGBA (or RGB, or grey) image, `width` × `height` pixels.
@@ -134,34 +191,154 @@ impl Ocr {
             return Err(OcrError::EmptyImage);
         }
         // ocrs wants 1 or 3 channels.
-        let rgb: std::borrow::Cow<[u8]> = if pixels.len() == (width * height * 4) as usize {
+        let rgb: std::borrow::Cow<[u8]> = if pixels.len() == (width as usize).saturating_mul(height as usize).saturating_mul(4) {
             pixels.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect::<Vec<u8>>().into()
         } else {
             pixels.into()
         };
         let err = |e: &dyn std::fmt::Display| OcrError::Recognize(e.to_string());
-        let source = ocrs::ImageSource::from_bytes(&rgb, (width, height)).map_err(|e| err(&e))?;
-        let input = self.engine.prepare_input(source).map_err(|e| err(&e))?;
-        let found = self.engine.detect_words(&input).map_err(|e| err(&e))?;
-        let lines = self.engine.find_text_lines(&input, &found);
-        let read = self.engine.recognize_text(&input, &lines).map_err(|e| err(&e))?;
-        use ocrs::TextItem;
-        Ok(read
-            .into_iter()
-            .flatten()
-            .map(|line| Line {
-                words: line
-                    .words()
-                    .map(|w| {
-                        let r = w.bounding_rect();
-                        Word { text: w.to_string(), rect: [r.left() as f32, r.top() as f32, r.right() as f32, r.bottom() as f32] }
+        match &self.recognizer {
+            Recognizer::Ocrs(engine) => {
+                let source = ocrs::ImageSource::from_bytes(&rgb, (width, height)).map_err(|e| err(&e))?;
+                let input = engine.prepare_input(source).map_err(|e| err(&e))?;
+                let found = engine.detect_words(&input).map_err(|e| err(&e))?;
+                let lines = engine.find_text_lines(&input, &found);
+                let read = engine.recognize_text(&input, &lines).map_err(|e| err(&e))?;
+                use ocrs::TextItem;
+                Ok(read
+                    .into_iter()
+                    .flatten()
+                    .map(|line| Line {
+                        words: line
+                            .words()
+                            .map(|w| {
+                                let r = w.bounding_rect();
+                                Word { text: w.to_string(), rect: [r.left() as f32, r.top() as f32, r.right() as f32, r.bottom() as f32] }
+                            })
+                            .filter(|w| !w.text.trim().is_empty())
+                            .collect(),
                     })
-                    .filter(|w| !w.text.trim().is_empty())
-                    .collect(),
-            })
-            .filter(|l| !l.words.is_empty())
-            .collect())
+                    .filter(|l| !l.words.is_empty())
+                    .collect())
+            }
+            Recognizer::Ctc { detector, model, dict } => {
+                let source = ocrs::ImageSource::from_bytes(&rgb, (width, height)).map_err(|e| err(&e))?;
+                let input = detector.prepare_input(source).map_err(|e| err(&e))?;
+                let found = detector.detect_words(&input).map_err(|e| err(&e))?;
+                let line_polys = detector.find_text_lines(&input, &found);
+                let mut out = Vec::new();
+                for poly_line in line_polys {
+                    let mut left = f32::INFINITY;
+                    let mut top = f32::INFINITY;
+                    let mut right = f32::NEG_INFINITY;
+                    let mut bottom = f32::NEG_INFINITY;
+                    for r in &poly_line {
+                        for p in r.corners() {
+                            left = left.min(p.x);
+                            top = top.min(p.y);
+                            right = right.max(p.x);
+                            bottom = bottom.max(p.y);
+                        }
+                    }
+                    if !left.is_finite() || !top.is_finite() || right <= left || bottom <= top {
+                        continue;
+                    }
+                    let box_h = bottom - top;
+                    // Pad vertical bounds (25% above, 15% below) so Thai marks above/below the base
+                    // line are never clipped by the Latin-trained detector, plus a small horizontal margin.
+                    let pad_x = (box_h * 0.15).max(2.0);
+                    let x0 = (left - pad_x).floor().max(0.0) as u32;
+                    let y0 = (top - box_h * 0.25).floor().max(0.0) as u32;
+                    let x1 = (right + pad_x).ceil().min(width as f32).max(0.0) as u32;
+                    let y1 = (bottom + box_h * 0.15).ceil().min(height as f32).max(0.0) as u32;
+                    if x1 <= x0 || y1 <= y0 {
+                        continue;
+                    }
+                    let Some(text) = recognize_ctc_crop(&rgb, width, height, [x0, y0, x1, y1], model, dict)? else {
+                        continue;
+                    };
+                    let trimmed = text.trim();
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+                    let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                    let total_chars: usize = parts.iter().map(|p| p.chars().count().max(1)).sum();
+                    if parts.len() <= 1 || total_chars == 0 {
+                        out.push(Line { words: vec![Word { text: trimmed.to_string(), rect: [left, top, right, bottom] }] });
+                    } else {
+                        let span = right - left;
+                        let mut cur = left;
+                        let mut words = Vec::new();
+                        for part in parts {
+                            let w_span = span * (part.chars().count().max(1) as f32 / total_chars as f32);
+                            words.push(Word { text: part.to_string(), rect: [cur, top, cur + w_span, bottom] });
+                            cur += w_span;
+                        }
+                        out.push(Line { words });
+                    }
+                }
+                Ok(out)
+            }
+        }
     }
+}
+
+/// Crop `[x0, y0, x1, y1]` from `rgb` (`width` × `height`, 3 or 1 channels), resize to height
+/// [`CTC_HEIGHT`] with BGR channels normalized to `[-1.0, 1.0]`, run `model`, and decode with [`ctc::decode`].
+fn recognize_ctc_crop(
+    rgb: &[u8],
+    width: u32,
+    height: u32,
+    [x0, y0, x1, y1]: [u32; 4],
+    model: &rten::Model,
+    dict: &[char],
+) -> Result<Option<String>, OcrError> {
+    let crop_w = (x1 - x0) as usize;
+    let crop_h = (y1 - y0) as usize;
+    if crop_w == 0 || crop_h == 0 {
+        return Ok(None);
+    }
+    let dst_w = ((crop_w * CTC_HEIGHT) / crop_h.max(1)).max(16);
+    if dst_w > MAX_CTC_WIDTH {
+        return Ok(None);
+    }
+    // PaddleOCR RecResizeImg pads to at least 320 wide when narrower, or runs dynamic width.
+    let padded_w = dst_w.max(160);
+    if padded_w > MAX_CTC_WIDTH {
+        return Ok(None);
+    }
+    let channels = if rgb.len() >= (width as usize).saturating_mul(height as usize).saturating_mul(3) { 3usize } else { 1usize };
+    let plane = CTC_HEIGHT * padded_w;
+    let mut tensor = vec![0.0f32; 3 * plane];
+    for dy in 0..CTC_HEIGHT {
+        let sy = (y0 as usize).saturating_add((dy * crop_h) / CTC_HEIGHT).min((height as usize).saturating_sub(1));
+        for dx in 0..dst_w {
+            let sx = (x0 as usize).saturating_add((dx * crop_w) / dst_w).min((width as usize).saturating_sub(1));
+            let base = (sy * (width as usize) + sx) * channels;
+            let (r, g, b) = if channels == 3 {
+                (rgb.get(base).copied().unwrap_or(255), rgb.get(base + 1).copied().unwrap_or(255), rgb.get(base + 2).copied().unwrap_or(255))
+            } else {
+                let v = rgb.get(base).copied().unwrap_or(255);
+                (v, v, v)
+            };
+            // PaddleOCR DecodeImage(BGR) + RecResizeImg: (pixel / 255.0 - 0.5) / 0.5.
+            let idx = dy * padded_w + dx;
+            if let Some(slot) = tensor.get_mut(idx) {
+                *slot = (f32::from(b) / 255.0 - 0.5) / 0.5;
+            }
+            if let Some(slot) = tensor.get_mut(plane + idx) {
+                *slot = (f32::from(g) / 255.0 - 0.5) / 0.5;
+            }
+            if let Some(slot) = tensor.get_mut(2 * plane + idx) {
+                *slot = (f32::from(r) / 255.0 - 0.5) / 0.5;
+            }
+        }
+    }
+    let input = rten::Value::from_shape([1, 3, CTC_HEIGHT, padded_w], tensor).map_err(|e| OcrError::Recognize(e.to_string()))?;
+    let output = model.run_one(input.into(), None).map_err(|e| OcrError::Recognize(e.to_string()))?;
+    let (shape, probs): ([usize; 3], Vec<f32>) = output.into_shape_vec().map_err(|e| OcrError::Recognize(e.to_string()))?;
+    let classes = shape[2];
+    Ok(Some(ctc::decode(&probs, classes, dict)))
 }
 
 /// A word placed on a page, in PDF user space: the bottom-left corner of its box, and the
@@ -351,6 +528,20 @@ mod tests {
     #[test]
     fn the_model_alphabet_fits_the_text_layer_font() {
         assert_eq!(pdfcraft_fonts::first_undrawable(ALPHABET), None);
+    }
+
+    #[test]
+    fn missing_language_model_names_it() {
+        let dir = std::env::temp_dir().join(format!("pdfcraft-ocr-lang-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for file in [DETECTION_MODEL, RECOGNITION_MODEL] {
+            std::fs::write(dir.join(file), b"model").unwrap();
+        }
+        assert!(Models::in_dir_for(&dir, "en").is_some());
+        assert!(Models::in_dir_for(&dir, "th").is_none(), "English files alone don't make Thai");
+        let msg = OcrError::NoLanguageModel("th".into()).to_string();
+        assert!(msg.contains("th") && msg.contains("PDFCRAFT_MODELS") && !msg.contains("cargo"), "{msg}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
