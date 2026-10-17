@@ -6,8 +6,8 @@
 //! and quotes, currency signs before an amount): the line-start and line-end prohibitions of
 //! JIS X 4051 ("kinsoku"), which UAX #14 gives as classes CL, CP, EX, IS, NS and OP, PR.
 //!
-//! Korean is written with spaces between words and keeps breaking only there; so does Thai, whose
-//! words need a dictionary to find.
+//! Korean is written with spaces between words and keeps breaking only there. Thai has no spaces
+//! either, and its word boundaries come from a dictionary ([`pdfcraft_fonts::thai`]).
 
 /// Writing with no spaces between words, where a row may end between two characters (UAX #14 ID).
 fn ideographic(c: char) -> bool {
@@ -84,12 +84,13 @@ pub(crate) fn between(before: char, after: char) -> bool {
 
 /// `word` (text without spaces) cut where a row may end inside it; the pieces join with nothing.
 pub(crate) fn pieces(word: &str) -> Vec<&str> {
+    let thai = pdfcraft_fonts::thai::break_offsets(word);
     let mut out = Vec::new();
     let mut start = 0;
     let mut prev: Option<char> = None;
     for (at, c) in word.char_indices() {
         if let Some(before) = prev
-            && between(before, c)
+            && (between(before, c) || thai.binary_search(&at).is_ok())
         {
             out.extend(word.get(start..at));
             start = at;
@@ -120,5 +121,20 @@ mod tests {
         assert_eq!(pieces("한국어"), ["한국어"]);
         assert_eq!(pieces(""), Vec::<&str>::new());
         assert!(!between('a', 'b') && between('字', 'a') && !between('字', '。') && !between('「', '字'));
+    }
+
+    #[test]
+    fn thai_words_wrap_between_words() {
+        assert_eq!(pieces("ผมกินข้าว"), ["ผม", "กิน", "ข้าว"]);
+        // Latin and digits inside Thai stay whole.
+        let mixed = pieces("ใบแจ้งหนี้No.2569/001");
+        assert!(mixed.iter().any(|p| p.contains("2569/001")), "{mixed:?}");
+    }
+
+    #[test]
+    fn pieces_rejoin_to_the_input() {
+        for word in ["น้ำใจ", "ปั้นดิน", "日本語の文章", "wrapping", "ใบแจ้งหนี้No.2569/001", ""] {
+            assert_eq!(pieces(word).concat(), word);
+        }
     }
 }
