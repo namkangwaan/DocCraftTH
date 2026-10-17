@@ -37,3 +37,77 @@ fn local_pdf_date_follows_language() {
     assert_eq!(local_pdf_date_in(th, "๒๕๖๙"), "๒๕๖๙", "non-ASCII is left alone");
     assert_eq!(local_pdf_date_in(th, ""), "");
 }
+
+#[test]
+fn thai_covers_commands_and_tools() {
+    let th = Lang::from_code("th").expect("th registered");
+    let mut missing = std::collections::BTreeSet::new();
+    for command in pdfcraft_engine::commands::COMMANDS {
+        if !has(th, command.label) {
+            missing.insert(command.label);
+        }
+        if let Some(menu) = command.menu
+            && !has(th, menu)
+        {
+            missing.insert(menu);
+        }
+    }
+    for group in pdfcraft_engine::catalog::TOOL_GROUPS {
+        if !has(th, group.label) {
+            missing.insert(group.label);
+        }
+        for section in group.sections {
+            if !has(th, section.title) {
+                missing.insert(section.title);
+            }
+            for item in section.items {
+                if !has(th, item.label) {
+                    missing.insert(item.label);
+                }
+            }
+        }
+    }
+    assert!(missing.is_empty(), "Thai misses commands/tools: {missing:#?}");
+}
+
+#[test]
+fn thai_covers_ui_literals() {
+    let th = Lang::from_code("th").expect("th registered");
+    let literals = super::tests::scan_ui_literals(true);
+    let missing: Vec<_> = literals.iter().filter(|label| !has(th, label)).collect();
+    assert!(missing.is_empty(), "Untranslated Thai UI labels: {missing:#?}");
+}
+
+#[test]
+fn thai_covers_bundled_catalog_keys() {
+    let th = Lang::from_code("th").expect("th registered");
+    let mut missing = std::collections::BTreeSet::new();
+    for reference in LANGUAGES.iter().filter(|language| language.code != "th") {
+        let (entries, errors) = catalog::parse_entries(reference.source, reference.plural_forms());
+        assert!(errors.is_empty(), "{}: invalid reference catalog: {errors:?}", reference.code);
+        for entry in entries {
+            let translated = match entry.context.as_str() {
+                "" => th.catalog().plain(&entry.source),
+                "@id" => th.catalog().id(&entry.source),
+                "@plural" => entry.source.split_once('|').and_then(|(one, other)| th.catalog().plural(one, other, 0)),
+                context => th.catalog().contextual(context, &entry.source),
+            };
+            if translated.is_none() {
+                missing.insert((entry.context, entry.source));
+            }
+        }
+    }
+    assert!(missing.is_empty(), "Thai misses bundled catalog keys: {missing:#?}");
+}
+
+#[test]
+fn thai_months_and_contexts() {
+    let th = Lang::from_code("th").expect("th registered");
+    let months = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    let english = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    for (en, thai) in english.iter().zip(months) {
+        assert_eq!(tr(th, en), thai);
+    }
+    assert_ne!(tr_ctx(th, "signature pad", "Type"), "Type");
+    assert_ne!(tr_ctx(th, "comment menu", "Edit"), "Edit");
+}
