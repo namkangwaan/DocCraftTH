@@ -273,7 +273,7 @@ fn calendar(ctx: &egui::Context, view: &mut DocView, field: egui::Rect, fmt: &st
                     ui.label(
                         egui::RichText::new(crate::i18n::fmt(
                             tl!("{month} {y}"),
-                            &[("month", tl!(MONTHS[(m.clamp(1, 12) - 1) as usize])), ("y", &y.to_string())],
+                            &[("month", tl!(MONTHS[(m.clamp(1, 12) - 1) as usize])), ("y", &crate::i18n::local_year(i64::from(y)).to_string())],
                         ))
                         .strong(),
                     );

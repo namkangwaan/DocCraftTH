@@ -26,3 +26,14 @@ fn thai_is_registered_and_persists() {
     restored.restore(&app.persist());
     assert_eq!(restored.language, "th");
 }
+
+#[test]
+fn local_pdf_date_follows_language() {
+    let th = Lang::from_code("th").expect("th registered");
+    assert_eq!(local_pdf_date_in(th, "D:20260930104512-04'00'"), "2569-09-30 10:45");
+    assert_eq!(local_pdf_date_in(th, "2026-09-30 10:45"), "2569-09-30 10:45", "already pretty");
+    assert_eq!(local_pdf_date_in(Lang::EN, "D:20260930104512-04'00'"), "2026-09-30 10:45");
+    assert_eq!(local_pdf_date_in(th, "yesterday"), "yesterday");
+    assert_eq!(local_pdf_date_in(th, "๒๕๖๙"), "๒๕๖๙", "non-ASCII is left alone");
+    assert_eq!(local_pdf_date_in(th, ""), "");
+}

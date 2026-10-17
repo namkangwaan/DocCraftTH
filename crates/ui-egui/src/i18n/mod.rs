@@ -489,6 +489,28 @@ pub fn fmt(template: &str, args: &[(&str, &str)]) -> String {
     out
 }
 
+/// `y` (Common Era) as the current interface language counts years: Buddhist Era for Thai.
+pub fn local_year(y: i64) -> i64 {
+    pdfcraft_engine::dates::era_year(current().code(), y)
+}
+
+/// A PDF date shown as [`pdfcraft_render::pretty_date`] does (`2026-09-30 10:45`), with the year
+/// in `lang`'s era. Strings that aren't such a date come back unchanged.
+pub fn local_pdf_date_in(lang: Lang, s: &str) -> String {
+    let pretty = pdfcraft_render::pretty_date(s);
+    let offset = pdfcraft_engine::dates::era_year(lang.code(), 0);
+    let year = pretty.get(..4).filter(|y| y.bytes().all(|b| b.is_ascii_digit())).and_then(|y| y.parse::<i64>().ok());
+    match (year, pretty.get(4..)) {
+        (Some(y), Some(rest)) if offset != 0 && rest.starts_with('-') => format!("{}{rest}", y.saturating_add(offset)),
+        _ => pretty,
+    }
+}
+
+/// [`local_pdf_date_in`] for the current interface language.
+pub fn local_pdf_date(s: &str) -> String {
+    local_pdf_date_in(current(), s)
+}
+
 /// A generated history label (the action part of "Undo …") in the current language. Captured
 /// values (file and field names) are inserted as they are; unknown labels are looked up whole.
 pub fn action_label(text: &str) -> String {
