@@ -6505,7 +6505,7 @@ status = "partial"
 commands = ["ocr.recognize"]
 tools = ["ocr_recognize"]
 evidence = ["crates/ui-egui/tests/ocr.rs::recognize_text_dialog_adds_searchable_text"]
-notes = "Language choice exists, but the models read only the Latin alphabet without accents (English)."
+notes = "Document language choice reads English (Latin alphabet, no accents) and Thai (DocCraftTH: PP-OCRv5 Thai mobile recognizer, Apache-2.0, fetched by cargo xtask models; the dialog starts on Thai in a Thai interface). Missing: other languages; the web build has no models; no deskew; the Thai error rate (mean CER 0.0136 on 5 synthetic 300 dpi sentences) comes from synthetic pages only, the real-scan gate is pending."
 
 [[feature]]
 id = "ocr.searchable-image"

@@ -63,6 +63,12 @@ Measured at 300 dpi with `CRAFT_FONTS_DIR=K:\src\craft-fonts` (Noto Sans Thai):
 | `ข้อมูลส่วนบุคคลได้รับการคุ้มครองตามกฎหมาย` | `0.0244` |
 | **Mean** | **`0.0136`** (gate ≤ `0.05`) |
 
+## Installing the model
+
+The app looks for `text-recognition-th.rten`, `dict-th.txt` and the shared `text-detection.rten` in `$PDFCRAFT_MODELS`, in `models/` beside the executable (release packages) and in `assets/models/` of the source tree. `ocr_status` lists the directories it searched and whether `th` is available. Without the Thai files the Recognize Text dialog, on Thai, says that the Thai model is not installed and English keeps working.
+
+`cargo xtask models` fetches `dict-th.txt` and the English models. The `[[fetched]]` entry of `text-recognition-th.rten` still points at the Paddle weights the conversion started from, so a fresh fetch stops on the SHA-256 mismatch until the converted file has a download address (read from `xtask/src/assets.rs`, not run). Until then copy the converted file into one of the directories above.
+
 ## Ruling
 
 `Thai recognizer = B` (`text-recognition-th.rten` + `dict-th.txt`, Apache-2.0). Mean CER is `0.0136`, well within the `0.05` gate. Path A (training an ocrs-format model) is not needed.
