@@ -1861,8 +1861,12 @@ pub(crate) fn ago(time: SystemTime) -> String {
     }
 }
 
-/// `time` as "2026-10-08 14:05 UTC".
+/// `time` as "2026-10-08 14:05 UTC", with the year in the current interface language's era.
 fn utc_stamp(time: SystemTime) -> String {
+    utc_stamp_in(crate::i18n::current(), time)
+}
+
+fn utc_stamp_in(lang: crate::i18n::Lang, time: SystemTime) -> String {
     let secs = time.duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     let days = i64::try_from(secs / 86_400).unwrap_or(0);
     let rem = secs % 86_400;
@@ -1875,7 +1879,7 @@ fn utc_stamp(time: SystemTime) -> String {
     let mp = (5 * doy + 2) / 153;
     let d = doy - (153 * mp + 2) / 5 + 1;
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
+    let y = pdfcraft_engine::dates::era_year(lang.code(), yoe + era * 400 + i64::from(m <= 2));
     format!("{y:04}-{m:02}-{d:02} {:02}:{:02} UTC", rem / 3600, rem % 3600 / 60)
 }
 
@@ -2785,5 +2789,14 @@ mod tests {
         assert_eq!(removed_pages(&repeats, &BTreeSet::from([(1, 1)]), &mut new_id), Some(vec![part(1, 1, &[0])]));
         // A page that isn't there: nothing changes, and it says so.
         assert_eq!(removed_pages(&two, &BTreeSet::from([(1, 9)]), &mut new_id), None);
+    }
+
+    #[test]
+    fn utc_stamp_uses_buddhist_era_in_thai() {
+        let time = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_791_468_300);
+        let th = crate::i18n::Lang::from_code("th").unwrap();
+        assert_eq!(utc_stamp_in(th, time), "2569-10-08 14:05 UTC");
+        assert_eq!(utc_stamp_in(th, time).get(..10), Some("2569-10-08"));
+        assert_eq!(utc_stamp_in(crate::i18n::Lang::EN, time), "2026-10-08 14:05 UTC");
     }
 }
