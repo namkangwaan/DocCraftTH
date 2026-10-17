@@ -252,6 +252,25 @@ const MONTHS: [&str; 12] = ["January", "February", "March", "April", "May", "Jun
 
 /// The date picker under a focused date field. Returns the picked date, formatted with the
 /// field's own format.
+/// The calendar's hover text for one day (`October 17, 2026`) in `lang`.
+pub(crate) fn day_tooltip_in(lang: crate::i18n::Lang, y: i32, m: u32, day: u32) -> String {
+    use crate::i18n::{fmt, tr, tr_ctx};
+    let month = MONTHS.get(m.clamp(1, 12) as usize - 1).copied().unwrap_or_default();
+    fmt(
+        tr(lang, "{month} {day}, {y}"),
+        &[
+            ("month", tr_ctx(lang, "calendar date", month)),
+            ("day", &day.to_string()),
+            ("y", &pdfcraft_engine::dates::era_year(lang.code(), i64::from(y)).to_string()),
+        ],
+    )
+}
+
+/// [`day_tooltip_in`] for the current interface language.
+fn day_tooltip(y: i32, m: u32, day: u32) -> String {
+    day_tooltip_in(crate::i18n::current(), y, m, day)
+}
+
 fn calendar(ctx: &egui::Context, view: &mut DocView, field: egui::Rect, fmt: &str, today: (i64, u32, u32)) -> Option<String> {
     use pdfcraft_engine::form_scripts::{DateTime, format_date, parse_date};
     let fx = view.forms.focus.as_mut()?;
@@ -273,7 +292,7 @@ fn calendar(ctx: &egui::Context, view: &mut DocView, field: egui::Rect, fmt: &st
                     ui.label(
                         egui::RichText::new(crate::i18n::fmt(
                             tl!("{month} {y}"),
-                            &[("month", tl!(MONTHS[(m.clamp(1, 12) - 1) as usize])), ("y", &y.to_string())],
+                            &[("month", tl!(MONTHS[(m.clamp(1, 12) - 1) as usize])), ("y", &crate::i18n::local_year(i64::from(y)).to_string())],
                         ))
                         .strong(),
                     );
@@ -305,18 +324,7 @@ fn calendar(ctx: &egui::Context, view: &mut DocView, field: egui::Rect, fmt: &st
                             if is_today {
                                 text = text.strong();
                             }
-                            if ui
-                                .selectable_label(selected, text)
-                                .on_hover_text(crate::i18n::fmt(
-                                    tl!("{month} {day}, {y}"),
-                                    &[
-                                        ("month", tl_ctx!("calendar date", MONTHS[(m - 1) as usize])),
-                                        ("day", &day.to_string()),
-                                        ("y", &y.to_string()),
-                                    ],
-                                ))
-                                .clicked()
-                            {
+                            if ui.selectable_label(selected, text).on_hover_text(day_tooltip(y, m, day)).clicked() {
                                 picked = Some(format_date(DateTime { y, m, d: day, hh: 0, mm: 0, ss: 0 }, fmt));
                             }
                         } else {
