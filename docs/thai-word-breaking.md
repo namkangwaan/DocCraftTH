@@ -1,6 +1,6 @@
 # Thai word breaking
 
-> **Last reviewed:** 2026-10-17 · **Last updated:** 2026-10-17 · **Change:** major (first version: engine, the four wrap paths, the PyThaiNLP oracle and its licences) · **Status:** Part 1 (`break_offsets`, Edit text) on `feat/thai-line-breaking`; Add text fix and Part 2 (UI labels, comments) in progress on `wip/thai-line-breaking-part2`
+> **Last reviewed:** 2026-10-17 · **Last updated:** 2026-10-17 · **Change:** minor (first oracle run: the ICU4X dictionary segmenter breaks mid-word after unknown words; LSTM does not) · **Status:** Part 1 (`break_offsets`, Edit text) on `feat/thai-line-breaking`; Add text fix and Part 2 (UI labels, comments) in progress on `wip/thai-line-breaking-part2`
 
 Thai is written without spaces between words. A line may end between two words, but never inside a word and never before a tone mark or a vowel sign written above or below its letter. DocCraftTH finds the word boundaries with one function and uses it in four places.
 
@@ -45,7 +45,23 @@ The oracle compares, for every unique Thai translation in `crates/ui-egui/src/i1
 | e | ICU-only break inside a run newmm could not segment. No verdict. |
 | d | newmm-only break. A missed wrap opportunity, harmless. |
 
-The first run (2026-10-17, pythainlp 5.4.0, `th.tsv` at `1d0a35bc`) is in `K:\tmp\thai-break-oracle.md`, with every row in `thai-break-oracle.json` beside it. Its verdict is in the revision history below.
+### First run (2026-10-17)
+
+pythainlp 5.4.0, `th.tsv` at `1d0a35bc`, `break_offsets` at `d802ee7c`, 2,464 unique translations. Report: `K:\tmp\thai-break-oracle.md`, every row in `thai-break-oracle.json`.
+
+| | Dictionary (shipped) | LSTM (`new_lstm`, tested only) |
+|---|---|---|
+| Strings where both engines agree | 1,145 (46.5%) | 890 (36.1%) |
+| Precision / recall vs newmm | 76.1% / 95.5% | 75.2% / 92.2% |
+| a: splits a cluster | 191 breaks in 127 strings | 0 |
+| b: inside a dictionary word | 258 | 143 |
+| Strings with any a or b break | 200 (8.1%) | 132 (5.4%) |
+
+**ICU's dictionary segmenter is wrong on real UI words.** After a word it does not know (transliterated loanwords such as บุ๊กมาร์ก, ออบเจ็กต์, ไดเจสต์, ไฮไลต์, and ลงนาม), icu_segmenter 2.3.0 loses step and cuts the rest of the run in the wrong places: `บุ๊กมาร์กบางรายการไม่ได้แสดงที่นี่` → `บุ๊ก|มา|ร์|กบ|า|งร|า|ยก|า|รไ|ม่ไ|ด้แ|สด|งที่|นี่`, while the same sentence without the loanword segments correctly. The raw `segment_str` output has the same fault, so it is ICU4X's, not the filter's. Consequences:
+
+- A guard against breaks before ะ า ำ ๅ ๆ ฯ and after เ แ โ ใ ไ catches 104 of the 191 cluster splits and none of the mid-word breaks. It is a safety net, not a fix.
+- A supplementary word list hides the known triggers but not the desync. The next loanword sets it off again.
+- `LineSegmenter::new_lstm` (icu_segmenter feature `lstm`) has no cluster splits on this catalog. Its wasm cost is not measured yet; measure it against the 2 MiB budget before switching.
 
 ### Rerunning the oracle
 
@@ -57,17 +73,28 @@ Nothing here is part of the build. Python stays outside the repository.
    ```rust
    //! Oracle helper, never committed: reads one string per stdin line and prints
    //! `pdfcraft_fonts::thai::break_offsets` for it as a JSON array of byte offsets.
+   //! `--raw` prints the ICU4X dictionary segmenter's unfiltered offsets, `--lstm` the LSTM one's.
+   use icu_segmenter::LineSegmenter;
+   use icu_segmenter::options::LineBreakOptions;
    use std::io::BufRead;
 
    fn main() {
+       let mode = std::env::args().nth(1).unwrap_or_default();
+       let dict = LineSegmenter::new_dictionary(LineBreakOptions::default());
+       let lstm = LineSegmenter::new_lstm(LineBreakOptions::default());
        for line in std::io::stdin().lock().lines().map_while(Result::ok) {
-           let offsets: Vec<String> = pdfcraft_fonts::thai::break_offsets(&line).iter().map(usize::to_string).collect();
+           let offsets: Vec<usize> = match mode.as_str() {
+               "--raw" => dict.segment_str(&line).collect(),
+               "--lstm" => lstm.segment_str(&line).collect(),
+               _ => pdfcraft_fonts::thai::break_offsets(&line),
+           };
+           let offsets: Vec<String> = offsets.iter().map(usize::to_string).collect();
            println!("[{}]", offsets.join(","));
        }
    }
    ```
 
-   Build it with `cargo build -p pdfcraft-fonts -j 2 --example thai_breaks` and its own `CARGO_TARGET_DIR`.
+   Build it with `cargo build -p pdfcraft-fonts -j 2 --example thai_breaks` and its own `CARGO_TARGET_DIR`. `new_lstm` needs the icu_segmenter feature `lstm`: add it to `crates/fonts/Cargo.toml` for the run only and revert it afterwards. The raw and LSTM modes include the offsets 0 and the text length; drop them before `compare`.
 3. The script `oracle.py` (kept in `K:\tmp\thai-oracle\` and in the session notes, not in the repository) does the rest. Run Python with `-I -X utf8`.
    - `oracle.py extract th.tsv strings.txt` writes the unique third-column translations, one per line, after a canary line ผมกินข้าว.
    - Feed `strings.txt` to the example with shell redirection, not a PowerShell pipe, which re-encodes stdin: `thai_breaks.exe < strings.txt > icu.jsonl`.
@@ -103,4 +130,5 @@ Only if the oracle shows ICU splitting real UI words (class a, or class b rows a
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-17 | minor | First oracle run: the ICU4X dictionary segmenter desyncs after unknown words (191 cluster splits in 127 of 2,464 strings); LSTM has none on the same catalog. Rerun steps cover `--raw` and `--lstm`. |
 | 2026-10-17 | major | First version: ICU4X dictionary engine and why (wasm +1.76 MiB of 2 MiB), the four wrap paths, the PyThaiNLP oracle and how to rerun it, PyThaiNLP corpus licences, clean-room rule. |
