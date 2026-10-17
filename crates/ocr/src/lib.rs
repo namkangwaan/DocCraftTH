@@ -38,7 +38,7 @@ pub enum OcrError {
     /// `cargo xtask models`). The UI catalogs key this exact text.
     #[error("the text recognition models are not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them)")]
     NoModels,
-    #[error("the {0} text recognition model is not installed (reinstall DocCraftTH, or set PDFCRAFT_MODELS to the folder that holds it)")]
+    #[error("the {0} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)")]
     NoLanguageModel(String),
     #[error("loading {0}: {1}")]
     Load(String, String),

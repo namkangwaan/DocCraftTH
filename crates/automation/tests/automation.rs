@@ -4772,6 +4772,17 @@ fn initial_view_through_tools() {
     assert!(matches!(a.call("doc_initial_view", &json!({ "doc": doc, "page": 9 })), Err(ToolError::Failed(_))));
 }
 
+/// FR-02: `ocr_status` lists Thai and says whether its models are installed.
+#[test]
+fn ocr_status_reports_thai() {
+    let dir = workdir("ocr-status");
+    let mut a = auto(&dir);
+    let status = ok(&mut a, "ocr_status", json!({}));
+    assert!(status["languages"].as_array().unwrap().contains(&json!({ "code": "th", "name": "ไทย" })), "{status}");
+    assert!(status["available_by_language"]["th"].is_boolean(), "{status}");
+    assert!(status["th"].is_boolean(), "{status}");
+}
+
 #[test]
 fn ocr_tools_make_a_scan_searchable() {
     let dir = workdir("ocr");

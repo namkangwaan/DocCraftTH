@@ -2414,6 +2414,7 @@ comment menu	Edit	แก้ไข
 	the image is empty	รูปภาพว่างเปล่า
 	the password is incorrect	รหัสผ่านไม่ถูกต้อง
 	the text recognition models are not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them)	ไม่ได้ติดตั้งโมเดลการรู้จำข้อความ (ติดตั้ง PdfCraft ใหม่ หรือตั้ง PDFCRAFT_MODELS เป็นโฟลเดอร์ที่มีโมเดล)
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	ไม่ได้ติดตั้งโมเดลการรู้จำข้อความสำหรับ {language} (ติดตั้ง PdfCraft ใหม่ หรือตั้ง PDFCRAFT_MODELS เป็นโฟลเดอร์ที่มีโมเดลนี้)
 	the title must not be empty	ชื่อเรื่องต้องไม่ว่างเปล่า
 	there are no pages to print	ไม่มีหน้าให้พิมพ์
 	there are no redaction marks to apply	ไม่มีเครื่องหมายปกปิดให้ใช้

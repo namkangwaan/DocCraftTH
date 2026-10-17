@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use egui::{Align, Layout};
 use pdfcraft_engine::DocId;
-use pdfcraft_engine::ocr::{LANGUAGES, OcrPage, OcrSettings};
+use pdfcraft_engine::ocr::{LANGUAGES, OcrError, OcrPage, OcrSettings};
 
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, widgets};
@@ -25,7 +25,8 @@ pub struct OcrDraft {
     pub pages: OcrPages,
     pub from: usize,
     pub to: usize,
-    pub language: String,
+    /// The language the user picked; `None` follows the interface language ([`Self::language`]).
+    pub language: Option<String>,
     /// "Downsample to" resolution.
     pub dpi: u32,
     /// Also recognize pages that already have text (pictures on them; their text isn't added again).
@@ -34,15 +35,39 @@ pub struct OcrDraft {
 
 impl Default for OcrDraft {
     fn default() -> Self {
-        OcrDraft { pages: OcrPages::All, from: 1, to: 1, language: "en".into(), dpi: 300, text_pages: false }
+        OcrDraft { pages: OcrPages::All, from: 1, to: 1, language: None, dpi: 300, text_pages: false }
     }
 }
 
 impl OcrDraft {
+    /// The document language: the user's pick, else the interface language when text recognition
+    /// reads it (Thai in a Thai interface), else English.
+    pub fn language(&self) -> &str {
+        self.language.as_deref().unwrap_or_else(|| {
+            let ui = crate::i18n::current().code();
+            LANGUAGES.iter().find(|l| l.0 == ui).map_or("en", |l| l.0)
+        })
+    }
+
     /// The recognition settings these choices make.
     pub fn settings(&self) -> OcrSettings {
-        OcrSettings { dpi: self.dpi as f32, language: self.language.clone(), skip_text_pages: !self.text_pages }
+        OcrSettings { dpi: self.dpi as f32, language: self.language().to_string(), skip_text_pages: !self.text_pages }
     }
+}
+
+/// What to tell the user when `language` has no models installed, in the interface language
+/// (`None` when it has). The sentence for a named language is [`OcrError::NoLanguageModel`]'s own
+/// wording with `{language}` where it names the language: that is the catalogs' key.
+fn missing_models(language: &str) -> Option<String> {
+    if pdfcraft_engine::ocr::available_for(language) {
+        return None;
+    }
+    if language == "en" {
+        return Some(tl!("Text recognition isn't installed: its model files are missing. Reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them.").to_string());
+    }
+    let name = LANGUAGES.iter().find(|l| l.0 == language).map_or(language, |l| l.1);
+    let key = OcrError::NoLanguageModel("{language}".into()).to_string();
+    Some(crate::i18n::fmt(crate::i18n::t(&key), &[("language", name)]))
 }
 
 /// Progress of a run: pages done, total, the result once finished, and a cancel request.
@@ -69,8 +94,8 @@ pub struct OcrRun {
 
 pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (bool, bool) {
     let pages = app.active_ids().and_then(|(_, id)| app.session.get(id)).map_or(1, |d| d.info.pages.len().max(1));
-    let available = pdfcraft_engine::ocr::available();
     let d = &mut app.ocr_draft;
+    let mut language = d.language().to_string();
     d.to = d.to.clamp(1, pages);
     d.from = d.from.clamp(1, d.to);
     ui.label(egui::RichText::new(tl!("Recognize Text")).font(theme::semibold(18.0)));
@@ -97,10 +122,10 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
     group(ui, "Settings", &mut |ui| {
         egui::Grid::new("ocr-settings").num_columns(2).spacing([12.0, 8.0]).show(ui, |ui| {
             ui.label(tl!("Document language"));
-            let name = LANGUAGES.iter().find(|l| l.0 == d.language).map_or("English", |l| l.1);
+            let name = LANGUAGES.iter().find(|l| l.0 == language).map_or("English", |l| l.1);
             egui::ComboBox::from_id_salt("ocr-language").selected_text(tl!(name)).width(220.0).show_ui(ui, |ui| {
                 for (code, name) in LANGUAGES {
-                    ui.selectable_value(&mut d.language, (*code).to_string(), tl!(*name));
+                    ui.selectable_value(&mut language, (*code).to_string(), tl!(*name));
                 }
             });
             ui.end_row();
@@ -123,14 +148,15 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
         ui.add(crate::widgets::checkbox(&mut d.text_pages, tl!("Also recognize pages that already have text")))
             .on_hover_text(tl!("Pictures on those pages are recognized too; words already in the page's text are not added again"));
     });
-    if !available {
-        ui.label(
-            egui::RichText::new(tl!("Text recognition isn't installed: its model files are missing. Reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them."))
-                .small()
-                .color(t.text_muted),
-        );
+    if language != app.ocr_draft.language() {
+        app.ocr_draft.language = Some(language.clone());
+    }
+    let missing = missing_models(&language);
+    if let Some(why) = &missing {
+        ui.label(egui::RichText::new(why).small().color(t.text_muted));
         ui.add_space(6.0);
     }
+    let available = missing.is_none();
     ui.add_space(6.0);
     let (mut go, mut cancel) = (false, false);
     ui.horizontal(|ui| {
@@ -165,11 +191,16 @@ impl PdfCraftApp {
             OcrPages::Range => (d.from.saturating_sub(1)..d.to).collect(),
         };
         let settings = d.settings();
+        if let Some(why) = missing_models(&settings.language) {
+            self.notify(why);
+            return;
+        }
+        let language = settings.language.clone();
         let Some(job) = self.session.ocr_job(id, &pages, settings) else { return };
         let progress = Arc::new(Mutex::new(OcrProgress { total: job.pages.len(), ..Default::default() }));
         let p = progress.clone();
         let work = move || {
-            let result = pdfcraft_engine::ocr::engine().map(|ocr| {
+            let result = pdfcraft_engine::ocr::engine_for(&language).map(|ocr| {
                 job.run(&ocr, |done, total| {
                     let Ok(mut s) = p.lock() else { return false };
                     s.done = done;
@@ -202,6 +233,10 @@ impl PdfCraftApp {
         }
         // The settings showing now, not when the folder arrives.
         let settings = self.ocr_draft.settings();
+        if let Some(why) = missing_models(&settings.language) {
+            self.notify(why);
+            return;
+        }
         #[cfg(not(target_arch = "wasm32"))]
         match self.export_dir_override.clone() {
             Some(d) => self.ocr_files_into(files, settings, d.into()),
@@ -228,7 +263,7 @@ impl PdfCraftApp {
         let work = move || {
             crate::i18n::set_current(lang);
             let (mut ok, mut words, mut failed) = (0, 0, Vec::new());
-            match pdfcraft_engine::ocr::engine() {
+            match pdfcraft_engine::ocr::engine_for(&settings.language) {
                 Err(e) => failed.push(e),
                 Ok(ocr) => {
                     for (i, (name, bytes)) in files.into_iter().enumerate() {

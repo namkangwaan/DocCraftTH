@@ -78,6 +78,18 @@ fn thai_covers_ui_literals() {
     assert!(missing.is_empty(), "Untranslated Thai UI labels: {missing:#?}");
 }
 
+/// FR-05: the catalog key is the engine's own wording with a placeholder where it names the
+/// language (`ocr_ui::missing_models` builds it the same way).
+#[test]
+fn thai_names_the_missing_language_model() {
+    let th = Lang::from_code("th").expect("th registered");
+    let key = pdfcraft_engine::ocr::OcrError::NoLanguageModel("{language}".into()).to_string();
+    assert!(has(th, &key));
+    let thai = fmt(tr(th, &key), &[("language", "ไทย")]);
+    assert!(thai.contains("ไทย") && thai.contains("PDFCRAFT_MODELS") && !thai.is_ascii(), "{thai}");
+    assert!(!thai.contains("not installed"), "{thai}");
+}
+
 #[test]
 fn thai_covers_bundled_catalog_keys() {
     let th = Lang::from_code("th").expect("th registered");
