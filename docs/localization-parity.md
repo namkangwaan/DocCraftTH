@@ -70,6 +70,7 @@ none has translated help. Vietnamese's **To `full`** hours are therefore residua
 | Greek | `el` | 2,341 entries | partial | no |
 | Turkish | `tr` | 2,313 entries | partial | yes |
 | Lithuanian | `lt` | 2,585 entries | partial; community native-speaker review ([#1401](https://github.com/storytold/pdfcraft/pull/1401)) | no |
+| Thai (DocCraftTH fork) | `th` | 2,672 entries (every key of the Vietnamese catalog) | partial; AI-assisted, no native review yet; Buddhist Era years; words can break mid-word in narrow labels | not checked |
 
 **14 other languages** ship (22 catalogs plus English = **23** interface languages in Preferences).
 The entry counts without percentages were measured on 2026-10-12–13; they are not percentages of the older 2,143-key snapshot above. Their presence does not imply a detailed linguistic or runtime review.
@@ -82,6 +83,7 @@ Acrobat languages PdfCraft lacks: Danish, Dutch, Finnish, Norwegian, Swedish, He
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-17 | minor | DocCraftTH fork: Thai (`th`) catalog, 2,672 entries (every Vietnamese key), `plural_none`, Buddhist Era years with a Thai interface; AI-assisted, not native-reviewed |
 | 2026-10-13 | minor | Vietnamese (`vi`) catalog: 2,591 entries (100% of current key union + `theme`/`Appearance`); twelve-language mean ≈ 68%; native-speaker community review; registered with `plural_none` |
 | 2026-10-14 | minor | Italian: 2,528 entries after adding the 201 keys the other catalogs had and the code looks up |
 | 2026-10-12 | minor | Added current counts for Kazakh, Polish, Slovenian, Greek, Turkish and Lithuanian; retained existing language assessments and the original percentage snapshot |

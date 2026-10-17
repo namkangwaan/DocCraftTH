@@ -606,10 +606,10 @@ theme	Appearance	รูปลักษณ์
 	Flip on short edge	พลิกตามขอบสั้น
 	Flip vertical	พลิกแนวตั้ง
 	Folders	โฟลเดอร์
-	Font Size:	ขนาดแบบอักษร:
+	Font Size:	ขนาดอักษร:
 	Font colour:	สีแบบอักษร:
 	Font size 0 uses automatic sizing.	ขนาดแบบอักษร 0 จะปรับขนาดอัตโนมัติ
-	Font size:	ขนาดแบบอักษร:
+	Font size:	ขนาดอักษร:
 	Font:	แบบอักษร:
 	Font: Helvetica	แบบอักษร: Helvetica
 	Fonts	แบบอักษร
@@ -2630,7 +2630,7 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 	Exclude tagged tables	ไม่รวมตารางที่ติดแท็ก
 	Exclusions use PDF tags. Untagged tables and code remain included. Image exclusion also removes invisible text.	การยกเว้นใช้แท็กของ PDF ตารางและโค้ดที่ไม่ได้ติดแท็กยังนับรวม การยกเว้นรูปภาพจะไม่นับข้อความที่มองไม่เห็นด้วย
 	Fill colour:	สีพื้น:
-	Font size	ขนาดแบบอักษร
+	Font size	ขนาดอักษร
 	Full Screen	เต็มหน้าจอ
 	Make properties default	ตั้งคุณสมบัติเป็นค่าเริ่มต้น
 	Mark as artifact	ทำเครื่องหมายเป็นส่วนตกแต่ง
