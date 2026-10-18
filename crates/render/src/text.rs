@@ -1963,9 +1963,9 @@ mod tests {
         let page =
             |s: &str| layout(s.chars().enumerate().map(|(i, c)| g(&c.to_string(), 10.0 + 8.0 * i as f32, 10.0, 18.0 + 8.0 * i as f32)).collect());
         let (ascii, thai) = (page("ปี2569"), page("ปี๒๕๖๙"));
-        assert_eq!(ascii.find("๒๕๖๙"), [2..6]);
-        assert_eq!(thai.find("2569"), [2..6]);
-        assert_eq!(thai.find("ปี๒๕"), [0..4]);
+        assert_eq!(ascii.find("๒๕๖๙"), vec![2..6]);
+        assert_eq!(thai.find("2569"), vec![2..6]);
+        assert_eq!(thai.find("ปี๒๕"), vec![0..4]);
         assert!(thai.find_opts("2569", true, false).is_empty(), "case-sensitive search matches digits as typed");
         assert_eq!(fold_case("๐๑๒๓๔๕๖๗๘๙"), "0123456789");
     }
