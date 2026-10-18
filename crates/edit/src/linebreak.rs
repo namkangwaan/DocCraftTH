@@ -7,7 +7,7 @@
 //! JIS X 4051 ("kinsoku"), which UAX #14 gives as classes CL, CP, EX, IS, NS and OP, PR.
 //!
 //! Korean is written with spaces between words and keeps breaking only there. Thai has no spaces
-//! either, and its word boundaries come from a dictionary ([`pdfcraft_fonts::thai`]).
+//! either, and its word boundaries come from a word model ([`pdfcraft_fonts::thai`]).
 
 /// Writing with no spaces between words, where a row may end between two characters (UAX #14 ID).
 fn ideographic(c: char) -> bool {

@@ -277,7 +277,7 @@ fn wrapped(t: &AddedText) -> Vec<(String, bool)> {
     out
 }
 
-/// Thai wrapping between words ([`pdfcraft_fonts::thai::break_offsets`], a dictionary) and at
+/// Thai wrapping between words ([`pdfcraft_fonts::thai::break_offsets`], a word model) and at
 /// spaces. A word wider than the row breaks at shaped cluster boundaries, which never detach a
 /// tone/vowel mark from its base.
 fn thai_lines(t: &AddedText, para: &str, width: f64) -> Result<Vec<String>, EditError> {
@@ -293,7 +293,7 @@ fn thai_lines(t: &AddedText, para: &str, width: f64) -> Result<Vec<String>, Edit
             })),
         }
     }
-    // Clusters grouped into words: a word starts at a dictionary break or after a space. Breaks
+    // Clusters grouped into words: a word starts at a segmenter break or after a space. Breaks
     // are only looked up at cluster boundaries, so none can split a cluster.
     let breaks = pdfcraft_fonts::thai::break_offsets(para);
     let mut words: Vec<Vec<(String, f64)>> = Vec::new();
@@ -317,7 +317,9 @@ fn thai_lines(t: &AddedText, para: &str, width: f64) -> Result<Vec<String>, Edit
             used = 0.0;
         }
         for (text, advance) in word {
-            if !line.is_empty() && used + advance > width {
+            // Inside a word a row ends only between syllables: never after เ, never before า.
+            let syllable_edge = line.chars().next_back().zip(text.chars().next()).is_some_and(|(b, a)| pdfcraft_fonts::thai::may_break(b, a));
+            if syllable_edge && used + advance > width {
                 lines.push(std::mem::take(&mut line));
                 used = 0.0;
             }

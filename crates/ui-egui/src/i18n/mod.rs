@@ -230,6 +230,9 @@ impl LangInfo {
             if self.rtl {
                 catalog.map_translations(crate::bidi::display_rtl);
             }
+            if self.code == "th" {
+                catalog.map_translations(|s| th_breaks::soft_breaks(s).into_owned());
+            }
             catalog
         })
     }
@@ -3377,6 +3380,8 @@ mod tests {
         assert_eq!(dates, interface);
     }
 }
+
+pub(crate) mod th_breaks;
 
 #[cfg(test)]
 mod th_tests;

@@ -2,6 +2,11 @@
 
 use super::*;
 
+/// A translation as it is typed: without the display-only Thai soft breaks (U+200B).
+fn plain(s: &str) -> String {
+    super::th_breaks::without_soft_breaks(s).into_owned()
+}
+
 #[test]
 fn thai_is_registered_and_persists() {
     let th = Lang::from_code("th").expect("th registered");
@@ -12,10 +17,10 @@ fn thai_is_registered_and_persists() {
         assert_eq!(lang_from_tag(tag), Some(th), "{tag}");
     }
     assert_eq!(tr(th, "File"), "ไฟล์");
-    assert_eq!(tr(th, "Edit"), "แก้ไข");
-    assert_eq!(tr(th, "Save"), "บันทึก");
-    assert_eq!(tr(th, "Save as…"), "บันทึกเป็น…");
-    assert_eq!(tr(th, "Interface language"), "ภาษาของหน้าจอ");
+    assert_eq!(plain(tr(th, "Edit")), "แก้ไข");
+    assert_eq!(plain(tr(th, "Save")), "บันทึก");
+    assert_eq!(plain(tr(th, "Save as…")), "บันทึกเป็น…");
+    assert_eq!(plain(tr(th, "Interface language")), "ภาษาของหน้าจอ");
     for n in [0, 1, 2, 5] {
         assert_eq!(trn(th, n, "{n} page", "{n} pages"), format!("{n} หน้า"));
     }
@@ -106,7 +111,7 @@ fn thai_months_and_contexts() {
     let months = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
     let english = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     for (en, thai) in english.iter().zip(months) {
-        assert_eq!(tr(th, en), thai);
+        assert_eq!(plain(tr(th, en)), thai);
     }
     assert_ne!(tr_ctx(th, "signature pad", "Type"), "Type");
     assert_ne!(tr_ctx(th, "comment menu", "Edit"), "Edit");
@@ -115,7 +120,7 @@ fn thai_months_and_contexts() {
 #[test]
 fn calendar_day_tooltip_uses_the_buddhist_era_in_thai() {
     let th = Lang::from_code("th").expect("th registered");
-    assert_eq!(crate::forms_ui::day_tooltip_in(th, 2026, 10, 17), "17 ตุลาคม 2569");
+    assert_eq!(plain(&crate::forms_ui::day_tooltip_in(th, 2026, 10, 17)), "17 ตุลาคม 2569");
     assert_eq!(crate::forms_ui::day_tooltip_in(Lang::EN, 2026, 10, 17), "October 17, 2026");
 }
 
@@ -125,4 +130,21 @@ fn thai_keeps_self_signed_apart_from_signing_yourself() {
     let yourself = tr(th, "Sign yourself");
     assert_ne!(tr(th, "Self-signed"), yourself, "a certificate's trust is not the act of signing");
     assert_ne!(tr_ctx(th, "certificate", "Self-signed"), yourself);
+}
+
+#[test]
+fn thai_strings_carry_soft_breaks() {
+    let th = Lang::from_code("th").expect("th registered");
+    let said = tr(th, "Only allow this if you trust the source document.");
+    assert!(said.contains('\u{200B}'), "{said:?}");
+    assert_eq!(super::th_breaks::without_soft_breaks(said), "อนุญาตเฉพาะเมื่อคุณเชื่อถือเอกสารต้นทาง");
+    assert_eq!(tr(th, "File"), "ไฟล์", "one word, no break");
+}
+
+#[test]
+fn soft_breaks_are_display_only() {
+    for text in ["ทดสอบ เอกสาร น้ำใจ", "abc", ""] {
+        let marked = super::th_breaks::soft_breaks(text);
+        assert_eq!(super::th_breaks::without_soft_breaks(&marked), text);
+    }
 }
