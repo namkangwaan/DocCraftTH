@@ -1173,7 +1173,7 @@ impl Automation {
     }
 
     fn marks(&mut self, tool: &str, a: &Args) -> Result<Value> {
-        use pdfcraft_engine::{Background, HeaderFooter, MarkKind, Watermark};
+        use pdfcraft_engine::{Background, HeaderFooter, MarkKind, PageNumberStyle, Watermark};
         let n = self.doc(a)?.info.pages.len();
         let pages = match a.opt_ints("pages")? {
             Some(_) => self.pages(a, "pages")?,
@@ -1198,6 +1198,23 @@ impl Automation {
                 }
                 if let Some(s) = a.opt_int("start_number")? {
                     hf.start_number = s.clamp(1, u32::MAX as i64) as u32;
+                }
+                if let Some(style) = a.opt_str("number_style")? {
+                    hf.number_style = match style {
+                        "decimal" => PageNumberStyle::Decimal,
+                        "latin-upper" => PageNumberStyle::LatinUpper,
+                        "latin-lower" => PageNumberStyle::LatinLower,
+                        "thai-digits" => PageNumberStyle::ThaiDigits,
+                        "thai-letters" => PageNumberStyle::ThaiLetters,
+                        other => {
+                            return Err(ToolError::InvalidArgs(format!(
+                                "number_style must be decimal, latin-upper, latin-lower, thai-digits or thai-letters, not {other:?}"
+                            )));
+                        }
+                    };
+                }
+                if let Some(cont) = a.opt_bool("continue_numbering")? {
+                    hf.continue_numbering = cont;
                 }
                 Edit::AddHeaderFooter { pages, settings: hf, replace }
             }

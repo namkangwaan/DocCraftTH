@@ -10,7 +10,8 @@
 //! anything is drawn on top, the page's original content is wrapped in `q … Q` (two tiny streams)
 //! so its graphics state can't leak into the mark.
 //!
-//! Text uses standard Helvetica (WinAnsi) added to the page resources as `/PCHelv`.
+//! Decimal and Latin text uses standard Helvetica (WinAnsi) as `/PCHelv`. A line that contains
+//! Thai reuses the Add Text Type 3 face for the Thai span and keeps the rest on `/PCHelv`.
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
@@ -48,6 +49,27 @@ impl MarkKind {
 
 pub type Rgb = [f64; 3];
 
+/// How `<<1>>` and the other page-number tokens are written. `<<n>>` stays a decimal count.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum PageNumberStyle {
+    #[default]
+    Decimal,
+    /// A, B, C, …, Z, AA. The PDF page-label alphabet (`a`…`z`, `aa`…), uppercased.
+    LatinUpper,
+    /// a, b, c, …, z, aa. [`pdfcraft_cos::page_labels::alpha`].
+    LatinLower,
+    /// ๑, ๒, ๓, and ๑๐ for 10. Digits U+0E50..=U+0E59.
+    ThaiDigits,
+    /// ก, ข, ฃ, … then กก. The 44 consonants, same repetition as [`PageNumberStyle::LatinLower`].
+    ThaiLetters,
+}
+
+/// The 44 Thai consonants, in dictionary order. ฤ is a vowel sign here, so it is not in the list.
+const THAI_CONSONANTS: &str = "กขฃคฅฆงจฉชซฌญฎฏฐฑฒณดตถทธนบปผฝพฟภมยรลวศษสหฬอฮ";
+const _: () = assert!(THAI_CONSONANTS.len() == 132);
+
+const THAI_DIGITS: [char; 10] = ['๐', '๑', '๒', '๓', '๔', '๕', '๖', '๗', '๘', '๙'];
+
 /// Header and footer settings (Acrobat's Add Header and Footer dialog).
 #[derive(Clone, Debug, PartialEq)]
 pub struct HeaderFooter {
@@ -62,26 +84,70 @@ pub struct HeaderFooter {
     pub underline: bool,
     /// Margins in points: top, bottom, left, right (the text's distance from the page edges).
     pub margins: [f64; 4],
-    /// The number `<<1>>` shows on the first page of the range.
+    /// The number `<<1>>` shows on the first page of the range, unless [`Self::continue_numbering`].
     pub start_number: u32,
+    /// How page-number tokens are written. `<<n>>`, dates and Bates numbers ignore this.
+    pub number_style: PageNumberStyle,
+    /// The first selected page is one past the `/PCPageNum` on the nearest earlier page.
+    pub continue_numbering: bool,
 }
 
 impl Default for HeaderFooter {
     /// Acrobat's defaults: 8 pt black, margins 0.5 in top and bottom, 1 in left and right.
     fn default() -> Self {
-        Self { text: Default::default(), font_size: 8.0, color: [0.0; 3], underline: false, margins: [36.0, 36.0, 72.0, 72.0], start_number: 1 }
+        Self {
+            text: Default::default(),
+            font_size: 8.0,
+            color: [0.0; 3],
+            underline: false,
+            margins: [36.0, 36.0, 72.0, 72.0],
+            start_number: 1,
+            number_style: PageNumberStyle::Decimal,
+            continue_numbering: false,
+        }
     }
 }
 
 impl HeaderFooter {
-    /// The first character [`add_header_footer`] would refuse, because the standard fonts can't
-    /// draw it (#125). Tokens only add ASCII (Bates prefixes and suffixes are part of the
-    /// template), so checking the templates, split as `expand`'s output is, covers every page
-    /// (and a `\r` that would be drawn is refused too). The dialog asks this too, so its preview
-    /// never offers text that applying refuses (#2013).
+    /// The first character [`add_header_footer`] would refuse. Decimal and Latin styles can draw
+    /// only WinAnsi. A Thai style can also draw Thai the document face has. A `\r` that would be
+    /// drawn is refused too. The dialog asks this so its preview never offers text that applying
+    /// refuses (#2013).
     pub fn first_undrawable(&self) -> Option<char> {
-        self.text.iter().flat_map(|t| t.lines()).find_map(pdfcraft_fonts::first_non_win_ansi)
+        let thai_font = pdfcraft_fonts::document_thai_font().is_some();
+        let thai_style = self.number_style.draws_thai();
+        for line in self.text.iter().flat_map(|t| t.lines()) {
+            for c in line.chars() {
+                if is_thai(c) {
+                    if thai_style && thai_font && pdfcraft_fonts::thai_has(c) {
+                        continue;
+                    }
+                    return Some(c);
+                }
+                let mut buf = [0u8; 4];
+                if pdfcraft_fonts::first_non_win_ansi(c.encode_utf8(&mut buf)).is_some() {
+                    return Some(c);
+                }
+            }
+        }
+        if thai_style && !thai_font && self.text.iter().any(|t| numbers_the_page(t)) {
+            return Some(match self.number_style {
+                PageNumberStyle::ThaiLetters => 'ก',
+                _ => '๑',
+            });
+        }
+        None
     }
+}
+
+impl PageNumberStyle {
+    fn draws_thai(self) -> bool {
+        matches!(self, PageNumberStyle::ThaiDigits | PageNumberStyle::ThaiLetters)
+    }
+}
+
+fn is_thai(c: char) -> bool {
+    matches!(u32::from(c), 0x0E00..=0x0E7F)
 }
 
 /// A picture for a background or watermark (Acrobat: Source ▸ File): an XObject already in
@@ -214,8 +280,8 @@ fn rgb(c: Rgb) -> String {
 
 const MONTHS: [&str; 12] = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-/// Expand `<<…>>` tokens for page `index` (0-based within the range) of `count`.
-pub fn expand(template: &str, page_number: u32, count: usize, bates: u64, cx: &Context) -> String {
+/// Expand `<<…>>` tokens for one page of `count`. Page-number tokens use `style`. `<<n>>` stays decimal.
+pub fn expand(template: &str, page_number: u32, count: usize, bates: u64, cx: &Context, style: PageNumberStyle) -> String {
     let (y, m, d) = cx.date;
     let mut out = String::new();
     let mut rest = template;
@@ -227,9 +293,9 @@ pub fn expand(template: &str, page_number: u32, count: usize, bates: u64, cx: &C
             return out;
         };
         let token = &after[..end];
-        let p = page_number;
+        let p = page_label(page_number, style);
         let value = match token {
-            "1" => p.to_string(),
+            "1" => p,
             "n" => count.to_string(),
             "1 of n" => format!("{p} of {count}"),
             "1/n" => format!("{p}/{count}"),
@@ -258,6 +324,68 @@ pub fn expand(template: &str, page_number: u32, count: usize, bates: u64, cx: &C
     }
     out.push_str(rest);
     out
+}
+
+fn page_label(n: u32, style: PageNumberStyle) -> String {
+    format_number(n, style).unwrap_or_default()
+}
+
+/// `None` when the styled label would exceed the page-label byte budget.
+fn format_number(n: u32, style: PageNumberStyle) -> Option<String> {
+    match style {
+        PageNumberStyle::Decimal => Some(n.to_string()),
+        PageNumberStyle::LatinLower => latin_label(n, false),
+        PageNumberStyle::LatinUpper => latin_label(n, true),
+        PageNumberStyle::ThaiDigits => Some(thai_digits(n)),
+        PageNumberStyle::ThaiLetters => thai_letters(n),
+    }
+}
+
+fn latin_label(n: u32, upper: bool) -> Option<String> {
+    let label = pdfcraft_cos::page_labels::alpha(u64::from(n), pdfcraft_cos::page_labels::MAX_LABEL_BYTES)?;
+    Some(if upper { label.to_ascii_uppercase() } else { label })
+}
+
+fn thai_digits(n: u32) -> String {
+    n.to_string()
+        .chars()
+        .map(|c| match c {
+            '0'..='9' => {
+                let digit = u32::from(c) - u32::from('0');
+                usize::try_from(digit).ok().and_then(|index| THAI_DIGITS.get(index).copied()).unwrap_or(c)
+            }
+            other => other,
+        })
+        .collect()
+}
+
+fn thai_letters(n: u32) -> Option<String> {
+    let n = u64::from(n).max(1) - 1;
+    let count = usize::try_from(n / 44 + 1).ok()?;
+    if count > pdfcraft_cos::page_labels::MAX_LABEL_BYTES {
+        return None;
+    }
+    let index = usize::try_from(n % 44).ok()?;
+    let letter = THAI_CONSONANTS.chars().nth(index)?;
+    Some(std::iter::repeat_n(letter, count).collect())
+}
+
+fn numbers_the_page(template: &str) -> bool {
+    let mut rest = template;
+    while let Some(start) = rest.find("<<") {
+        let Some(after) = rest.get(start.saturating_add(2)..) else { return false };
+        let Some(end) = after.find(">>") else { return false };
+        let token = after.get(..end).unwrap_or("");
+        if matches!(token, "1" | "1 of n" | "1/n" | "Page 1" | "Page 1 of n") {
+            return true;
+        }
+        rest = after.get(end.saturating_add(2)..).unwrap_or("");
+    }
+    false
+}
+
+fn missing_thai_font(c: char) -> EditError {
+    EditError::Invalid(format!("can't draw \"{c}\" (U+{:04X}); rebuild with CRAFT_FONTS_DIR", u32::from(c)))
 }
 
 /// The Bates start number in a template (`<<Bates Number#digits#start#…>>`), if any.
@@ -407,9 +535,13 @@ pub fn stamp_with_fonts(doc: &mut Document, page: usize, tag: &str, content: Vec
     place_tagged(doc, &p, tag, content, false)
 }
 
-fn begin(kind: MarkKind, subtype: &str, matrix: [f64; 6]) -> String {
+fn begin(kind: MarkKind, subtype: &str, matrix: [f64; 6], page_num: Option<u32>) -> String {
+    let page_num = match page_num {
+        Some(n) => format!(" /PCPageNum {n}"),
+        None => String::new(),
+    };
     format!(
-        "q\n/Artifact <</Type /Pagination /Subtype /{subtype} /PCMark /{}>> BDC\n{} {} {} {} {} {} cm\n",
+        "q\n/Artifact <</Type /Pagination /Subtype /{subtype} /PCMark /{}{page_num}>> BDC\n{} {} {} {} {} {} cm\n",
         kind.tag(),
         matrix_number(matrix[0]),
         matrix_number(matrix[1]),
@@ -448,24 +580,33 @@ pub fn add_header_footer(doc: &mut Document, pages: &[usize], hf: &HeaderFooter,
         return Err(EditError::Invalid("type the header or footer text first".into()));
     }
     if let Some(c) = hf.first_undrawable() {
+        if is_thai(c) && hf.number_style.draws_thai() && pdfcraft_fonts::document_thai_font().is_none() {
+            return Err(missing_thai_font(c));
+        }
         return Err(undrawable(c));
     }
     if !(hf.font_size.is_finite() && hf.font_size > 0.0 && hf.font_size <= 200.0 && hf.margins.iter().all(|m| m.is_finite() && *m >= 0.0)) {
         return Err(EditError::Invalid("invalid font size or margins".into()));
     }
-    // Page numbers count up from start_number, so the last selected page needs the most room.
+    // Page numbers count up from the resolved start, so the last selected page needs the most room.
     // Refuse the whole run before drawing anything: headers applied to some pages and then a
     // failed page number would leave the document half changed.
-    let last_number = u64::from(hf.start_number)
+    let start = numbering_start(doc, pages, hf)?;
+    let last_number = u64::from(start)
         .checked_add(pages.len().saturating_sub(1) as u64)
         .ok_or_else(|| EditError::Invalid("the header page numbers are too large".into()))?;
     if last_number > u64::from(u32::MAX) {
         return Err(EditError::Invalid(format!(
-            "the header start number {} leaves no room for {} pages (page numbers stop at {})",
-            hf.start_number,
+            "the header start number {start} leaves no room for {} pages (page numbers stop at {})",
             pages.len(),
             u32::MAX
         )));
+    }
+    if hf.text.iter().any(|t| numbers_the_page(t)) {
+        let last = u32::try_from(last_number).map_err(|_| EditError::Invalid("the header page numbers are too large".into()))?;
+        if format_number(last, hf.number_style).is_none() {
+            return Err(EditError::Invalid("the header page numbers are too large".into()));
+        }
     }
     // The same goes for Bates numbers: the last selected page must still fit in a u64.
     let bates0 = hf.text.iter().find_map(|t| bates_start(t)).unwrap_or(1);
@@ -476,30 +617,59 @@ pub fn add_header_footer(doc: &mut Document, pages: &[usize], hf: &HeaderFooter,
             u64::MAX
         )));
     }
+    let all = page_list(doc);
+    let count = all.len();
+    // Shape every Thai line before the first page is changed. A missing face or glyph then
+    // leaves the document as it was.
+    for (k, _) in pages.iter().enumerate() {
+        let number = ranged_number(start, k)?;
+        let bates = bates0.checked_add(k as u64).ok_or_else(|| EditError::Invalid("the Bates numbers are too large".into()))?;
+        for template in &hf.text {
+            if template.trim().is_empty() {
+                continue;
+            }
+            for line in expand(template, number, count, bates, cx, hf.number_style).lines() {
+                if let Some(c) = line.chars().find(|c| is_thai(*c)) {
+                    if pdfcraft_fonts::document_thai_font().is_none() {
+                        return Err(missing_thai_font(c));
+                    }
+                    added::header_line_width(line, hf.font_size)?;
+                }
+            }
+        }
+    }
     if replace {
         remove_marks(doc, pages, MarkKind::HeaderFooter)?;
     }
     let all = page_list(doc);
-    let count = all.len();
     for (k, &i) in pages.iter().enumerate() {
         let page = &all[i];
         let (w, h) = page.display_size(doc);
-        let number =
-            u32::try_from(u64::from(hf.start_number) + k as u64).map_err(|_| EditError::Invalid("the header page numbers are too large".into()))?;
+        let number = ranged_number(start, k)?;
         let bates = bates0.checked_add(k as u64).ok_or_else(|| EditError::Invalid("the Bates numbers are too large".into()))?;
         let size = hf.font_size;
         let [top, bottom, left, right] = hf.margins;
-        let mut body: Vec<u8> = format!("BT\n/PCHelv {} Tf\n{}\n", n(size), rgb(hf.color)).into_bytes();
+        let mut body: Vec<u8> = Vec::new();
+        let mut latin_open = false;
         let mut underlines = String::new();
+        let mut thai_fonts = Dict::new();
+        let taken = page
+            .dict
+            .get(b"Resources")
+            .map(|r| doc.resolve(r))
+            .and_then(|r| r.as_dict().cloned())
+            .and_then(|res| res.get(b"Font").map(|f| doc.resolve(f)).and_then(|f| f.as_dict().cloned()))
+            .unwrap_or_default();
         for (slot, template) in hf.text.iter().enumerate() {
             if template.trim().is_empty() {
                 continue;
             }
-            let lines: Vec<String> = expand(template, number, count, bates, cx).lines().map(str::to_owned).collect();
+            let lines: Vec<String> = expand(template, number, count, bates, cx, hf.number_style).lines().map(str::to_owned).collect();
             let header = slot < 3;
             let line_h = size * 1.2;
             for (li, line) in lines.iter().enumerate() {
-                let tw = helvetica_width(line, size);
+                let thai = line.chars().any(is_thai);
+                let tw = if thai { added::header_line_width(line, size)? } else { helvetica_width(line, size) };
                 let x = match slot % 3 {
                     0 => left,
                     1 => (w - tw) / 2.0,
@@ -507,24 +677,154 @@ pub fn add_header_footer(doc: &mut Document, pages: &[usize], hf: &HeaderFooter,
                 };
                 // Headers hang below the top margin; footers sit on the bottom margin.
                 let y = if header { h - top - size * 0.8 - li as f64 * line_h } else { bottom + (lines.len() - 1 - li) as f64 * line_h };
-                body.extend(text_op(x, y, line));
+                if thai {
+                    if latin_open {
+                        body.extend_from_slice(b"ET\n");
+                        latin_open = false;
+                    }
+                    added::paint_header_line(doc, line, size, hf.color, x, y, &taken, &mut thai_fonts, &mut body)?;
+                } else {
+                    if !latin_open {
+                        body.extend(format!("BT\n/PCHelv {} Tf\n{}\n", n(size), rgb(hf.color)).into_bytes());
+                        latin_open = true;
+                    }
+                    body.extend(text_op(x, y, line));
+                }
                 if hf.underline {
                     underlines.push_str(&format!("{} {} {} {} re f\n", n(x), n(y - size * 0.15), n(tw), n((size * 0.06).max(0.4))));
                 }
             }
         }
-        body.extend_from_slice(b"ET\n");
+        if latin_open {
+            body.extend_from_slice(b"ET\n");
+        }
         if !underlines.is_empty() {
             body.extend(format!("{}\n{underlines}", rgb(hf.color)).bytes());
         }
-        let mut content = begin(MarkKind::HeaderFooter, "Header", page.view_matrix(doc)).into_bytes();
+        let mut content = begin(MarkKind::HeaderFooter, "Header", page.view_matrix(doc), Some(number)).into_bytes();
         content.extend(body);
         content.extend_from_slice(END.as_bytes());
         add_resources(doc, page, None, None)?;
+        if !thai_fonts.is_empty() {
+            let current = &page_list(doc)[i];
+            let mut res = current.dict.get(b"Resources").map(|r| doc.resolve(r)).and_then(|r| r.as_dict().cloned()).unwrap_or_default();
+            let mut font_dict = res.get(b"Font").map(|f| doc.resolve(f)).and_then(|f| f.as_dict().cloned()).unwrap_or_default();
+            for (name, obj) in thai_fonts.iter() {
+                font_dict.set(name.clone(), obj.clone());
+            }
+            res.set(b"Font".to_vec(), Object::Dict(font_dict));
+            doc.update_dict(current.obj, |d| d.set(b"Resources".to_vec(), Object::Dict(res)))?;
+        }
         let page = &page_list(doc)[i];
         place(doc, page, MarkKind::HeaderFooter, content, false)?;
     }
     Ok(())
+}
+
+fn ranged_number(start: u32, index: usize) -> Result<u32, EditError> {
+    let index = u64::try_from(index).map_err(|_| EditError::Invalid("the header page numbers are too large".into()))?;
+    let n = u64::from(start).checked_add(index).ok_or_else(|| EditError::Invalid("the header page numbers are too large".into()))?;
+    u32::try_from(n).map_err(|_| EditError::Invalid("the header page numbers are too large".into()))
+}
+
+fn numbering_start(doc: &Document, pages: &[usize], hf: &HeaderFooter) -> Result<u32, EditError> {
+    if !hf.continue_numbering {
+        return Ok(hf.start_number);
+    }
+    let Some(&first) = pages.first() else { return Ok(hf.start_number) };
+    let mut earlier = first;
+    while earlier > 0 {
+        earlier -= 1;
+        if let Some(n) = stored_header_number(doc, earlier) {
+            return n.checked_add(1).ok_or_else(|| EditError::Invalid("the header page numbers are too large".into()));
+        }
+    }
+    Ok(hf.start_number)
+}
+
+const SCAN_MAX_BYTES: usize = 64 * 1024;
+const SCAN_MAX_DEPTH: usize = 8;
+const SCAN_MAX_OBJECTS: usize = 64;
+
+/// `/PCPageNum` lives in the artifact dictionary inside the content stream. The mark is appended,
+/// so the walk starts at the end of a contents array and stops at the first number it finds.
+fn stored_header_number(doc: &Document, page_index: usize) -> Option<u32> {
+    let pages = page_list(doc);
+    let page = pages.get(page_index)?;
+    let contents = page.dict.get(b"Contents")?;
+    let mut budget = SCAN_MAX_BYTES;
+    let mut seen = Vec::new();
+    scan_page_number(doc, contents, 0, &mut budget, &mut seen)
+}
+
+fn scan_page_number(doc: &Document, obj: &Object, depth: usize, budget: &mut usize, seen: &mut Vec<u32>) -> Option<u32> {
+    if depth > SCAN_MAX_DEPTH || *budget == 0 || seen.len() > SCAN_MAX_OBJECTS {
+        return None;
+    }
+    match obj {
+        Object::Ref(r) => {
+            if seen.contains(&r.num) {
+                return None;
+            }
+            seen.push(r.num);
+            let next = doc.get(*r);
+            scan_page_number(doc, &next, depth.saturating_add(1), budget, seen)
+        }
+        Object::Array(items) => {
+            let n = items.len().min(SCAN_MAX_OBJECTS);
+            for index in (0..n).rev() {
+                let item = items.get(index)?;
+                if let Some(n) = scan_page_number(doc, item, depth.saturating_add(1), budget, seen) {
+                    return Some(n);
+                }
+            }
+            None
+        }
+        Object::Stream(stream) => {
+            let cap = (*budget).min(SCAN_MAX_BYTES);
+            let bytes = stream.decoded_within(cap).ok()?;
+            let take = bytes.len().min(*budget);
+            *budget = budget.saturating_sub(take);
+            bytes.get(..take).and_then(last_pc_page_num)
+        }
+        _ => None,
+    }
+}
+
+fn last_pc_page_num(bytes: &[u8]) -> Option<u32> {
+    const KEY: &[u8] = b"/PCPageNum";
+    let mut last = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        let Some(window) = bytes.get(i..i.saturating_add(KEY.len())) else { break };
+        if window == KEY && !bytes.get(i.saturating_add(KEY.len())).is_some_and(|b| is_pdf_name_byte(*b)) {
+            let mut j = i.saturating_add(KEY.len());
+            let ws_end = j.saturating_add(32);
+            while j < ws_end && bytes.get(j).is_some_and(u8::is_ascii_whitespace) {
+                j = j.saturating_add(1);
+            }
+            let start = j;
+            let digit_end = start.saturating_add(10);
+            while j < digit_end && bytes.get(j).is_some_and(u8::is_ascii_digit) {
+                j = j.saturating_add(1);
+            }
+            if j > start
+                && let Some(slice) = bytes.get(start..j)
+                && let Ok(text) = std::str::from_utf8(slice)
+                && let Ok(n) = text.parse::<u32>()
+            {
+                last = Some(n);
+            }
+            i = j.max(i.saturating_add(1));
+        } else {
+            i = i.saturating_add(1);
+        }
+    }
+    last
+}
+
+fn is_pdf_name_byte(b: u8) -> bool {
+    !b.is_ascii_whitespace() && !matches!(b, b'(' | b')' | b'<' | b'>' | b'[' | b']' | b'{' | b'}' | b'/' | b'%')
 }
 
 /// Add a text watermark to `pages`.
@@ -555,7 +855,7 @@ pub fn add_watermark(doc: &mut Document, pages: &[usize], wm: &Watermark, replac
         let page = page_list(doc)[i].clone();
         let (w, h) = page.display_size(doc);
         if let Some(src) = &wm.source {
-            let mut content = begin(MarkKind::Watermark, "Watermark", page.view_matrix(doc));
+            let mut content = begin(MarkKind::Watermark, "Watermark", page.view_matrix(doc), None);
             content.push_str(&format!("/PCGS{} gs\n", (opacity * 100.0).round() as i64));
             content.push_str(&picture(src, (w, h), wm.scale, wm.rotation, wm.offset));
             content.push_str(END);
@@ -569,7 +869,7 @@ pub fn add_watermark(doc: &mut Document, pages: &[usize], wm: &Watermark, replac
         let size = if wm.font_size > 0.0 { wm.font_size } else { ((w * w + h * h).sqrt() * 0.5 / widest).clamp(6.0, 300.0) };
         let (s, c) = wm.rotation.to_radians().sin_cos();
         let (cx, cy) = (w / 2.0 + wm.offset[0], h / 2.0 + wm.offset[1]);
-        let mut content = begin(MarkKind::Watermark, "Watermark", page.view_matrix(doc)).into_bytes();
+        let mut content = begin(MarkKind::Watermark, "Watermark", page.view_matrix(doc), None).into_bytes();
         content.extend(
             format!(
                 "/PCGS{} gs\n{} {} {} {} {} {} cm\nBT\n/PCHelv {} Tf\n{}\n",
@@ -611,7 +911,7 @@ pub fn add_background(doc: &mut Document, pages: &[usize], bg: &Background, repl
     for &i in pages {
         let page = page_list(doc)[i].clone();
         let (w, h) = page.display_size(doc);
-        let mut content = begin(MarkKind::Background, "Background", page.view_matrix(doc));
+        let mut content = begin(MarkKind::Background, "Background", page.view_matrix(doc), None);
         match &bg.source {
             Some(src) => {
                 content.push_str(&format!("/PCGS{} gs\n", (opacity * 100.0).round() as i64));

@@ -2680,3 +2680,16 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 @id	file.word_count	จำนวนคำ…
 	You are viewing the signed version of “{from}” (revision {rev}). It is a snapshot: changes here won't affect the original.	คุณกำลังดูฉบับที่ลงนามของ “{from}” (ฉบับแก้ไข {rev}) ซึ่งเป็นภาพบันทึก การเปลี่ยนแปลงที่นี่จะไม่กระทบต้นฉบับ
 	You are viewing revision {rev} of “{from}”. It is a snapshot: changes here won't affect the original.	คุณกำลังดูฉบับแก้ไขที่ {rev} ของ “{from}” ซึ่งเป็นภาพบันทึก การเปลี่ยนแปลงที่นี่จะไม่กระทบต้นฉบับ
+	Continue from previous section	นับต่อจากส่วนก่อนหน้า
+	Interface font	ฟอนต์ของหน้าจอ
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium ใช้แสดงภาษาอังกฤษและภาษาไทยบนหน้าจอ
+	Thai text	ข้อความภาษาไทย
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped ใช้แสดงภาษาไทยเท่านั้น ข้อความภาษาอังกฤษบนหน้าจอยังใช้ฟอนต์ของหน้าจอ
+	Thai text font	ฟอนต์สำหรับข้อความภาษาไทย
+	Show optional fonts	แสดงฟอนต์ทางเลือก
+	Primary	ตัวเลือกหลัก
+	Optional font	ตัวเลือกรอง
+	This application	แอปพลิเคชันนี้
+	Operating system	ระบบปฏิบัติการ
+	Not installed	ไม่ได้ติดตั้ง
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	ฟอนต์จากระบบปฏิบัติการใช้แสดงบนหน้าจอเท่านั้น และจะไม่ถูกเขียนลงในไฟล์ PDF
