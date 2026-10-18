@@ -43,6 +43,49 @@ fn recognize_text_dialog_adds_searchable_text() {
     assert_eq!(app.session.get(id).unwrap().can_undo(), Some("Recognize text"));
 }
 
+/// Opens Recognize Text on a scan with the interface set to `ui`.
+fn recognize_dialog(ui: &'static str) -> Harness<'static, PdfCraftApp> {
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", ui).unwrap();
+        app.open_bytes("scan.pdf", None, scan()).unwrap();
+        app.run_inline = true;
+        app
+    });
+    h.run_steps(4);
+    assert!(h.state_mut().execute("ocr.recognize"));
+    h.run_steps(2);
+    h
+}
+
+/// FR-03: the dialog starts on the interface language when text recognition reads it, and on
+/// English otherwise. A choice made in the dialog is kept.
+#[test]
+fn recognize_text_dialog_defaults_to_thai_in_a_thai_interface() {
+    let mut h = recognize_dialog("th");
+    assert_eq!(h.state().ocr_draft.settings().language, "th");
+    h.get_by_value("ไทย");
+    h.state_mut().ocr_draft.language = Some("en".into());
+    h.run_steps(2);
+    assert_eq!(h.state().ocr_draft.settings().language, "en", "the user's choice wins over the interface language");
+    let h = recognize_dialog("en");
+    assert_eq!(h.state().ocr_draft.settings().language, "en");
+    let h = recognize_dialog("de");
+    assert_eq!(h.state().ocr_draft.settings().language, "en", "no German model: English");
+}
+
+/// FR-05: a language without models is reported in the interface language, naming the language,
+/// and nothing starts.
+#[test]
+fn a_missing_language_model_is_reported_in_the_interface_language() {
+    let mut h = recognize_dialog("th");
+    h.state_mut().ocr_draft.language = Some("xx".into());
+    h.state_mut().start_ocr();
+    let toast = h.state().toast.clone().unwrap().0;
+    assert!(toast.contains("xx") && toast.contains("โมเดลการรู้จำข้อความ") && toast.contains("PDFCRAFT_MODELS"), "{toast}");
+    assert!(h.state().ocr_run.is_none(), "nothing started");
+}
+
 #[test]
 fn recognize_text_in_multiple_files_writes_searchable_copies() {
     if !pdfcraft_engine::ocr::available() {

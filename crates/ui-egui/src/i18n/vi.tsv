@@ -2398,6 +2398,7 @@ comment menu	Edit	Sửa
 	the image is empty	hình ảnh trống
 	the password is incorrect	mật khẩu không đúng
 	the text recognition models are not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them)	các mô hình nhận dạng văn bản chưa được cài đặt (hãy cài đặt lại PdfCraft, hoặc đặt PDFCRAFT_MODELS thành thư mục chứa chúng)
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	mô hình nhận dạng văn bản {language} chưa được cài đặt (hãy cài đặt lại PdfCraft, hoặc đặt PDFCRAFT_MODELS thành thư mục chứa mô hình này)
 	the title must not be empty	tiêu đề không được để trống
 	there are no pages to print	không có trang nào để in
 	there are no redaction marks to apply	không có dấu đánh dấu xóa nào để áp dụng

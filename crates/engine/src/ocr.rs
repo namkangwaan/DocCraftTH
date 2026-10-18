@@ -18,7 +18,7 @@ use crate::{DocId, Edit, EditError, Session};
 pub struct OcrSettings {
     /// Resolution pages are rendered at for recognition (Acrobat's "Downsample to" choices).
     pub dpi: f32,
-    /// Language code from [`LANGUAGES`] (the models read the Latin alphabet, whatever this says).
+    /// Language code from [`LANGUAGES`]: `"en"` is read with the Latin (ocrs) models and `"th"` with the Thai recognizer ([`engine_for`]).
     pub language: String,
     /// Leave pages that already have text alone (Acrobat reports "page contains renderable
     /// text" and skips them). When `false`, such pages are read too (a picture on a page that
@@ -72,21 +72,37 @@ impl OcrPage {
     }
 }
 
-/// The recogniser, loaded once (it takes a moment) and shared.
-pub fn engine() -> Result<Arc<Ocr>, String> {
-    static OCR: Mutex<Option<Arc<Ocr>>> = Mutex::new(None);
-    let mut slot = OCR.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(o) = slot.as_ref() {
+/// The recogniser for `lang` (`"en"`, `"th"`, …), loaded once per language and shared.
+pub fn engine_for(lang: &str) -> Result<Arc<Ocr>, String> {
+    static OCR: Mutex<Option<std::collections::HashMap<String, Arc<Ocr>>>> = Mutex::new(None);
+    let key = match lang {
+        "th" | "tha" => "th",
+        "en" | "eng" | "" => "en",
+        other => other,
+    };
+    let mut guard = OCR.lock().unwrap_or_else(|e| e.into_inner());
+    let map = guard.get_or_insert_with(std::collections::HashMap::new);
+    if let Some(o) = map.get(key) {
         return Ok(o.clone());
     }
-    let o = Arc::new(Ocr::find().map_err(|e| e.to_string())?);
-    *slot = Some(o.clone());
+    let o = Arc::new(Ocr::load_for(key).map_err(|e| e.to_string())?);
+    map.insert(key.to_string(), o.clone());
     Ok(o)
 }
 
-/// Whether the recognition models are installed.
+/// The default (English/Latin) recogniser, loaded once and shared.
+pub fn engine() -> Result<Arc<Ocr>, String> {
+    engine_for("en")
+}
+
+/// Whether the recognition models for `lang` are installed.
+pub fn available_for(lang: &str) -> bool {
+    Models::find_for(lang).is_some()
+}
+
+/// Whether the default (English/Latin) recognition models are installed.
 pub fn available() -> bool {
-    Models::find().is_some()
+    available_for("en")
 }
 
 /// Everything recognition needs from a document, detached from the session.
@@ -203,11 +219,12 @@ impl Session {
 
     /// Recognise text on `pages` and add it, in one call (the CLI and agents use this).
     pub fn recognize_text(&mut self, id: DocId, pages: &[usize], settings: OcrSettings) -> Result<Vec<OcrPage>, String> {
+        let lang = settings.language.clone();
         let job = self.ocr_job(id, pages, settings).ok_or("no such document")?;
         if let Some(why) = self.get(id).and_then(|d| d.read_only_reason.clone()) {
             return Err(why);
         }
-        let ocr = engine()?;
+        let ocr = engine_for(&lang)?;
         let found = job.run(&ocr, |_, _| true);
         self.apply_ocr(id, &found).map_err(|e| e.to_string())?;
         Ok(found)

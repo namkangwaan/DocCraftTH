@@ -3365,6 +3365,25 @@ fn recognize_text_reads_a_picture_on_a_page_that_has_text() {
     assert_eq!((count(&s, "invoice"), count(&s, "brown")), (1, 1));
 }
 
+#[test]
+fn thai_ocr_layer_is_searchable() {
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let blank = s.create_blank(612.0, 792.0, 1).unwrap();
+    let id = s.open("thai-scan.pdf", None, blank, None).unwrap();
+    let words = vec![
+        ocr::PlacedWord { text: "รายงานประจำปี".into(), origin: [72.0, 700.0], across: [120.0, 0.0], up: [0.0, 16.0] },
+        ocr::PlacedWord { text: "๒๕๖๙".into(), origin: [204.0, 700.0], across: [48.0, 0.0], up: [0.0, 16.0] },
+    ];
+    s.apply(id, Edit::AddOcrText { page: 0, words }).unwrap();
+    let saved = s.save_bytes(id).unwrap();
+    let reopened = s.open("reopened.pdf", None, saved, None).unwrap();
+    let doc = s.get(reopened).unwrap();
+    let mut r = pdfcraft_render::PageRenderer::new(doc.bytes.clone(), pdfcraft_render::RenderConfig::default());
+    let text = r.render(RenderRequestFor::text(0)).text.expect("page has OCR text");
+    assert!(text.plain_text().contains("รายงานประจำปี") && text.plain_text().contains("๒๕๖๙"), "{}", text.plain_text());
+    assert!(!text.find("ประจำ").is_empty(), "substring inside a Thai phrase is searchable: {}", text.plain_text());
+}
+
 /// A form whose scripts are custom JavaScript: total = price × qty (calculate, through a
 /// document-level function), shown with a custom format; qty is validated; a button script.
 fn scripted_form() -> Vec<u8> {

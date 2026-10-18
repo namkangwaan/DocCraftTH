@@ -228,7 +228,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Lithuanian UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "17c8579e0e9d1524ffbeb87e7b30c14562dbaac64400826ee786cecfe31648fa"
+sha256 = "3a53cbdf065b2e24ce8067cb9a0dc2804162aad58cecd9599d4f64c7e075dd52"
 
 
 [[asset]]
@@ -3310,6 +3310,32 @@ kind = "model"
 usage = "Scan & OCR: reads the words it finds (cargo xtask models)"
 sha256 = "e484866d4cce403175bd8d00b128feb08ab42e208de30e42cd9889d8f1735a6e"
 
+[[fetched]]
+file = "text-recognition-th.rten"
+url = "https://huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec/resolve/9e25080455925d3943f5db885fddc79db6a07ca3/inference.pdiparams"
+title = "PaddleOCR v5 mobile Thai text recognition model (converted to rten)"
+author = "PaddlePaddle Contributors (PaddleOCR team)"
+source = "https://huggingface.co/PaddlePaddle/th_PP-OCRv5_mobile_rec (rev 9e25080455925d3943f5db885fddc79db6a07ca3; converted via paddle2onnx + rten-convert, see docs/thai-ocr-model.md)"
+licence = "Apache-2.0"
+licence_url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+licence_sha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+kind = "model"
+usage = "Scan & OCR: reads Thai text lines (cargo xtask models)"
+sha256 = "8b70e6d18967e93fccb32e045e0f80ee3859efe7ccdd67586a9d136a284e834a"
+
+[[fetched]]
+file = "dict-th.txt"
+url = "https://raw.githubusercontent.com/PaddlePaddle/PaddleOCR/main/ppocr/utils/dict/ppocrv5_th_dict.txt"
+title = "PaddleOCR v5 Thai character dictionary (ppocrv5_th_dict.txt)"
+author = "PaddlePaddle Contributors (PaddleOCR team)"
+source = "https://github.com/PaddlePaddle/PaddleOCR/blob/main/ppocr/utils/dict/ppocrv5_th_dict.txt"
+licence = "Apache-2.0"
+licence_url = "https://www.apache.org/licenses/LICENSE-2.0.txt"
+licence_sha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+kind = "model"
+usage = "Scan & OCR: character class table for text-recognition-th.rten (cargo xtask models)"
+sha256 = "57f5406f94bb6688fb7077f7be65f08bbd71cecf48c01ea26c522cb5c4836b7a"
+
 [[build_input]]
 name = "craft-fonts"
 option = "CRAFT_FONTS_DIR"
@@ -3352,7 +3378,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Vietnamese UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
-sha256 = "2d1c4b4276d02512a4e20101be95a1671de5c4f5cdfd661887af5ebab0db06a6"
+sha256 = "5b6783789a10e44f60edaa3184497169e30af00c69422e414459ff75dacc931b"
 
 [[asset]]
 path = "crates/ui-egui/src/i18n/sl.tsv"
@@ -3376,3 +3402,14 @@ licence_file = "vendor/vello_common/LICENSE-MIT"
 kind = "image"
 usage = "Reference picture of the vendored vello_common probe module, for people only; the build reads probe.rgba, not this file"
 sha256 = "78c59a0cfd2c829909d77006f94e34dac1ae5d1f90e7f10f72e84de541fef697"
+
+[[asset]]
+path = "crates/ui-egui/src/i18n/th.tsv"
+title = "Thai interface translation catalog"
+author = "DocCraftTH contributors"
+source = "Contributor-original: clean-room translations of PdfCraft's English UI labels for the DocCraftTH fork; 2026-10-17 full-coverage additions are AI-assisted and not yet reviewed by a native Thai speaker"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Thai UI strings, compiled in by crates/ui-egui/src/i18n/mod.rs"
+sha256 = "acc611fd361cb47e2b20c02f1e87006472a50fc0f878ebd98b20ec662f64f070"
