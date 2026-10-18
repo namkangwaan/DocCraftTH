@@ -2686,3 +2686,19 @@ key	Space	Space
 # Historical snapshot notice bar (View signed version / View revision).
 	You are viewing the signed version of “{from}” (revision {rev}). It is a snapshot: changes here won't affect the original.	Bạn đang xem phiên bản đã ký của “{from}” (bản sửa đổi {rev}). Đây là ảnh nhanh: các thay đổi ở đây không được áp dụng đến bản gốc.
 	You are viewing revision {rev} of “{from}”. It is a snapshot: changes here won't affect the original.	Bạn đang xem bản sửa đổi {rev} của “{from}”. Đây là ảnh nhanh: các thay đổi ở đây không được áp dụng đến bản gốc.
+
+# AI-assisted additions: Thai page numbers and the Thai text font (2026-10-19, DocCraftTH).
+# These additions have not had separate native-speaker review.
+	Continue from previous section	Tiếp tục từ phần trước
+	Interface font	Phông chữ giao diện
+	Not installed	Chưa cài đặt
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped chỉ hiển thị chữ Thái. Văn bản giao diện tiếng Anh vẫn dùng phông chữ giao diện.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium hiển thị giao diện tiếng Anh và tiếng Thái.
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	Phông chữ của hệ điều hành chỉ được hiển thị trên màn hình. Chúng không được ghi vào PDF.
+	Operating system	Hệ điều hành
+	Optional font	Phông chữ tùy chọn
+	Primary	Chính
+	Show optional fonts	Hiện phông chữ tùy chọn
+	Thai text font	Phông chữ cho văn bản tiếng Thái
+	Thai text	Văn bản tiếng Thái
+	This application	Ứng dụng này

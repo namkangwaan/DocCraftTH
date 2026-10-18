@@ -3,7 +3,7 @@
 //! preview of the current page. "Update" opens the same dialog in replace mode.
 
 use egui::{Align, Color32, CornerRadius, Layout, Rect, Stroke, pos2, vec2};
-use pdfcraft_engine::{Background, Edit, HeaderFooter, MarkKind, Watermark};
+use pdfcraft_engine::{Background, Edit, HeaderFooter, MarkKind, PageNumberStyle, Watermark};
 
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, widgets};
@@ -112,6 +112,13 @@ impl Default for MarksDraft {
 }
 
 const PAGE_FORMATS: [&str; 5] = ["<<1>>", "<<1 of n>>", "<<1/n>>", "<<Page 1>>", "<<Page 1 of n>>"];
+const NUMBER_STYLES: [(PageNumberStyle, &str); 5] = [
+    (PageNumberStyle::Decimal, "1, 2, 3"),
+    (PageNumberStyle::LatinUpper, "A, B, C"),
+    (PageNumberStyle::LatinLower, "a, b, c"),
+    (PageNumberStyle::ThaiDigits, "๑, ๒, ๓"),
+    (PageNumberStyle::ThaiLetters, "ก, ข, ค"),
+];
 const DATE_FORMATS: [&str; 6] = ["<<m/d/yyyy>>", "<<mm/dd/yyyy>>", "<<d/m/yyyy>>", "<<yyyy-mm-dd>>", "<<m/d/yy>>", "<<mmmm d, yyyy>>"];
 const BOX_NAMES: [&str; 6] =
     ["Left Header Text", "Center Header Text", "Right Header Text", "Left Footer Text", "Center Footer Text", "Right Footer Text"];
@@ -205,6 +212,12 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                         }
                     },
                 );
+                let style_label = NUMBER_STYLES.iter().find(|(style, _)| *style == d.hf.number_style).map(|(_, label)| *label).unwrap_or("1, 2, 3");
+                egui::ComboBox::from_id_salt("hf-number-style").selected_text(style_label).show_ui(ui, |ui| {
+                    for (style, label) in NUMBER_STYLES {
+                        ui.selectable_value(&mut d.hf.number_style, style, label);
+                    }
+                });
                 if ui.button(tl!("Insert Page Number")).clicked() {
                     d.hf.text[d.focused_box].push_str(PAGE_FORMATS[d.page_format]);
                 }
@@ -223,6 +236,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                 ui.add_space(12.0);
                 ui.label(tl!("Start page number"));
                 ui.add(egui::DragValue::new(&mut d.hf.start_number).range(1..=999_999));
+                ui.add(widgets::checkbox(&mut d.hf.continue_numbering, tl!("Continue from previous section")));
             });
         }
         MarkKind::Watermark => {

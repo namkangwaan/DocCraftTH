@@ -15,3 +15,5 @@ skrifa = "0.44"
 # Arabic shaping for text written into PDFs; already in the tree via egui, on the same read-fonts.
 harfrust = "0.12"
 unicode-bidi = "0.3"
+# Thai word boundaries (LSTM line segmenter, +0.38 MiB wasm); icu_properties/icu_provider are already in the tree via egui.
+icu_segmenter = { version = "2", default-features = false, features = ["compiled_data", "lstm"] }

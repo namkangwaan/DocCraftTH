@@ -163,28 +163,38 @@ fn break_lines(text: &str, range: Range<usize>, fits: &mut impl FnMut(&str) -> b
 fn fitting_prefix(text: &str, range: Range<usize>, fits: &mut impl FnMut(&str) -> bool) -> usize {
     let piece = text.get(range.clone()).unwrap_or_default();
     let mut end = range.end;
-    for (i, (at, c)) in piece.char_indices().enumerate() {
+    let mut before = None;
+    for (at, c) in piece.char_indices() {
         let next = range.start.saturating_add(at).saturating_add(c.len_utf8());
-        if i > 0 && !fits(text.get(range.start..next).unwrap_or_default()) {
+        // A Thai syllable stays whole: no line starts with a mark or า, none ends with เ.
+        if before.is_some_and(|b| pdfcraft_fonts::thai::may_break(b, c)) && !fits(text.get(range.start..next).unwrap_or_default()) {
             end = range.start.saturating_add(at);
             break;
         }
+        before = Some(c);
     }
     end
 }
 
-/// The byte ranges of the whitespace-separated words of `range` in `text`.
+/// The byte ranges of the whitespace-separated words of `range` in `text`. Thai, written without
+/// spaces, is split further where the segmenter finds word boundaries.
 fn words(text: &str, range: Range<usize>) -> Vec<Range<usize>> {
+    let slice = text.get(range.clone()).unwrap_or_default();
+    let thai = pdfcraft_fonts::thai::break_offsets(slice);
     let mut words = Vec::new();
     let mut start = None;
-    for (at, c) in text.get(range.clone()).unwrap_or_default().char_indices() {
-        let at = range.start.saturating_add(at);
+    for (rel, c) in slice.char_indices() {
+        let at = range.start.saturating_add(rel);
         match (c.is_whitespace(), start) {
             (true, Some(s)) => {
                 words.push(s..at);
                 start = None;
             }
             (false, None) => start = Some(at),
+            (false, Some(s)) if thai.binary_search(&rel).is_ok() => {
+                words.push(s..at);
+                start = Some(at);
+            }
             _ => {}
         }
     }
@@ -534,6 +544,34 @@ mod tests {
             let lines = wrap_at(s, 7);
             let shown: usize = lines.iter().map(|l| l.text.chars().count()).sum();
             assert!(shown <= s.chars().count(), "{:?}", s.chars().take(12).collect::<String>());
+        }
+    }
+
+    #[test]
+    fn thai_lines_break_between_words() {
+        let text = "ผมกินข้าวทุกวัน";
+        let lines = wrap_at(text, 6);
+        assert!(lines.len() > 1, "{lines:?}");
+        assert_eq!(lines.iter().map(|l| l.text.as_str()).collect::<String>(), text);
+        // Every line ends where the segmenter allows a break, never inside a word.
+        let words = pdfcraft_fonts::thai::break_offsets(text);
+        let mut at = 0;
+        for line in &lines[..lines.len() - 1] {
+            assert!(!line.rtl);
+            at += line.text.len();
+            assert!(words.contains(&at), "line ends inside a word at {at}: {lines:?}");
+        }
+    }
+
+    #[test]
+    fn thai_lines_keep_syllables_whole() {
+        // One character per line forces breaks inside words: none may strand เ or start with า.
+        let text = "เกเกเกตาตา";
+        let lines = wrap_at(text, 1);
+        assert_eq!(lines.iter().map(|l| l.text.as_str()).collect::<String>(), text);
+        for pair in lines.windows(2) {
+            let (before, after) = (pair[0].text.chars().next_back(), pair[1].text.chars().next());
+            assert!(before.zip(after).is_some_and(|(b, a)| pdfcraft_fonts::thai::may_break(b, a)), "a syllable is split: {lines:?}");
         }
     }
 

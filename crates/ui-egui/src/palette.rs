@@ -22,7 +22,8 @@ fn score(hay: &str, needle: &str) -> Option<usize> {
     if needle.is_empty() {
         return Some(0);
     }
-    let h = pdfcraft_render::text::fold_case(hay);
+    // Thai labels carry soft breaks nobody types.
+    let h = pdfcraft_render::text::fold_case(&crate::i18n::th_breaks::without_soft_breaks(hay));
     if let Some(p) = h.find(needle) {
         return Some(p);
     }

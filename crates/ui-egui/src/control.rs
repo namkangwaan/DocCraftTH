@@ -448,7 +448,11 @@ impl Control {
                 let matches: Vec<NodeId> = s
                     .nodes
                     .iter()
-                    .filter(|(_, n)| n.supports_action(Action::Click) && !n.is_disabled() && n.label().is_some_and(|l| l.to_lowercase() == want))
+                    .filter(|(_, n)| {
+                        n.supports_action(Action::Click)
+                            && !n.is_disabled()
+                            && n.label().is_some_and(|l| crate::i18n::th_breaks::without_soft_breaks(l).to_lowercase() == want)
+                    })
                     .map(|(id, _)| *id)
                     .collect();
                 match matches.as_slice() {

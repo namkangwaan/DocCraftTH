@@ -277,8 +277,9 @@ fn wrapped(t: &AddedText) -> Vec<(String, bool)> {
     out
 }
 
-/// Thai wrapping at shaped cluster boundaries never detaches a tone/vowel mark from its base.
-/// This is glyph-safe wrapping, not dictionary-based Thai word segmentation.
+/// Thai wrapping between words ([`pdfcraft_fonts::thai::break_offsets`], a word model) and at
+/// spaces. A word wider than the row breaks at shaped cluster boundaries, which never detach a
+/// tone/vowel mark from its base.
 fn thai_lines(t: &AddedText, para: &str, width: f64) -> Result<Vec<String>, EditError> {
     let (pieces, _) = shaped_layout(t, para, false)?;
     let mut atoms = Vec::new();
@@ -292,15 +293,39 @@ fn thai_lines(t: &AddedText, para: &str, width: f64) -> Result<Vec<String>, Edit
             })),
         }
     }
+    // Clusters grouped into words: a word starts at a segmenter break or after a space. Breaks
+    // are only looked up at cluster boundaries, so none can split a cluster.
+    let breaks = pdfcraft_fonts::thai::break_offsets(para);
+    let mut words: Vec<Vec<(String, f64)>> = Vec::new();
+    let (mut at, mut after_space) = (0usize, true);
+    for (text, advance) in atoms {
+        if after_space || breaks.binary_search(&at).is_ok() {
+            words.push(Vec::new());
+        }
+        at = at.saturating_add(text.len());
+        after_space = text.chars().all(char::is_whitespace);
+        if let Some(word) = words.last_mut() {
+            word.push((text, advance));
+        }
+    }
     let mut lines = Vec::new();
     let (mut line, mut used) = (String::new(), 0.0);
-    for (text, advance) in atoms {
-        if !line.is_empty() && used + advance > width {
+    for word in words {
+        let word_width: f64 = word.iter().map(|(_, advance)| advance).sum();
+        if !line.is_empty() && used + word_width > width {
             lines.push(std::mem::take(&mut line));
             used = 0.0;
         }
-        line.push_str(&text);
-        used += advance;
+        for (text, advance) in word {
+            // Inside a word a row ends only between syllables: never after เ, never before า.
+            let syllable_edge = line.chars().next_back().zip(text.chars().next()).is_some_and(|(b, a)| pdfcraft_fonts::thai::may_break(b, a));
+            if syllable_edge && used + advance > width {
+                lines.push(std::mem::take(&mut line));
+                used = 0.0;
+            }
+            line.push_str(&text);
+            used += advance;
+        }
     }
     lines.push(line);
     Ok(lines)
@@ -526,11 +551,14 @@ fn draw_shaped(doc: &mut Document, t: &AddedText, taken: &Dict, fonts: &mut Dict
         .into_iter()
         .map(|(line, rtl)| shaped_layout(t, &line, rtl).map(|(pieces, w)| (line, rtl, pieces, w)))
         .collect::<Result<Vec<_>, _>>()?;
-    draw_laid_shaped(doc, t, &laid, taken, fonts, out, shaped_glyph)
+    let latin = font_name(t.family.base_font(t.bold, t.italic));
+    draw_laid_shaped(doc, t, &laid, taken, fonts, out, &latin, shaped_glyph)
 }
 
 /// [`draw_shaped`] for lines that are already laid out. `outline` is the source of glyph outlines
-/// for a script's face (the craft-fonts faces, or a stand-in in tests).
+/// for a script's face (the craft-fonts faces, or a stand-in in tests). `latin_font` is the
+/// resource name for the unshaped spans (the item's standard face, or `/PCHelv` for a header).
+#[allow(clippy::too_many_arguments)]
 fn draw_laid_shaped(
     doc: &mut Document,
     t: &AddedText,
@@ -538,10 +566,10 @@ fn draw_laid_shaped(
     taken: &Dict,
     fonts: &mut Dict,
     out: &mut Vec<u8>,
+    latin_font: &str,
     outline: impl Fn(ShapedScript, u32) -> Result<GlyphOutline, GlyphError>,
 ) -> Result<(), EditError> {
     let r = text_rect(t);
-    let latin = font_name(t.family.base_font(t.bold, t.italic));
     // Every distinct cluster (a letter with its dots and the text it stands for) is one glyph of
     // one of the fonts, so copy and search get each character exactly once.
     let mut keys: Vec<&ShapedCluster> = Vec::new();
@@ -609,10 +637,10 @@ fn draw_laid_shaped(
         for piece in pieces {
             match piece {
                 Piece::Latin(s) => {
-                    out.extend(format!("/{latin} {} Tf {} Tw 1 0 0 1 {} {} Tm ", n(t.size), n(tw), n(pen), n(y)).bytes());
+                    out.extend(format!("/{latin_font} {} Tf {} Tw 1 0 0 1 {} {} Tm ", n(t.size), n(tw), n(pen), n(y)).bytes());
                     out.extend(literal(&win_ansi(s)));
                     out.extend_from_slice(b" Tj\n");
-                    current = Some(latin.as_str());
+                    current = Some(latin_font);
                     pen += t.family.width(s, t.size, t.bold, t.italic) + tw * s.matches(' ').count() as f64;
                 }
                 Piece::Shaped(clusters) => {
@@ -637,6 +665,79 @@ fn draw_laid_shaped(
     }
     out.extend_from_slice(b"ET\n");
     Ok(())
+}
+
+fn split_script_spans(line: &str) -> Vec<(bool, String)> {
+    let mut out = Vec::new();
+    let mut buf = String::new();
+    let mut thai: Option<bool> = None;
+    for c in line.chars() {
+        let is = is_thai(c);
+        if thai == Some(is) {
+            buf.push(c);
+        } else {
+            if !buf.is_empty()
+                && let Some(flag) = thai
+            {
+                out.push((flag, std::mem::take(&mut buf)));
+            }
+            buf.push(c);
+            thai = Some(is);
+        }
+    }
+    if !buf.is_empty()
+        && let Some(flag) = thai
+    {
+        out.push((flag, buf));
+    }
+    out
+}
+
+/// Width of one header line. Thai spans use cluster advance. The rest uses Helvetica.
+pub(crate) fn header_line_width(line: &str, size: f64) -> Result<f64, EditError> {
+    let mut width = 0.0;
+    for (thai, span) in split_script_spans(line) {
+        if thai {
+            let clusters = shape_thai(&span).map_err(|e| thai_error(e, &span))?;
+            let advance = clusters.iter().map(|c| c.advance).sum::<f64>();
+            width += advance * size;
+        } else {
+            width += pdfcraft_fonts::helvetica_width(&span, size);
+        }
+    }
+    if !width.is_finite() {
+        return Err(EditError::Invalid("the header text has no measurable width".into()));
+    }
+    Ok(width)
+}
+
+/// Paint one header line. Latin stays on `/PCHelv`. Thai goes through [`shape_thai`] and
+/// [`draw_laid_shaped`], which is the Add Text Type 3 writer.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn paint_header_line(
+    doc: &mut Document,
+    line: &str,
+    size: f64,
+    color: [f64; 3],
+    x: f64,
+    baseline: f64,
+    taken: &Dict,
+    fonts: &mut Dict,
+    out: &mut Vec<u8>,
+) -> Result<(), EditError> {
+    let mut pieces = Vec::new();
+    for (thai, span) in split_script_spans(line) {
+        if thai {
+            let clusters = shape_thai(&span).map_err(|e| thai_error(e, &span))?;
+            pieces.push(Piece::Shaped(clusters));
+        } else {
+            pieces.push(Piece::Latin(span));
+        }
+    }
+    let top = baseline + 0.95 * size;
+    let t = AddedText { rect: [x, baseline, x + 1.0e6, top], text: line.to_string(), size, color, align: Align::Left, ..AddedText::default() };
+    let laid = [(line.to_string(), false, pieces, 0.0)];
+    draw_laid_shaped(doc, &t, &laid, taken, fonts, out, "PCHelv", shaped_glyph)
 }
 
 /// What makes two clusters the same Type 3 glyph: text, glyphs, offsets and advance (bit for bit;

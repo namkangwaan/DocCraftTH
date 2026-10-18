@@ -3384,6 +3384,30 @@ fn thai_ocr_layer_is_searchable() {
     assert!(!text.find("ประจำ").is_empty(), "substring inside a Thai phrase is searchable: {}", text.plain_text());
 }
 
+#[test]
+fn thai_ocr_marks_stay_in_their_word() {
+    // Detection pads each word box, so neighbouring OCR words often touch or overlap. A word-final
+    // mark (the ์ of หลักเกณฑ์) must still come out before the next word.
+    for gap in [4.0, 0.0, -4.0] {
+        let mut s = Session::new().with_clock(|| 1_700_000_000);
+        let blank = s.create_blank(612.0, 792.0, 1).unwrap();
+        let id = s.open("thai-scan.pdf", None, blank, None).unwrap();
+        let words = vec![
+            ocr::PlacedWord { text: "หลักเกณฑ์".into(), origin: [72.0, 700.0], across: [80.0, 0.0], up: [0.0, 16.0] },
+            ocr::PlacedWord { text: "วิธีการ".into(), origin: [152.0 + gap, 700.0], across: [56.0, 0.0], up: [0.0, 16.0] },
+        ];
+        s.apply(id, Edit::AddOcrText { page: 0, words }).unwrap();
+        let saved = s.save_bytes(id).unwrap();
+        let reopened = s.open("reopened.pdf", None, saved, None).unwrap();
+        let doc = s.get(reopened).unwrap();
+        let mut r = pdfcraft_render::PageRenderer::new(doc.bytes.clone(), pdfcraft_render::RenderConfig::default());
+        let text = r.render(RenderRequestFor::text(0)).text.expect("page has OCR text");
+        let plain = text.plain_text();
+        assert!(plain.contains("หลักเกณฑ์") && plain.contains("วิธีการ"), "gap {gap}: {plain:?}");
+        assert!(!text.find("หลักเกณฑ์").is_empty(), "gap {gap}: {plain:?}");
+    }
+}
+
 /// A form whose scripts are custom JavaScript: total = price × qty (calculate, through a
 /// document-level function), shown with a custom format; qty is validated; a button script.
 fn scripted_form() -> Vec<u8> {

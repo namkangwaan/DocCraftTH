@@ -896,7 +896,10 @@ pub(crate) fn appearance_labels(lang: crate::i18n::Lang) -> (AppearanceLabels, b
     if lang == crate::i18n::Lang::EN {
         return (english, false);
     }
-    let said = |s: &str| (!lang.rtl() && crate::i18n::has(lang, s)).then(|| crate::i18n::tr(lang, s).to_string());
+    // The labels are written into the PDF: without the on-screen Thai soft breaks.
+    let said = |s: &str| {
+        (!lang.rtl() && crate::i18n::has(lang, s)).then(|| crate::i18n::th_breaks::without_soft_breaks(crate::i18n::tr(lang, s)).into_owned())
+    };
     let translated = (|| {
         Some(AppearanceLabels {
             signed_by: said(&english.signed_by)?,

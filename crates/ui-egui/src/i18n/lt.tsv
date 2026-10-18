@@ -2684,3 +2684,19 @@ key	Space	Tarpas
 	The password must have at least 6 characters.	Slaptažodį turi sudaryti bent 6 simboliai.
 	This file changed on disk. Reload it to see the new version; your unsaved changes will be lost.	Šis failas diske pasikeitė. Įkelkite jį iš naujo, kad pamatytumėte naują versiją; neįrašyti pakeitimai bus prarasti.
 theme	Appearance	Išvaizda
+
+# AI-assisted additions: Thai page numbers and the Thai text font (2026-10-19, DocCraftTH).
+# These additions have not had separate native-speaker review.
+	Continue from previous section	Tęsti nuo ankstesnio skyriaus
+	Interface font	Sąsajos šriftas
+	Not installed	Neįdiegta
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped rodo tik tajų tekstą. Angliškas sąsajos tekstas lieka sąsajos šriftu.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium rodo anglišką ir tajų sąsają.
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	Operacinės sistemos šriftai rodomi tik ekrane. Jie neįrašomi į PDF.
+	Operating system	Operacinė sistema
+	Optional font	Pasirenkamas šriftas
+	Primary	Pagrindinis
+	Show optional fonts	Rodyti pasirenkamus šriftus
+	Thai text font	Tajų teksto šriftas
+	Thai text	Tajų tekstas
+	This application	Ši programa
