@@ -2913,6 +2913,45 @@ fn added_thai_text_wraps_clusters_and_survives_reopen() {
 }
 
 #[test]
+fn added_thai_text_wraps_between_words() {
+    if pdfcraft_fonts::document_thai_font().is_none() {
+        eprintln!("skipping added_thai_text_wraps_between_words: no Thai face in this build");
+        return;
+    }
+    let t = AddedText {
+        rect: [72.0, 72.0, 132.0, 400.0], text: "เอกสารนี้กำลังพยายามเปิดไฟล์ในเครื่อง".into(), ..AddedText::default()
+    };
+    let lines = super::added::lines(&t);
+    assert!(lines.len() > 1, "{lines:?}");
+    assert_eq!(lines.concat(), t.text);
+    // Every row ends where the dictionary allows a break, never inside a word.
+    let words = pdfcraft_fonts::thai::break_offsets(&t.text);
+    let mut at = 0;
+    for line in lines.iter().take(lines.len() - 1) {
+        at += line.len();
+        assert!(words.contains(&at), "row ends inside a word at {at}: {lines:?}");
+    }
+}
+
+#[test]
+fn added_thai_long_words_keep_syllables_whole() {
+    if pdfcraft_fonts::document_thai_font().is_none() {
+        eprintln!("skipping added_thai_long_words_keep_syllables_whole: no Thai face in this build");
+        return;
+    }
+    // Narrower than any word, so every row break falls back to cluster boundaries.
+    let t =
+        AddedText { rect: [0.0, 0.0, 16.0, 400.0], text: "เปลี่ยนแปลงตระการตา".into(), ..AddedText::default() };
+    let lines = super::added::lines(&t);
+    assert!(lines.len() > 1, "{lines:?}");
+    assert_eq!(lines.concat(), t.text);
+    for pair in lines.windows(2) {
+        let (before, after) = (pair[0].chars().next_back(), pair[1].chars().next());
+        assert!(before.zip(after).is_some_and(|(b, a)| pdfcraft_fonts::thai::may_break(b, a)), "a syllable is split: {lines:?}");
+    }
+}
+
+#[test]
 fn group_moves_preserve_glyph_bytes_and_unselected_text_state() {
     for content in [
         "BT /F1 12 Tf 1.3 Tc 2 Tw 80 Tz 14 TL 1 0.2 -0.1 1 50 600 Tm (A\\101) Tj 1 0 0 rg (Neighbour) Tj T* (Next) Tj ET",
