@@ -57,11 +57,12 @@ fn cx() -> Context {
 #[test]
 fn tokens_expand() {
     let c = cx();
-    assert_eq!(expand("Page <<1>> of <<n>>", 3, 10, 0, &c), "Page 3 of 10");
-    assert_eq!(expand("<<1 of n>> · <<Page 1>> · <<1/n>>", 2, 5, 0, &c), "2 of 5 · Page 2 · 2/5");
-    assert_eq!(expand("<<m/d/yyyy>> <<yyyy-mm-dd>> <<mmmm d, yyyy>>", 1, 1, 0, &c), "10/1/2026 2026-10-01 October 1, 2026");
-    assert_eq!(expand("<<Bates Number#6#100#ABC#-X>>", 1, 1, 104, &c), "ABC000104-X");
-    assert_eq!(expand("keep <<unknown>> and <<unclosed", 1, 1, 0, &c), "keep <<unknown>> and <<unclosed");
+    let d = PageNumberStyle::Decimal;
+    assert_eq!(expand("Page <<1>> of <<n>>", 3, 10, 0, &c, d), "Page 3 of 10");
+    assert_eq!(expand("<<1 of n>> · <<Page 1>> · <<1/n>>", 2, 5, 0, &c, d), "2 of 5 · Page 2 · 2/5");
+    assert_eq!(expand("<<m/d/yyyy>> <<yyyy-mm-dd>> <<mmmm d, yyyy>>", 1, 1, 0, &c, d), "10/1/2026 2026-10-01 October 1, 2026");
+    assert_eq!(expand("<<Bates Number#6#100#ABC#-X>>", 1, 1, 104, &c, d), "ABC000104-X");
+    assert_eq!(expand("keep <<unknown>> and <<unclosed", 1, 1, 0, &c, d), "keep <<unknown>> and <<unclosed");
     assert_eq!(bates_start("x <<Bates Number#6#100#A#B>>"), Some(100));
 }
 
@@ -113,6 +114,104 @@ fn header_start_number_that_would_wrap_is_refused_without_drawing() {
     // A single page still fits the start number itself.
     add_header_footer(&mut doc, &[0], &hf, false, &cx()).unwrap();
     assert_eq!(marks_present(&doc).len(), 1);
+}
+
+#[test]
+fn header_page_number_styles_format_the_number_and_leave_the_count_decimal() {
+    assert_eq!(THAI_CONSONANTS.chars().count(), 44);
+    assert!(THAI_CONSONANTS.contains('ฃ') && THAI_CONSONANTS.contains('ฅ'));
+    assert!(!THAI_CONSONANTS.contains('ฤ'));
+    let c = cx();
+    assert_eq!(expand("<<1 of n>>", 10, 12, 0, &c, PageNumberStyle::Decimal), "10 of 12");
+    assert_eq!(expand("<<1>>", 1, 1, 0, &c, PageNumberStyle::LatinUpper), "A");
+    assert_eq!(expand("<<1>>", 26, 1, 0, &c, PageNumberStyle::LatinUpper), "Z");
+    assert_eq!(expand("<<1>>", 27, 1, 0, &c, PageNumberStyle::LatinUpper), "AA");
+    assert_eq!(expand("<<1>>", 1, 1, 0, &c, PageNumberStyle::LatinLower), "a");
+    assert_eq!(expand("<<1>>", 1, 1, 0, &c, PageNumberStyle::ThaiDigits), "๑");
+    assert_eq!(expand("<<1>>", 10, 1, 0, &c, PageNumberStyle::ThaiDigits), "๑๐");
+    assert_eq!(expand("<<1>>", 1, 1, 0, &c, PageNumberStyle::ThaiLetters), "ก");
+    assert_eq!(expand("<<1>>", 45, 1, 0, &c, PageNumberStyle::ThaiLetters), "กก");
+    assert_eq!(expand("<<Page 1 of n>>", 1, 3, 0, &c, PageNumberStyle::LatinUpper), "Page A of 3");
+    assert_eq!(expand("<<1 of n>>", 10, 12, 0, &c, PageNumberStyle::ThaiDigits), "๑๐ of 12");
+}
+
+#[test]
+fn header_decimal_on_page_ten_of_a_range_stays_decimal() {
+    let mut doc = fixture();
+    let hf = HeaderFooter {
+        text: [String::new(), "<<1 of n>>".into(), String::new(), String::new(), String::new(), String::new()],
+        start_number: 10,
+        ..HeaderFooter::default()
+    };
+    add_header_footer(&mut doc, &[0], &hf, false, &cx()).unwrap();
+    let mark = streams(&reopen(&doc), 0).pop().expect("mark");
+    assert!(mark.contains("(10 of 3)"), "{mark}");
+    assert!(mark.contains("/PCHelv"), "{mark}");
+    assert!(mark.contains("/PCPageNum 10"), "{mark}");
+}
+
+#[test]
+fn header_continue_numbering_uses_the_stored_number_not_the_page_index() {
+    let mut doc = fixture();
+    let first = HeaderFooter {
+        text: [String::new(), "<<1>>".into(), String::new(), String::new(), String::new(), String::new()],
+        start_number: 5,
+        ..HeaderFooter::default()
+    };
+    add_header_footer(&mut doc, &[0], &first, false, &cx()).unwrap();
+    let second = HeaderFooter {
+        text: [String::new(), "<<1>>".into(), String::new(), String::new(), String::new(), String::new()],
+        start_number: 1,
+        continue_numbering: true,
+        ..HeaderFooter::default()
+    };
+    add_header_footer(&mut doc, &[1], &second, false, &cx()).unwrap();
+    let mark = streams(&reopen(&doc), 1).pop().expect("mark");
+    assert!(mark.contains("(6) Tj"), "{mark}");
+    assert!(!mark.contains("(1) Tj"), "{mark}");
+    assert!(mark.contains("/PCPageNum 6"), "{mark}");
+}
+
+#[test]
+fn thai_page_number_without_a_font_is_refused_and_draws_nothing() {
+    let c = cx();
+    assert_eq!(expand("<<1>>", 1, 1, 0, &c, PageNumberStyle::ThaiDigits), "๑");
+    assert_eq!(expand("<<1>>", 10, 3, 0, &c, PageNumberStyle::ThaiDigits), "๑๐");
+    let mut doc = fixture();
+    let before = streams(&doc, 0);
+    let hf = HeaderFooter {
+        text: [String::new(), "<<1 of n>>".into(), String::new(), String::new(), String::new(), String::new()],
+        number_style: PageNumberStyle::ThaiDigits,
+        start_number: 10,
+        ..HeaderFooter::default()
+    };
+    if pdfcraft_fonts::document_thai_font().is_none() {
+        let err = add_header_footer(&mut doc, &[0], &hf, false, &cx()).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("CRAFT_FONTS_DIR"), "{msg}");
+        assert!(msg.contains('๑'), "{msg}");
+        assert_eq!(streams(&doc, 0), before, "a refused Thai header changes nothing");
+        return;
+    }
+    add_header_footer(&mut doc, &[0], &hf, false, &cx()).unwrap();
+    let mark = streams(&reopen(&doc), 0).pop().expect("mark");
+    assert!(mark.contains("0E51") && mark.contains("0E50"), "{mark}");
+    assert!(mark.contains("/PCHelv") && mark.contains("( of "), "{mark}");
+}
+
+#[test]
+fn decimal_header_rejects_thai_and_a_thai_style_allows_thai_the_face_can_draw() {
+    let mut decimal = HeaderFooter::default();
+    decimal.text[0] = "๑".into();
+    assert_eq!(decimal.first_undrawable(), Some('๑'));
+    let mut thai = decimal.clone();
+    thai.number_style = PageNumberStyle::ThaiLetters;
+    thai.text[0] = "ก".into();
+    if pdfcraft_fonts::document_thai_font().is_some() {
+        assert_eq!(thai.first_undrawable(), None);
+    } else {
+        assert_eq!(thai.first_undrawable(), Some('ก'));
+    }
 }
 
 #[test]

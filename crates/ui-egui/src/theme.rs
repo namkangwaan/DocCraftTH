@@ -211,7 +211,12 @@ impl CjkPreference {
 /// first for Chinese, Japanese first otherwise). Call it when the language changes; the new
 /// faces take effect next frame.
 pub fn install_fonts_for(ctx: &egui::Context, cjk: CjkPreference) {
-    ctx.set_fonts(installed_font_definitions(cjk));
+    install_fonts_with(ctx, cjk, crate::thai_fonts::DEFAULT_THAI_FONT);
+}
+
+/// [`install_fonts_for`] with the Thai text family from Preferences.
+pub fn install_fonts_with(ctx: &egui::Context, cjk: CjkPreference, thai_family: &str) {
+    ctx.set_fonts(installed_font_definitions_with(cjk, thai_family));
 }
 
 /// The name of the installed face [`installed_font_definitions`] may add after the embedded ones.
@@ -244,6 +249,11 @@ pub const SYSTEM_THAI_FALLBACK: &str = "system-thai-fallback";
 ///
 /// `PDFCRAFT_SYSTEM_FONTS=0` leaves them out.
 pub fn installed_font_definitions(cjk: CjkPreference) -> FontDefinitions {
+    installed_font_definitions_with(cjk, crate::thai_fonts::DEFAULT_THAI_FONT)
+}
+
+/// [`installed_font_definitions`] using `thai_family` for the Thai text face.
+pub fn installed_font_definitions_with(cjk: CjkPreference, thai_family: &str) -> FontDefinitions {
     #[cfg_attr(target_arch = "wasm32", expect(unused_mut))]
     let mut fonts = font_definitions_for(cjk == CjkPreference::SimplifiedChinese);
     #[cfg(not(target_arch = "wasm32"))]
@@ -281,6 +291,8 @@ pub fn installed_font_definitions(cjk: CjkPreference) -> FontDefinitions {
             }
         }
     }
+    // After the fallbacks, so the Thai text family can copy a stack that already ends with them.
+    crate::thai_fonts::install(&mut fonts, thai_family);
     fonts
 }
 

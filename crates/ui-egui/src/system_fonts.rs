@@ -368,6 +368,25 @@ fn unix_candidates(files: &[&str], installed: &[PathBuf]) -> Vec<PathBuf> {
     paths
 }
 
+/// Installed `.ttf` and `.ttc` files whose name is in `names`. Fontconfig's directories are
+/// searched, so a Nix store path counts. The first file for each name wins.
+#[cfg(all(unix, not(target_os = "macos"), not(target_arch = "wasm32")))]
+pub(crate) fn paths_named(names: &std::collections::HashSet<&str>) -> Vec<PathBuf> {
+    let mut found = Vec::new();
+    let mut taken = std::collections::HashSet::new();
+    for path in fontconfig::font_files(&fontconfig::config_path()) {
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else { continue };
+        if !names.contains(name) || !taken.insert(name.to_string()) {
+            continue;
+        }
+        found.push(path);
+        if taken.len() == names.len() {
+            break;
+        }
+    }
+    found
+}
+
 fn read(path: &Path, probe: char, max: u64) -> Option<Arc<FontData>> {
     let meta = std::fs::metadata(path).ok()?;
     if !meta.is_file() || meta.len() > max {

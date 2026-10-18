@@ -136,6 +136,7 @@ pub mod scroll_speed;
 #[cfg(not(target_arch = "wasm32"))]
 mod system_fonts;
 mod tab_context;
+mod thai_fonts;
 pub mod theme;
 pub mod ui_scale;
 pub mod updates;
@@ -539,6 +540,10 @@ pub struct PdfCraftApp {
     pub motion: motion::Motion,
     /// Interface language preference: `auto` (follow the system) or a code from [`i18n::LANGUAGES`].
     pub language: String,
+    /// Preferences ▸ Fonts: the face used for Thai text. Interface text stays on Noto Sans Thai Medium.
+    pub thai_font: String,
+    /// Preferences ▸ Fonts: list the optional families as well as the primary four.
+    pub thai_optional_fonts: bool,
     /// Preferences ▸ Interface size as a factor, or `None` to follow [`Self::system_text_scale`].
     pub ui_scale: Option<f32>,
     /// The desktop's text scaling (GNOME's text scaling factor), which the desktop app reads at
@@ -748,6 +753,8 @@ pub struct PdfCraftApp {
     fonts_ready: bool,
     /// The CJK fallback order the installed fonts follow (see `theme::installed_font_definitions`).
     fonts_cjk: theme::CjkPreference,
+    /// The Thai text family the installed fonts were built for.
+    fonts_thai: String,
     /// The window title last sent to the platform.
     pub window_title: String,
     /// The UI control channel, when enabled (`--control`; off by default).
@@ -916,6 +923,8 @@ impl PdfCraftApp {
             animation_effects: motion::AnimationEffects::default(),
             motion: motion::Motion::default(),
             language: i18n::AUTO.to_string(),
+            thai_font: thai_fonts::DEFAULT_THAI_FONT.to_string(),
+            thai_optional_fonts: false,
             ui_scale: None,
             system_text_scale: 1.0,
             ui_scale_applied: None,
@@ -1036,6 +1045,7 @@ impl PdfCraftApp {
             styled: false,
             fonts_ready: false,
             fonts_cjk: theme::CjkPreference::Default,
+            fonts_thai: String::new(),
             control: None,
             bookmark_rename: None,
             last_opened_url: None,
@@ -2279,6 +2289,8 @@ impl PdfCraftApp {
         v["redact_prefs"] = self.redact_defaults.to_json();
         // Set outside json! above, which is at serde_json's macro recursion limit.
         v["hide_empty_highlight_hover"] = serde_json::Value::Bool(self.comment_prefs.hide_empty_highlight_hover);
+        v["thai_font"] = serde_json::Value::String(self.thai_font.clone());
+        v["thai_optional_fonts"] = serde_json::Value::Bool(self.thai_optional_fonts);
         v.to_string()
     }
 
@@ -2350,6 +2362,13 @@ impl PdfCraftApp {
         }
         if let Some(language) = v["language"].as_str().and_then(i18n::normalize_pref) {
             self.language = language.to_string();
+        }
+        // Settings are untrusted: an unknown family, including one that was removed, keeps the default.
+        if let Some(family) = v["thai_font"].as_str().and_then(thai_fonts::known_choice) {
+            self.thai_font = family.to_string();
+        }
+        if let Some(on) = v["thai_optional_fonts"].as_bool() {
+            self.thai_optional_fonts = on;
         }
         if let Some(on) = v["flatten_fill_sign"].as_bool() {
             self.flatten_fill_sign_on_save = on;
@@ -2930,16 +2949,18 @@ impl eframe::App for PdfCraftApp {
         let cjk = theme::CjkPreference::for_language(lang.code());
         if !self.styled {
             egui_extras::install_image_loaders(ctx);
-            theme::install_fonts_for(ctx, cjk);
+            theme::install_fonts_with(ctx, cjk, &self.thai_font);
             self.fonts_cjk = cjk;
+            self.fonts_thai.clone_from(&self.thai_font);
             theme::apply(ctx, self.theme);
             self.styled = true;
         } else {
             self.fonts_ready = true;
-            if cjk != self.fonts_cjk {
+            if cjk != self.fonts_cjk || self.fonts_thai != self.thai_font {
                 // Same family names as before, so named fonts stay valid while the new set loads.
-                theme::install_fonts_for(ctx, cjk);
+                theme::install_fonts_with(ctx, cjk, &self.thai_font);
                 self.fonts_cjk = cjk;
+                self.fonts_thai.clone_from(&self.thai_font);
             }
         }
         self.sync_theme(ctx);

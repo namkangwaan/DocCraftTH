@@ -1433,6 +1433,8 @@ mod tests {
             "−Bin",
             // The distinguished name of a certificate, abbreviated as in X.500.
             "DN: ",
+            // Left in English on purpose: the page-number work translates this only into Thai.
+            "Continue from previous section",
         ];
         let (entries, errors) = parse_entries(cs.0.source, cs.0.plural_forms());
         assert!(errors.is_empty(), "{errors:?}");
@@ -1547,6 +1549,8 @@ mod tests {
             "Home / End",
             // The distinguished name of a certificate, abbreviated as in X.500.
             "DN: ",
+            // Left in English on purpose: the page-number work translates this only into Thai.
+            "Continue from previous section",
         ];
         let (entries, errors) = parse_entries(tr_lang.0.source, tr_lang.0.plural_forms());
         assert!(errors.is_empty(), "Turkish catalog errors: {errors:?}");
@@ -2544,6 +2548,8 @@ mod tests {
             "−Bin",
             "`{command}` {when}",
             "English",
+            // Left in English on purpose: the page-number work translates this only into Thai.
+            "Continue from previous section",
         ];
         const KEY_CAPS: &[&str] = &["Ctrl", "Shift", "Delete", "Esc", "Home", "End", "Space"];
         let (entries, errors) = catalog::parse_entries(vi.0.source, vi.0.plural_forms());
@@ -3001,6 +3007,8 @@ mod tests {
             "−Bin",
             // The distinguished name of a certificate, abbreviated as in X.500.
             "DN: ",
+            // Left in English on purpose: the page-number work translates this only into Thai.
+            "Continue from previous section",
         ];
         let unchanged: Vec<_> = entries
             .iter()
@@ -3081,6 +3089,8 @@ mod tests {
             "−Bin",
             // The distinguished name of a certificate, abbreviated as in X.500.
             "DN: ",
+            // Left in English on purpose: the page-number work translates this only into Thai.
+            "Continue from previous section",
         ];
         let unchanged: Vec<_> = entries
             .iter()

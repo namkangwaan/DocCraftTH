@@ -877,6 +877,8 @@ pub fn tools() -> Vec<ToolDef> {
                 "color": { "type": "string", "description": "#RRGGBB or a colour name." },
                 "margins": { "type": "array", "items": { "type": "number", "minimum": 0 }, "minItems": 4, "maxItems": 4, "description": "Top, bottom, left, right in points (default 36, 36, 72, 72)." },
                 "start_number": { "type": "integer", "minimum": 1 },
+                "number_style": { "type": "string", "enum": ["decimal", "latin-upper", "latin-lower", "thai-digits", "thai-letters"], "description": "How <<1>> is written. <<n>> stays a decimal count. Words of and Page stay English." },
+                "continue_numbering": { "type": "boolean", "description": "The first selected page is one past the header number stored on the nearest earlier page." },
                 "replace": { "type": "boolean" },
             }),
             &["doc"],

@@ -322,6 +322,7 @@ pub(crate) fn preferences_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tok
             app.notify(error);
         }
     });
+    crate::thai_fonts::preferences_section(ui, app, t);
     ui.add_space(8.0);
     crate::appearance::preferences_section(ui, app, t);
     ui.add_space(8.0);
