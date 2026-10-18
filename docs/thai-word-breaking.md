@@ -1,17 +1,18 @@
 # Thai word breaking
 
-> **Last reviewed:** 2026-10-18 · **Last updated:** 2026-10-18 · **Change:** minor (LSTM wasm cost measured: +0.377 MiB against +1.763 MiB for the dictionary; slower to segment) · **Status:** Part 1 (`break_offsets`, Edit text) on `feat/thai-line-breaking`; Add text fix and Part 2 (UI labels, comments) in progress on `wip/thai-line-breaking-part2`
+> **Last reviewed:** 2026-10-18 · **Last updated:** 2026-10-18 · **Change:** major (the LSTM segmenter and `may_break` ship; all four wrap paths landed) · **Status:** shipped on `feat/thai-line-breaking` at `7d7d837c` (pushed); not yet merged into `feat/thai-language`
 
-Thai is written without spaces between words. A line may end between two words, but never inside a word and never before a tone mark or a vowel sign written above or below its letter. DocCraftTH finds the word boundaries with one function and uses it in four places.
+Thai is written without spaces between words. A line may end between two words, but never inside a word and never before a tone mark or a vowel sign written above or below its letter. DocCraftTH finds the word boundaries with one function, keeps syllables whole with a second, and uses both in four places.
 
 ## The engine
 
-`pdfcraft_fonts::thai::break_offsets(text)` (`crates/fonts/src/thai.rs`) returns the byte offsets where a line may end next to a Thai character. It runs the ICU4X dictionary line segmenter, `icu_segmenter::LineSegmenter::new_dictionary` (icu_segmenter 2.3.0, `compiled_data`), which is UAX #14 line breaking with ICU's Thai word list. It then filters the segmenter's answer: offsets stay strictly inside the text and on char boundaries, never fall before a combining mark (U+0E31, U+0E34–U+0E3A, U+0E47–U+0E4E) and never directly after whitespace. A wrong answer from the segmenter can therefore drop a break, but cannot split a cluster on those marks.
+`pdfcraft_fonts::thai::break_offsets(text)` (`crates/fonts/src/thai.rs`) returns the byte offsets where a line may end next to a Thai character. It runs the ICU4X LSTM line segmenter, `icu_segmenter::LineSegmenter::new_lstm` (icu_segmenter 2.3.0, features `compiled_data` and `lstm`), which is UAX #14 line breaking with a Thai word model. It then filters the segmenter's answer: offsets stay strictly inside the text and on char boundaries, never directly after whitespace, and only where `pdfcraft_fonts::thai::may_break(before, after)` allows. `may_break` says no line starts with a combining mark (U+0E31, U+0E34–U+0E3A, U+0E47–U+0E4E), a following vowel (ะ า ำ ๅ), ๆ or ฯ, and none ends with a leading vowel (เ แ โ ใ ไ). A wrong answer from the segmenter can therefore drop a break, but cannot split a syllable at those letters.
 
-Why ICU4X's dictionary segmenter:
+Why ICU4X's LSTM segmenter:
 
 - Rust, offline, no new runtime. `icu_properties` and `icu_provider` were already in the tree through egui, so only the segmenter and its data are new.
-- It builds for wasm. The linked size cost, measured with a probe crate (`K:\tmp\wasm-probe`, after the Part 1 commit `5226aba1` recorded it as not measured), is +1.76 MiB of the 2 MiB budget the line-breaking plan set. `LineSegmenter::new_lstm` was meant as the fallback if that went over, and it did not. The first oracle run then found the dictionary cutting words mid-word, and `new_lstm` measured at only +0.377 MiB, so switching to it is now recommended (see First run below). That decision belongs to the Step 3 owner.
+- It builds for wasm, at +0.377 MiB linked of the 2 MiB budget the line-breaking plan set (probe crate `K:\tmp\wasm-probe`).
+- Part 1 shipped the dictionary segmenter (+1.763 MiB). The first oracle run found it splitting clusters after words it does not know, and LSTM has none on the same catalog (First run below), so `7d7d837c` switched. The cost is speed: segmenting the whole `th` catalog takes about 0.55 s more than the dictionary (native release), paid once when a Thai interface first loads its catalog.
 - The data is under the Unicode licence, already accepted for ICU4X.
 
 Rejected:
@@ -24,12 +25,12 @@ Rejected:
 
 | What wraps | Where | How it uses the breaks | State |
 |---|---|---|---|
-| Add text (new text written into a PDF) | `crates/edit/src/added.rs`, `thai_lines` | Shapes the paragraph, groups shaped clusters into words at `break_offsets` and at spaces, and fills rows word by word. A word wider than the row breaks at shaped cluster boundaries, which never detach a mark. | `74ba36c6` on `wip/thai-line-breaking-part2` |
-| Edit text (rewrapping existing page text) | `crates/edit/src/text.rs`, `wrap`, through `crates/edit/src/linebreak.rs`, `pieces` | `pieces` cuts a space-separated word at `break_offsets` as well as at the CJK rules (UAX #14 ID, kinsoku). | `051994f7` on `feat/thai-line-breaking` |
-| UI labels (the `th` catalog) | `crates/ui-egui/src/i18n/th_breaks.rs` and `vendor/epaint/src/text/text_layout.rs` | `soft_breaks` inserts U+200B ZERO WIDTH SPACE at each break. egui wraps only at whitespace, so the vendored epaint 0.36.2 treats U+200B as a break candidate and never starts a row with a combining mark (two `PdfCraft patch:` edits). Text that leaves the screen (signature appearance labels written into a PDF, control-channel matches) goes through `without_soft_breaks`. | Part 2, in progress |
-| Comments (annotation contents) | `crates/ui-egui/src/bidi.rs`, `words` and `fitting_prefix` | `words` splits Thai runs at `break_offsets`; `fitting_prefix` breaks an overlong word but never before a mark. | Part 2, in progress |
+| Add text (new text written into a PDF) | `crates/edit/src/added.rs`, `thai_lines` | Shapes the paragraph, groups shaped clusters into words at `break_offsets` and at spaces, and fills rows word by word. A word wider than the row breaks between shaped clusters, only where `may_break` allows. | `6f9adff9`, `7d7d837c` |
+| Edit text (rewrapping existing page text) | `crates/edit/src/text.rs`, `wrap`, through `crates/edit/src/linebreak.rs`, `pieces` | `pieces` cuts a space-separated word at `break_offsets` as well as at the CJK rules (UAX #14 ID, kinsoku). A piece wider than the row overflows rather than splitting. | `051994f7` |
+| UI labels (the `th` catalog) | `crates/ui-egui/src/i18n/th_breaks.rs` and `vendor/epaint/src/text/text_layout.rs` | `soft_breaks` inserts U+200B ZERO WIDTH SPACE at each break when the catalog first loads. The vendored epaint 0.36.2 (`[patch.crates-io]`) treats U+200B as a break candidate, and its last-resort break never starts a row with a following vowel or ends one with a leading vowel. Stock epaint already keeps combining marks with their letter, so that part needed no patch (`vendor/README.md`). Text that leaves the screen (signature appearance labels written into a PDF, the command search, control-channel matches) goes through `without_soft_breaks`. | `7d7d837c` |
+| Comments (annotation contents) | `crates/ui-egui/src/bidi.rs`, `words` and `fitting_prefix` | `words` splits Thai runs at `break_offsets`; `fitting_prefix` breaks an overlong word only where `may_break` allows. | `7d7d837c` |
 
-All four call the same function, so a fix to the engine or a supplementary word list reaches all of them.
+All four call the same functions, so a fix to the engine or a supplementary word list reaches all of them. The tests that hold each path: `thai::tests` (fonts), `added_thai_long_words_keep_syllables_whole` (edit), `bidi` tests and `crates/ui-egui/tests/thai_wrap.rs` (every row width from 20 to 90 pt).
 
 ## Measuring it: the PyThaiNLP oracle
 
@@ -49,7 +50,7 @@ The oracle compares, for every unique Thai translation in `crates/ui-egui/src/i1
 
 pythainlp 5.4.0, `th.tsv` at `1d0a35bc`, `break_offsets` at `d802ee7c`, 2,464 unique translations. Report: `K:\tmp\thai-break-oracle.md`, every row in `thai-break-oracle.json`.
 
-| | Dictionary (shipped) | LSTM (`new_lstm`, tested only) |
+| | Dictionary (Part 1) | LSTM (`new_lstm`) |
 |---|---|---|
 | Strings where both engines agree | 1,145 (46.5%) | 890 (36.1%) |
 | Precision / recall vs newmm | 76.1% / 95.5% | 75.2% / 92.2% |
@@ -65,6 +66,10 @@ pythainlp 5.4.0, `th.tsv` at `1d0a35bc`, `break_offsets` at `d802ee7c`, 2,464 un
 - A supplementary word list hides the known triggers but not the desync. The next loanword sets it off again.
 - icu_segmenter 2.3.0 is the newest release on crates.io (checked 2026-10-17), so an upgrade does not fix it.
 - `LineSegmenter::new_lstm` (icu_segmenter feature `lstm`) has no cluster splits on this catalog. It also costs less wasm: a probe build (2026-10-18, `K:\tmp\wasm-probe`, icu_segmenter alone, release with `opt-level = "s"`, LTO, strip) links 396,613 bytes with `new_lstm` against 1,849,411 with `new_dictionary` and 898 with no segmenter. That is +0.377 MiB against +1.763 MiB, so the switch saves 1.385 MiB of the 2 MiB budget. The probe slightly overstates the cost in the app, which already links `icu_provider` and `zerovec` through egui. LSTM is an order of magnitude or more slower: about 0.8 s for the whole catalog, native, on a busy laptop, while the dictionary stays within start-up noise (at most about 0.03 s). Part 2 segments the whole `th` catalog when the language loads, so time that with LSTM before switching. The rerun reproduced LSTM a 0 / b 143 with and without the `break_offsets` filter. Its 143 class-b breaks fall in 47 words, led by อัก\|ขระ (19), ก\|รอก (15) and บุ๊กมาร์\|ก (13). A few of them are newmm's mistakes, not LSTM's (newmm cuts แล้\|วจะ, LSTM gives แล้ว\|จะ). Full table: `K:\tmp\thai-lstm-wasm.md`.
+
+### Second run (2026-10-18, the shipped function)
+
+`break_offsets` at `5eb31257` (LSTM with the `may_break` filter, same tree as `7d7d837c`): class a 0, class b 143, the same as raw LSTM, canary `[6,15]`. Report: `K:\tmp\thai-break-oracle-product-lstm.md`. On this catalog LSTM never proposed a break the filter had to drop between two Thai letters; the filter earns its place on other text (`ไปๆมา` gives raw `ไป|ๆมา`, filtered `ไปๆมา`).
 
 ### Rerunning the oracle
 
@@ -97,7 +102,7 @@ Nothing here is part of the build. Python stays outside the repository.
    }
    ```
 
-   Build it with `cargo build -p pdfcraft-fonts -j 2 --example thai_breaks` and its own `CARGO_TARGET_DIR`. `new_lstm` needs the icu_segmenter feature `lstm`: add it to `crates/fonts/Cargo.toml` for the run only and revert it afterwards. The raw and LSTM modes include the offsets 0 and the text length; drop them before `compare`.
+   Build it with `cargo build -p pdfcraft-fonts -j 2 --example thai_breaks` and its own `CARGO_TARGET_DIR`. The default mode is the shipped `break_offsets`. The raw and LSTM modes include the offsets 0 and the text length; drop them before `compare`.
 3. The script `oracle.py` (kept in `K:\tmp\thai-oracle\` and in the session notes, not in the repository) does the rest. Run Python with `-I -X utf8`.
    - `oracle.py extract th.tsv strings.txt` writes the unique third-column translations, one per line, after a canary line ผมกินข้าว.
    - Feed `strings.txt` to the example with shell redirection, not a PowerShell pipe, which re-encodes stdin: `thai_breaks.exe < strings.txt > icu.jsonl`.
@@ -133,6 +138,7 @@ Only if the oracle shows ICU splitting real UI words (class a, or class b rows a
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-18 | major | LSTM and `may_break` ship on `feat/thai-line-breaking` (`7d7d837c`); the four wrap paths are landed and their tests named; the epaint patch lost its mark rule (stock behaviour); second oracle run on the shipped function: a 0, b 143. |
 | 2026-10-18 | minor | LSTM wasm cost measured: +0.377 MiB linked against +1.763 MiB for the dictionary (saves 1.385 MiB of 2 MiB), but an order of magnitude or more slower to segment the catalog natively (about 0.8 s against at most about 0.03 s). LSTM oracle numbers (a 0, b 143) reproduced; class b grouped by word. |
 | 2026-10-17 | minor | First oracle run: the ICU4X dictionary segmenter desyncs after unknown words (191 cluster splits in 127 of 2,464 strings); LSTM has none on the same catalog. Rerun steps cover `--raw` and `--lstm`. |
 | 2026-10-17 | major | First version: ICU4X dictionary engine and why (wasm +1.76 MiB of 2 MiB), the four wrap paths, the PyThaiNLP oracle and how to rerun it, PyThaiNLP corpus licences, clean-room rule. |
