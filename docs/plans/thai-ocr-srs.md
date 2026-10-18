@@ -3,8 +3,8 @@
 
 | รายการ | ค่า |
 |---|---|
-| เวอร์ชันเอกสาร | 0.3 (17 ตุลาคม 2569) |
-| สถานะ | ร่าง · ผู้ใช้ยืนยัน CR-001 ถึง CR-007 แล้ว ไม่มีข้อเสนอค้าง |
+| เวอร์ชันเอกสาร | 0.4 (18 ตุลาคม 2569) |
+| สถานะ | ร่าง · ผู้ใช้ยืนยัน CR-001 ถึง CR-008 แล้ว ไม่มีข้อเสนอค้าง |
 | แทนที่ | เป้าหมายข้อ 3 ของ `docs/plans/thai-support.md` (branch `chore/thai-plan`) และ Part B ของแผน `docs/superpowers/plans/2026-10-16-thai-support.md` (ไฟล์ในเครื่อง) ในส่วนที่เป็นข้อกำหนด แผนเดิมยังใช้เป็นขั้นตอนลงมือ |
 | เอกสารคู่กัน | `docs/thai-ocr-model.md` (โมเดลและผล CER) · `K:\src\DOCCRAFTTH-AGENT-BOARD.md` (สถานะงานของเอเจนต์) · `parity/acrobat-features.toml` (`ocr.*`) |
 | แหล่งอ้างอิง | โค้ดบน `feat/thai-ocr` `001f8756`: `crates/ocr/src/{lib.rs,ctc.rs,metrics.rs}` · `crates/edit/src/invisible_font.rs` · `crates/engine/src/ocr.rs` · `crates/engine/tests/thai_ocr.rs` · `crates/render/src/text.rs` · `crates/automation/src/tools.rs` |
@@ -224,7 +224,7 @@ render 300 dpi ─► detect ─► ขยายกรอบ ─► recognize �
 | ID | ระดับ | ข้อกำหนด | เกณฑ์ยอมรับ |
 |---|---|---|---|
 | FR-01 | ต้อง | **ดึงโมเดลไทยและตรวจ sha256** ตาม `ATTRIBUTION.toml` | `cargo xtask models` ดึงครบ · ไฟล์ที่ hash ไม่ตรงทำให้คำสั่งล้มพร้อมชื่อไฟล์ · `cargo xtask assets` ผ่าน |
-| FR-02 | ต้อง | **`ocr_status` รายงานภาษาไทย** | `languages` มี `{"code":"th","name":"ไทย"}` · `available.th` เป็น boolean (เทส `ocr_status_reports_thai`) |
+| FR-02 | ต้อง | **`ocr_status` รายงานภาษาไทย** | `languages` มี `{"code":"th","name":"ไทย"}` · `available_by_language.th` และ `th` ระดับบนสุดเป็น boolean · `available` ยังเป็น boolean ของภาษาอังกฤษตาม schema เดิม (เทส `ocr_status_reports_thai`, CR-008) |
 
 ### 6.2 PR-2 Recognize text ไฟล์เดียว
 
@@ -496,6 +496,7 @@ render 300 dpi ─► detect ─► ขยายกรอบ ─► recognize �
 | CR-005 | 17 ต.ค. 2569 | เกณฑ์ CER ของชุดสแกนจริง ≤ 10 % · oracle Tesseract | FR-21, FR-22, AC-07 | นักวิเคราะห์ · ผู้ใช้ยืนยัน 17 ต.ค. 2569 | ยืนยัน |
 | CR-006 | 17 ต.ค. 2569 | เกณฑ์เวลาและหน่วยความจำ | NFR-02, NFR-03 | นักวิเคราะห์ · ผู้ใช้ยืนยัน 17 ต.ค. 2569 | ยืนยัน |
 | CR-007 | 17 ต.ค. 2569 | ที่เก็บชุดสแกนจริง `K:\data\thai-ocr-eval` | §5.4, §9.3, FR-21, S-04 | นักวิเคราะห์ · ผู้ใช้ยืนยัน 17 ต.ค. 2569 | ยืนยัน |
+| CR-008 | 18 ต.ค. 2569 | FR-02 ใช้รูปแบบ `ocr_status` ที่มีอยู่ (`available_by_language.th`) แทน `available.th` เพื่อไม่ให้สคริปต์และเอเจนต์ที่อ่าน `available` แบบ boolean พัง | FR-02 | นักวิเคราะห์ (พบตอนทำ Task 13) · ผู้ใช้ยืนยัน 18 ต.ค. 2569 | ยืนยัน |
 
 ## 13. อภิธานศัพท์
 
