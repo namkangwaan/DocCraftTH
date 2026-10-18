@@ -905,6 +905,26 @@ fn is_complex(c: char) -> bool {
     matches!(c as u32, 0x0300..=0x036F | 0x0900..=0x0DFF | 0x0E00..=0x0EFF | 0x1000..=0x109F | 0x1780..=0x17FF)
 }
 
+/// Nonspacing combining marks (Unicode Mn) of the combining diacritical blocks, Thai and Lao. A Type 3 or outline glyph
+/// with a zero advance gets a default box when its text is extracted, so geometry alone cannot tell such a mark from a
+/// letter.
+fn is_combining_mark(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x0300..=0x036F
+            | 0x1AB0..=0x1AFF
+            | 0x1DC0..=0x1DFF
+            | 0x20D0..=0x20FF
+            | 0xFE20..=0xFE2F
+            | 0x0E31
+            | 0x0E34..=0x0E3A
+            | 0x0E47..=0x0E4E
+            | 0x0EB1
+            | 0x0EB4..=0x0EBC
+            | 0x0EC8..=0x0ECD
+    )
+}
+
 fn is_cjk(c: char) -> bool {
     matches!(c as u32, 0x2E80..=0x9FFF | 0xAC00..=0xD7AF | 0xF900..=0xFAFF | 0xFF00..=0xFFEF | 0x20000..=0x3134F | 0x1100..=0x11FF)
 }
@@ -1013,6 +1033,8 @@ struct Scratch {
     logical: Vec<usize>,
     /// `placed` with the marks merged in, built before it is swapped in.
     merged: Vec<usize>,
+    /// The first glyph of each run of the current segment, sorted.
+    starts: Vec<usize>,
 }
 
 /// One run of a colliding component.
@@ -1106,8 +1128,22 @@ fn restarts_run(glyphs: &[&TextGlyph], start: usize, next: usize, progress: f32)
 /// their glyph-by-glyph order, so the common case is one sort. A run of zero-width glyphs (a combining mark) has no
 /// extent of its own, so it goes next to the glyph it starts at.
 fn place_glyphs(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32, s: &Seg, sc: &mut Scratch) {
-    let x0 = |i: usize| glyphs[i].rect[0];
     let zero_width = |i: usize| glyphs[i].rect[2] - glyphs[i].rect[0] <= 0.05 * height(i);
+    let mut starts = std::mem::take(&mut sc.starts);
+    starts.clear();
+    starts.extend(s.runs().map(|run| run.start));
+    starts.sort_unstable();
+    // A combining mark sits at its base's right edge, which can pass the next word's left edge when word boxes overlap
+    // (OCR text). It is ordered at the letter it follows in its own run, so it never leaves that letter for a
+    // neighbouring run. A run of marks alone has no letter to follow and keeps its own x.
+    let mark = |i: usize| zero_width(i) || (!glyphs[i].text.is_empty() && glyphs[i].text.chars().all(is_combining_mark));
+    let x0 = |i: usize| {
+        let mut k = i;
+        while k > 0 && mark(k) && starts.binary_search(&k).is_err() {
+            k -= 1;
+        }
+        if mark(k) { glyphs[i].rect[0] } else { glyphs[k].rect[0] }
+    };
     sc.text.clear();
     sc.marks.clear();
     sc.placed.clear();
@@ -1124,7 +1160,7 @@ fn place_glyphs(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32, s: &Seg, s
         sc.placed.extend(sc.text.iter().flat_map(|run| run.range()));
         sc.placed.sort_unstable_by(|a, b| x0(*a).total_cmp(&x0(*b)).then(a.cmp(b)));
     } else {
-        collide(glyphs, height, s.h, sc);
+        collide(glyphs, height, &x0, s.h, sc);
     }
     // Each mark goes before the first placed glyph whose x is greater than its own. Marks are visited in x order, and
     // that position never moves back, so one pass over `placed` puts all of them in.
@@ -1142,6 +1178,7 @@ fn place_glyphs(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32, s: &Seg, s
         sc.merged.extend_from_slice(&sc.placed[next..]);
         std::mem::swap(&mut sc.placed, &mut sc.merged);
     }
+    sc.starts = starts;
 }
 
 /// `place_glyphs` for a segment of two or more text runs. `h` is the segment's line height. Returns whether the segment
@@ -1150,8 +1187,8 @@ fn place_glyphs(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32, s: &Seg, s
 /// The sweep tests each glyph against the glyphs after it that start before its right edge. Its work is bounded by the
 /// budget, so a page costs O(glyphs) pair tests plus the sorts. A dense segment is joined with one pass over its runs,
 /// which keeps each run whole. It may keep runs whole that do not overprint, but never interleaves overprinted glyphs.
-fn collide(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32, h: f32, sc: &mut Scratch) -> bool {
-    let x0 = |i: usize| glyphs[i].rect[0];
+/// `x0` is the x each glyph is ordered by ([`place_glyphs`]).
+fn collide(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32, x0: &dyn Fn(usize) -> f32, h: f32, sc: &mut Scratch) -> bool {
     let runs = sc.text.len();
     sc.owner.clear();
     for (r, run) in sc.text.iter().enumerate() {
@@ -2369,6 +2406,23 @@ mod tests {
     }
 
     #[test]
+    fn a_word_final_mark_stays_before_an_overlapping_next_word() {
+        // OCR words whose padded boxes overlap: "ฑ์" ends at x = 152, where its mark ์ starts, and "วิธ" starts 4 pt
+        // earlier, at 148. The marks have a zero advance, yet text extraction gives a Type 3 glyph without one a 0.6 em
+        // box, as here. The mark belongs to ฑ, so it must come out before ว.
+        let v = vec![
+            g("ฑ", 140.0, 10.0, 152.0),
+            g("\u{0E4C}", 152.0, 10.0, 158.0),
+            g("ว", 148.0, 10.0, 156.0),
+            g("\u{0E34}", 156.0, 10.0, 162.0),
+            g("ธ", 156.0, 10.0, 164.0),
+        ];
+        let t = layout(v);
+        let text: String = t.glyphs.iter().map(|g| g.text.as_str()).collect();
+        assert_eq!(text, "ฑ\u{0E4C}ว\u{0E34}ธ");
+    }
+
+    #[test]
     fn many_combining_marks_stay_with_their_letters() {
         // 400 letters on one line, then a zero-width mark at the start of each one, drawn after the whole line:
         // the marks form one run of their own, and each goes back next to its letter, in order.
@@ -2412,7 +2466,8 @@ mod tests {
         let refs: Vec<&TextGlyph> = v.iter().collect();
         let height = |i: usize| (refs[i].rect[3] - refs[i].rect[1]).max(0.1);
         let mut sc = Scratch { text: (0..150).map(|k| Run { start: 3 * k, end: 3 * k + 3 }).collect(), ..Default::default() };
-        assert!(collide(&refs, &height, 10.0, &mut sc), "more pairs than the budget");
+        let x0 = |i: usize| refs[i].rect[0];
+        assert!(collide(&refs, &height, &x0, 10.0, &mut sc), "more pairs than the budget");
         assert_eq!(sc.units.len(), 1, "one component");
 
         let v = overprinted_runs(150, true);
