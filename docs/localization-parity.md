@@ -70,7 +70,7 @@ none has translated help. Vietnamese's **To `full`** hours are therefore residua
 | Greek | `el` | 2,341 entries | partial | no |
 | Turkish | `tr` | 2,313 entries | partial | yes |
 | Lithuanian | `lt` | 2,585 entries | partial; community native-speaker review ([#1401](https://github.com/storytold/pdfcraft/pull/1401)) | no |
-| Thai (DocCraftTH fork) | `th` | 2,672 entries (every key of the Vietnamese catalog) | partial; AI-assisted, no native review yet; Buddhist Era years; words can break mid-word in narrow labels | not checked |
+| Thai (DocCraftTH fork) | `th` | 2,672 entries (every key of the Vietnamese catalog) | partial; AI-assisted, no native review yet; Buddhist Era years; words can break mid-word in narrow labels. With Thai the fork ships 15 other languages (23 catalogs plus English = 24 interface languages); the counts below predate it | not checked |
 
 **14 other languages** ship (22 catalogs plus English = **23** interface languages in Preferences).
 The entry counts without percentages were measured on 2026-10-12–13; they are not percentages of the older 2,143-key snapshot above. Their presence does not imply a detailed linguistic or runtime review.
