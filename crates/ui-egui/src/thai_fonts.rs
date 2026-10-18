@@ -443,8 +443,8 @@ mod tests {
         assert!(std::fs::create_dir_all(&dir).is_ok());
         let path = dir.join("Sarabun-Regular.ttf");
         assert!(std::fs::write(&path, b"x").is_ok());
-        assert_eq!(source_at(true, &[dir.clone()], "Sarabun-Regular.ttf"), Source::Application);
-        assert_eq!(source_at(false, &[dir.clone()], "Sarabun-Regular.ttf"), Source::OperatingSystem);
+        assert_eq!(source_at(true, std::slice::from_ref(&dir), "Sarabun-Regular.ttf"), Source::Application);
+        assert_eq!(source_at(false, std::slice::from_ref(&dir), "Sarabun-Regular.ttf"), Source::OperatingSystem);
         assert_eq!(source_at(false, &[dir], "missing.ttf"), Source::Missing);
         assert_eq!(source_at(false, &[], "Sarabun-Regular.ttf"), Source::Missing);
         let _ = std::fs::remove_file(path);
