@@ -61,12 +61,15 @@ pub struct TextGlyph {
 /// be found by typing `istanbul` or `ırmak`. Search can't know the document's language, so the
 /// four are treated as one letter; this only adds matches where an `ı` or `İ` is involved.
 /// Greek sigma's normal and word-final forms (`σ`/`ς`) both fold to `σ`, as does `Σ`.
+/// Thai digits (`๐`..`๙`) fold to `0`..`9`: Thai documents print either, and OCR reads one as the other, so
+/// `2569` finds `๒๕๖๙` and back. Only the comparison folds; the document keeps its digits.
 pub fn fold_case(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
             'I' | 'i' | '\u{130}' | '\u{131}' => out.push('i'),
             'Σ' | 'σ' | 'ς' => out.push('σ'),
+            '\u{0E50}'..='\u{0E59}' => out.push(char::from_digit(u32::from(c) - 0x0E50, 10).unwrap_or(c)),
             _ => out.extend(c.to_lowercase()),
         }
     }
@@ -1953,6 +1956,18 @@ mod tests {
         assert_eq!(fold_case("ÇAĞLAR Şişli"), "çağlar şişli");
         assert_eq!(fold_case("İIıi"), "iiii");
         assert_eq!(fold_case("Σσς"), "σσσ");
+    }
+
+    #[test]
+    fn thai_and_ascii_digits_find_each_other() {
+        let page =
+            |s: &str| layout(s.chars().enumerate().map(|(i, c)| g(&c.to_string(), 10.0 + 8.0 * i as f32, 10.0, 18.0 + 8.0 * i as f32)).collect());
+        let (ascii, thai) = (page("ปี2569"), page("ปี๒๕๖๙"));
+        assert_eq!(ascii.find("๒๕๖๙"), [2..6]);
+        assert_eq!(thai.find("2569"), [2..6]);
+        assert_eq!(thai.find("ปี๒๕"), [0..4]);
+        assert!(thai.find_opts("2569", true, false).is_empty(), "case-sensitive search matches digits as typed");
+        assert_eq!(fold_case("๐๑๒๓๔๕๖๗๘๙"), "0123456789");
     }
 
     fn g(t: &str, x0: f32, y0: f32, x1: f32) -> TextGlyph {
