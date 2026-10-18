@@ -1,6 +1,6 @@
 # Thai word breaking
 
-> **Last reviewed:** 2026-10-17 · **Last updated:** 2026-10-17 · **Change:** minor (first oracle run: the ICU4X dictionary segmenter breaks mid-word after unknown words; LSTM does not) · **Status:** Part 1 (`break_offsets`, Edit text) on `feat/thai-line-breaking`; Add text fix and Part 2 (UI labels, comments) in progress on `wip/thai-line-breaking-part2`
+> **Last reviewed:** 2026-10-18 · **Last updated:** 2026-10-18 · **Change:** minor (LSTM wasm cost measured: +0.377 MiB against +1.763 MiB for the dictionary; slower to segment) · **Status:** Part 1 (`break_offsets`, Edit text) on `feat/thai-line-breaking`; Add text fix and Part 2 (UI labels, comments) in progress on `wip/thai-line-breaking-part2`
 
 Thai is written without spaces between words. A line may end between two words, but never inside a word and never before a tone mark or a vowel sign written above or below its letter. DocCraftTH finds the word boundaries with one function and uses it in four places.
 
@@ -56,13 +56,15 @@ pythainlp 5.4.0, `th.tsv` at `1d0a35bc`, `break_offsets` at `d802ee7c`, 2,464 un
 | a: splits a cluster | 191 breaks in 127 strings | 0 |
 | b: inside a dictionary word | 258 | 143 |
 | Strings with any a or b break | 200 (8.1%) | 132 (5.4%) |
+| Linked wasm cost (probe, 2026-10-18) | +1.763 MiB (1,848,513 bytes) | +0.377 MiB (395,715 bytes) |
+| Catalog segmentation time (native release, rough) | about 0.02 s | about 0.75 s |
 
 **ICU's dictionary segmenter is wrong on real UI words.** After a word it does not know (transliterated loanwords such as บุ๊กมาร์ก, ออบเจ็กต์, ไดเจสต์, ไฮไลต์, and ลงนาม), icu_segmenter 2.3.0 loses step and cuts the rest of the run in the wrong places: `บุ๊กมาร์กบางรายการไม่ได้แสดงที่นี่` → `บุ๊ก|มา|ร์|กบ|า|งร|า|ยก|า|รไ|ม่ไ|ด้แ|สด|งที่|นี่`, while the same sentence without the loanword segments correctly. The raw `segment_str` output has the same fault, so it is ICU4X's, not the filter's. Consequences:
 
 - A guard against breaks before ะ า ำ ๅ ๆ ฯ and after เ แ โ ใ ไ catches 104 of the 191 cluster splits and none of the mid-word breaks. It is a safety net, not a fix.
 - A supplementary word list hides the known triggers but not the desync. The next loanword sets it off again.
 - icu_segmenter 2.3.0 is the newest release on crates.io (checked 2026-10-17), so an upgrade does not fix it.
-- `LineSegmenter::new_lstm` (icu_segmenter feature `lstm`) has no cluster splits on this catalog. Its wasm cost is not measured yet; measure it against the 2 MiB budget before switching.
+- `LineSegmenter::new_lstm` (icu_segmenter feature `lstm`) has no cluster splits on this catalog. It also costs less wasm: a probe build (2026-10-18, `K:\tmp\wasm-probe`, icu_segmenter alone, release with `opt-level = "s"`, LTO, strip) links 396,613 bytes with `new_lstm` against 1,849,411 with `new_dictionary` and 898 with no segmenter. That is +0.377 MiB against +1.763 MiB, so the switch saves 1.385 MiB of the 2 MiB budget. The probe slightly overstates the cost in the app, which already links `icu_provider` and `zerovec` through egui. LSTM is slower: roughly 0.75 s against 0.02 s for the whole catalog, native, on a busy laptop. Part 2 segments the whole `th` catalog when the language loads, so time that with LSTM before switching. The rerun reproduced LSTM a 0 / b 143 with and without the `break_offsets` filter. Its 143 class-b breaks fall in 47 words, led by อัก\|ขระ (19), ก\|รอก (15) and บุ๊กมาร์\|ก (13). A few of them are newmm's mistakes, not LSTM's (newmm cuts แล้\|วจะ, LSTM gives แล้ว\|จะ). Full table: `K:\tmp\thai-lstm-wasm.md`.
 
 ### Rerunning the oracle
 
@@ -131,5 +133,6 @@ Only if the oracle shows ICU splitting real UI words (class a, or class b rows a
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-18 | minor | LSTM wasm cost measured: +0.377 MiB linked against +1.763 MiB for the dictionary (saves 1.385 MiB of 2 MiB), but about 0.75 s against 0.02 s to segment the catalog natively. LSTM oracle numbers (a 0, b 143) reproduced; class b grouped by word. |
 | 2026-10-17 | minor | First oracle run: the ICU4X dictionary segmenter desyncs after unknown words (191 cluster splits in 127 of 2,464 strings); LSTM has none on the same catalog. Rerun steps cover `--raw` and `--lstm`. |
 | 2026-10-17 | major | First version: ICU4X dictionary engine and why (wasm +1.76 MiB of 2 MiB), the four wrap paths, the PyThaiNLP oracle and how to rerun it, PyThaiNLP corpus licences, clean-room rule. |
