@@ -3365,6 +3365,72 @@ fn recognize_text_reads_a_picture_on_a_page_that_has_text() {
     assert_eq!((count(&s, "invoice"), count(&s, "brown")), (1, 1));
 }
 
+/// Rows of words that cover the whole page and whose text maps to private-use code points, as a
+/// legacy Thai font's ToUnicode does.
+fn private_use_words(w: f64, h: f64) -> Vec<ocr::PlacedWord> {
+    (0..10)
+        .map(|i| ocr::PlacedWord {
+            text: "\u{F700}\u{F701}\u{F702}\u{F703}".into(),
+            origin: [0.0, h * 0.1 * i as f64],
+            across: [w, 0.0],
+            up: [0.0, h * 0.1],
+        })
+        .collect()
+}
+
+#[test]
+fn a_page_whose_text_maps_to_private_use_is_unusable() {
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let blank = s.create_blank(612.0, 792.0, 1).unwrap();
+    let id = s.open("legacy.pdf", None, blank, None).unwrap();
+    s.apply(id, Edit::AddOcrText { page: 0, words: private_use_words(612.0, 792.0) }).unwrap();
+    let saved = s.save_bytes(id).unwrap();
+    let reopened = s.open("reopened.pdf", None, saved, None).unwrap();
+    let doc = s.get(reopened).unwrap();
+    let mut r = pdfcraft_render::PageRenderer::new(doc.bytes.clone(), pdfcraft_render::RenderConfig::default());
+    let text = r.render(RenderRequestFor::text(0)).text.expect("page has text");
+    assert!(text.plain_text().contains('\u{F700}') && text.is_unusable(), "{:?}", text.plain_text());
+
+    let blank = s.create_blank(612.0, 792.0, 1).unwrap();
+    let thai = s.open("thai.pdf", None, blank, None).unwrap();
+    let word =
+        ocr::PlacedWord { text: "รายงานประจำปี".into(), origin: [72.0, 700.0], across: [120.0, 0.0], up: [0.0, 16.0] };
+    s.apply(thai, Edit::AddOcrText { page: 0, words: vec![word] }).unwrap();
+    let mut r = pdfcraft_render::PageRenderer::new(s.get(thai).unwrap().bytes.clone(), pdfcraft_render::RenderConfig::default());
+    assert!(!r.render(RenderRequestFor::text(0)).text.expect("page has text").is_unusable(), "ordinary Thai text is usable");
+}
+
+/// SRS FR-17: a scan under a private-use text layer is skipped with the reason by default, and is
+/// read when the user turns `skip_text_pages` off, the unreadable boxes hiding none of its words.
+#[test]
+fn recognize_text_reads_over_unusable_text_only_when_asked() {
+    if !ocr::available() {
+        eprintln!("skipped: OCR models not installed");
+        return;
+    }
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let text = s.create_from_text("t", "The quick brown fox jumps over the lazy dog.").unwrap();
+    let id = s.open("text.pdf", None, text, None).unwrap();
+    let png = export::Exporter::new(s.get(id).unwrap()).png(0, 300.0).unwrap();
+    let scan = s.create_from_images(&[("scan.png".into(), png)]).unwrap();
+    let id = s.open("scan.pdf", None, scan, None).unwrap();
+    let (w, h) = {
+        let p = &s.get(id).unwrap().info.pages[0];
+        (p.width as f64, p.height as f64)
+    };
+    s.apply(id, Edit::AddOcrText { page: 0, words: private_use_words(w, h) }).unwrap();
+
+    let skipped = s.recognize_text(id, &[], ocr::OcrSettings::default()).unwrap();
+    assert_eq!(skipped[0].skipped.as_deref(), Some(ocr::UNUSABLE_TEXT));
+    assert!(skipped[0].unusable_text && skipped[0].words.is_empty());
+
+    let found = s.recognize_text(id, &[], ocr::OcrSettings { skip_text_pages: false, ..Default::default() }).unwrap();
+    assert!(found[0].unusable_text && found[0].skipped.is_none());
+    assert_eq!(found[0].already_on_page, 0, "unreadable glyphs hide no recognised word: {:?}", found[0]);
+    let added = found[0].text().to_lowercase();
+    assert!(added.contains("brown") && added.contains("lazy"), "{added}");
+}
+
 #[test]
 fn thai_ocr_layer_is_searchable() {
     let mut s = Session::new().with_clock(|| 1_700_000_000);

@@ -614,8 +614,13 @@ impl Automation {
                 Ok(r) => {
                     let target = child(&folder, &name);
                     write_atomic(&target, &r.bytes)?;
-                    let skipped: Vec<usize> = r.pages.iter().filter(|p| p.skipped.is_some()).map(|p| p.page + 1).collect();
-                    json!({ "path": p, "output": target.to_string_lossy(), "words": r.words(), "skipped_pages": skipped })
+                    let numbers = |keep: fn(&pdfcraft_engine::ocr::OcrPage) -> bool| -> Vec<usize> {
+                        r.pages.iter().filter(|p| keep(p)).map(|p| p.page + 1).collect()
+                    };
+                    json!({
+                        "path": p, "output": target.to_string_lossy(), "words": r.words(),
+                        "skipped_pages": numbers(|p| p.skipped.is_some()), "unusable_text_pages": numbers(|p| p.unusable_text),
+                    })
                 }
                 Err(e) => json!({ "path": p, "error": e }),
             });
@@ -631,8 +636,10 @@ impl Automation {
         let list: Vec<Value> = found
             .iter()
             .map(|p| match &p.skipped {
-                Some(why) => json!({ "page": p.page + 1, "skipped": why }),
-                None => json!({ "page": p.page + 1, "words": p.words.len(), "already_on_page": p.already_on_page, "text": p.text() }),
+                Some(why) => json!({ "page": p.page + 1, "skipped": why, "unusable_text": p.unusable_text }),
+                None => json!({
+                    "page": p.page + 1, "words": p.words.len(), "already_on_page": p.already_on_page, "text": p.text(), "unusable_text": p.unusable_text,
+                }),
             })
             .collect();
         Ok(json!({ "words": found.iter().map(|p| p.words.len()).sum::<usize>(), "pages": list }))
