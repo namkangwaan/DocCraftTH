@@ -232,6 +232,7 @@ theme	Appearance	รูปลักษณ์
 	9 digit, A letter, O letter or digit, X any character	9 ตัวเลข, A ตัวอักษร, O ตัวอักษรหรือตัวเลข, X อักขระใดก็ได้
 	; 1 page already had text	; มี 1 หน้าที่มีข้อความอยู่แล้ว
 	; failed: {list}	; ล้มเหลว: {list}
+	; some pages have unreadable text (turn on “{option}” to read them)	; บางหน้ามีข้อความที่อ่านไม่ได้ (เปิด “{option}” เพื่ออ่านหน้าเหล่านั้น)
 	; {n} pages already had text	; มี {n} หน้าที่มีข้อความอยู่แล้ว
 	? of {n}	? จาก {n}
 	A clean-room, open-source PDF application written in Rust. MIT OR Apache-2.0.	แอปพลิเคชัน PDF โอเพนซอร์สแบบ clean-room เขียนด้วย Rust สัญญาอนุญาต MIT OR Apache-2.0

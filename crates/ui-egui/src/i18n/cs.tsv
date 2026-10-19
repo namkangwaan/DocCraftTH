@@ -1667,6 +1667,7 @@ key	Space	Mezerník
 	Recognized {n} words	Rozpoznáno slov: {n}
 	{words} on {pages}	{words} ({pages})
 	; 1 page already had text	; 1 stránka už text obsahovala
+	; some pages have unreadable text (turn on “{option}” to read them)	; některé stránky obsahují nečitelný text (chcete-li je rozpoznat, zapněte „{option}“)
 	; {n} pages already had text	; stránky, které už text obsahovaly: {n}
 	Recognized {w} words in 1 file	Rozpoznáno slov v 1 souboru: {w}
 	Recognized {w} words in {n} files	Rozpoznáno slov: {w} (souborů: {n})

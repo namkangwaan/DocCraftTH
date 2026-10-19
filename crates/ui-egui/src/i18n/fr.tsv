@@ -1590,6 +1590,7 @@
 	Recognized {n} words	{n} mots reconnus
 	{words} on {pages}	{words} sur {pages}
 	; 1 page already had text	; 1 page contenait déjà du texte
+	; some pages have unreadable text (turn on “{option}” to read them)	; certaines pages contiennent du texte illisible (activez « {option} » pour les reconnaître)
 	; {n} pages already had text	; {n} pages contenaient déjà du texte
 	Recognized {w} words in 1 file	{w} mots reconnus dans 1 fichier
 	Recognized {w} words in {n} files	{w} mots reconnus dans {n} fichiers

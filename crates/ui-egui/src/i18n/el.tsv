@@ -1124,6 +1124,7 @@
 	Recognized {n} words	Αναγνωρίστηκαν {n} λέξεις
 	{words} on {pages}	{words} σε {pages}
 	; 1 page already had text	· 1 σελίδα περιείχε ήδη κείμενο
+	; some pages have unreadable text (turn on “{option}” to read them)	 · ορισμένες σελίδες έχουν μη αναγνώσιμο κείμενο (ενεργοποιήστε το «{option}» για να αναγνωριστούν)
 	; {n} pages already had text	· {n} σελίδες περιείχαν ήδη κείμενο
 	Recognized {w} words in 1 file	Αναγνωρίστηκαν {w} λέξεις σε 1 αρχείο
 	Recognized {w} words in {n} files	Αναγνωρίστηκαν {w} λέξεις σε {n} αρχεία

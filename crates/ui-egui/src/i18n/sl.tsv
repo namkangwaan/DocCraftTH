@@ -49,6 +49,7 @@
 	9 digit, A letter, O letter or digit, X any character	9 števka, A črka, O črka ali števka, X poljuben znak
 	; 1 page already had text	; 1 stran je že imela besedilo
 	; failed: {list}	; neuspelo: {list}
+	; some pages have unreadable text (turn on “{option}” to read them)	; nekatere strani imajo neberljivo besedilo (vklopite »{option}«, da jih prepoznate)
 	; {n} pages already had text	; strani, ki so že imele besedilo: {n}
 	? of {n}	? od {n}
 	@{login}: {prs} PRs, {commits} commits, +{added} / −{deleted} lines (Δ {delta}), +{bin_added} / −{bin_deleted} binary assets, {first} – {last}	@{login}: {prs} PR-jev, {commits} commitov, +{added} / −{deleted} vrstic (Δ {delta}), +{bin_added} / −{bin_deleted} binarnih virov, {first} – {last}

@@ -1496,6 +1496,7 @@
 	Recognized {n} words	{n} palavras reconhecidas
 	{words} on {pages}	{words} em {pages}
 	; 1 page already had text	; 1 página já continha texto
+	; some pages have unreadable text (turn on “{option}” to read them)	; algumas páginas têm texto ilegível (ative “{option}” para reconhecê-las)
 	; {n} pages already had text	; {n} páginas já continham texto
 	Recognized {w} words in 1 file	{w} palavras reconhecidas em 1 arquivo
 	Recognized {w} words in {n} files	{w} palavras reconhecidas em {n} arquivos

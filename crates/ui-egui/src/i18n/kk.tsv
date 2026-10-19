@@ -1540,6 +1540,7 @@
 	Recognized {n} words	{n} сөз танылды
 	{words} on {pages}	{pages} бетте {words} сөз
 	; 1 page already had text	; 1 бетте мәтін бұрыннан бар еді
+	; some pages have unreadable text (turn on “{option}” to read them)	; кейбір беттердегі мәтін оқылмайды (оларды тану үшін «{option}» параметрін қосыңыз)
 	; {n} pages already had text	; {n} бетте мәтін бұрыннан бар еді
 	Recognized {w} words in 1 file	1 файлда {w} сөз танылды
 	Recognized {w} words in {n} files	{n} файлда {w} сөз танылды

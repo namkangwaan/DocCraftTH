@@ -1562,6 +1562,7 @@
 	Recognized {n} words	Разпознати са {n} думи
 	{words} on {pages}	{words} на {pages}
 	; 1 page already had text	; 1 страница вече съдържаше текст
+	; some pages have unreadable text (turn on “{option}” to read them)	; някои страници съдържат нечетим текст (включете „{option}“, за да бъдат разпознати)
 	; {n} pages already had text	; {n} страници вече съдържаха текст
 	Recognized {w} words in 1 file	Разпознати са {w} думи в 1 файл
 	Recognized {w} words in {n} files	Разпознати са {w} думи в {n} файла

@@ -1581,6 +1581,7 @@ action wizard	Start	ప్రారంభించు
 	Recognized {n} words	{n} పదాలు గుర్తించబడ్డాయి
 	{words} on {pages}	{words} ({pages})
 	; 1 page already had text	; 1 పేజీలో ఇప్పటికే టెక్స్ట్ ఉంది
+	; some pages have unreadable text (turn on “{option}” to read them)	; కొన్ని పేజీల్లోని టెక్స్ట్ చదవలేనిది (వాటిని గుర్తించడానికి “{option}” ను ఆన్ చేయండి)
 	; {n} pages already had text	; {n} పేజీలలో ఇప్పటికే టెక్స్ట్ ఉంది
 	Recognized {w} words in 1 file	1 ఫైల్‌లో {w} పదాలు గుర్తించబడ్డాయి
 	Recognized {w} words in {n} files	{n} ఫైల్‌లలో {w} పదాలు గుర్తించబడ్డాయి

@@ -1595,6 +1595,7 @@
 	Recognized {n} words	{n} Wörter erkannt
 	{words} on {pages}	{words} auf {pages}
 	; 1 page already had text	; 1 Seite enthielt bereits Text
+	; some pages have unreadable text (turn on “{option}” to read them)	; einige Seiten enthalten unlesbaren Text (aktivieren Sie „{option}“, um sie zu erkennen)
 	; {n} pages already had text	; {n} Seiten enthielten bereits Text
 	Recognized {w} words in 1 file	{w} Wörter in 1 Datei erkannt
 	Recognized {w} words in {n} files	{w} Wörter in {n} Dateien erkannt

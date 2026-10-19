@@ -1565,6 +1565,7 @@
 	Recognized {n} words	{n} sözcük tanındı
 	{words} on {pages}	{pages} üzerinde {words}
 	; 1 page already had text	; 1 sayfada zaten metin vardı
+	; some pages have unreadable text (turn on “{option}” to read them)	; bazı sayfalarda okunamayan metin var (tanımak için “{option}” seçeneğini açın)
 	; {n} pages already had text	; {n} sayfada zaten metin vardı
 	Recognized {w} words in 1 file	1 dosyada {w} sözcük tanındı
 	Recognized {w} words in {n} files	{n} dosyada {w} sözcük tanındı

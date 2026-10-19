@@ -1569,6 +1569,7 @@
 	Recognized {n} words	识别了{n}个单词
 	{words} on {pages}	在{pages}{words}
 	; 1 page already had text	；1 页已有文本
+	; some pages have unreadable text (turn on “{option}” to read them)	；部分页面的文本无法读取（要识别这些页面，请打开“{option}”）
 	; {n} pages already had text	；{n} 页已有文本
 	Recognized {w} words in 1 file	在 1 个文件中识别了{w}个单词
 	Recognized {w} words in {n} files	在{n}个文件中识别了{w}个单词

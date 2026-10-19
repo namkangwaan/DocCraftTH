@@ -215,6 +215,7 @@ theme	Appearance	Giao diện
 	9 digit, A letter, O letter or digit, X any character	9 chữ số, A chữ cái, O chữ cái hoặc chữ số, X ký tự bất kỳ
 	; 1 page already had text	; 1 trang đã có văn bản
 	; failed: {list}	; thất bại: {list}
+	; some pages have unreadable text (turn on “{option}” to read them)	; một số trang có văn bản không đọc được (bật “{option}” để nhận dạng các trang đó)
 	; {n} pages already had text	; {n} trang đã có văn bản
 	? of {n}	? trên {n}
 	A clean-room, open-source PDF application written in Rust. MIT OR Apache-2.0.	Ứng dụng PDF mã nguồn mở, viết lại độc lập (clean-room) bằng Rust. MIT OR Apache-2.0.

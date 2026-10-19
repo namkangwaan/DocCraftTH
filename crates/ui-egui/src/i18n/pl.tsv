@@ -1594,6 +1594,7 @@
 	Recognized {n} words	Liczba rozpoznanych słów: {n}
 	{words} on {pages}	{words} na {pages}
 	; 1 page already had text	; 1 strona zawierała już tekst
+	; some pages have unreadable text (turn on “{option}” to read them)	; niektóre strony zawierają nieczytelny tekst (włącz „{option}”, aby je rozpoznać)
 	; {n} pages already had text	; liczba stron zawierających już tekst: {n}
 	Recognized {w} words in 1 file	Rozpoznano słowa w liczbie {w} w 1 pliku
 	Recognized {w} words in {n} files	Liczba rozpoznanych słów: {w}; liczba plików: {n}

@@ -1580,6 +1580,7 @@
 	Recognized {n} words	{n} szó felismerve
 	{words} on {pages}	{words}, itt: {pages}
 	; 1 page already had text	; 1 oldalon már volt szöveg
+	; some pages have unreadable text (turn on “{option}” to read them)	; néhány oldalon olvashatatlan a szöveg (a felismeréshez kapcsolja be ezt: „{option}”)
 	; {n} pages already had text	; {n} oldalon már volt szöveg
 	Recognized {w} words in 1 file	{w} szó felismerve 1 fájlban
 	Recognized {w} words in {n} files	{w} szó felismerve {n} fájlban
