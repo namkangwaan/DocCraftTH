@@ -530,6 +530,30 @@ mod tests {
         assert_eq!(pdfcraft_fonts::first_undrawable(ALPHABET), None);
     }
 
+    /// SRS AC-10: broken model files are load errors, never a panic.
+    #[test]
+    fn broken_model_files_are_load_errors() {
+        let dir = std::env::temp_dir().join(format!("pdfcraft-ocr-broken-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let junk = dir.join("junk.rten");
+        std::fs::write(&junk, b"RTEN\x01\x00\x00\x00not a model").unwrap();
+        let fails = |m: &Models| matches!(Ocr::load(m), Err(OcrError::Load(..)));
+        assert!(fails(&Models { detection: junk.clone(), recognition: junk.clone(), dictionary: None }));
+        assert!(fails(&Models { detection: junk.clone(), recognition: junk.clone(), dictionary: Some(junk.clone()) }));
+        if let Some(thai) = Models::find_for("th") {
+            let half = dir.join("half.rten");
+            let model = std::fs::read(&thai.recognition).unwrap();
+            std::fs::write(&half, model.get(..model.len() / 2).unwrap()).unwrap();
+            assert!(fails(&Models { recognition: half, ..thai.clone() }), "a model cut in half");
+            let dict = dir.join("dict.txt");
+            std::fs::write(&dict, [0xff, 0xfe, 0x80, 0x0a]).unwrap();
+            assert!(fails(&Models { dictionary: Some(dict), ..thai.clone() }), "a dictionary that isn't UTF-8");
+        } else {
+            eprintln!("skipped the truncated-model cases: Thai OCR models not installed");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn missing_language_model_names_it() {
         let dir = std::env::temp_dir().join(format!("pdfcraft-ocr-lang-{}", std::process::id()));

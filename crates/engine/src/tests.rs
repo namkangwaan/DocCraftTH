@@ -3431,6 +3431,31 @@ fn recognize_text_reads_over_unusable_text_only_when_asked() {
     assert!(added.contains("brown") && added.contains("lazy"), "{added}");
 }
 
+/// SRS FR-12: recognised text on several pages is one undo step that restores the exact bytes,
+/// and saving it appends a revision to the original file.
+#[test]
+fn recognized_text_is_one_undo_step_and_an_incremental_save() {
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let blank = s.create_blank(612.0, 792.0, 2).unwrap();
+    let id = s.open("scan.pdf", None, blank, None).unwrap();
+    let original = s.get(id).unwrap().bytes.clone();
+    let page = |page: usize, text: &str| ocr::OcrPage {
+        page,
+        words: vec![ocr::PlacedWord { text: text.into(), origin: [72.0, 700.0], across: [120.0, 0.0], up: [0.0, 16.0] }],
+        already_on_page: 0,
+        skipped: None,
+        unusable_text: false,
+    };
+    assert_eq!(s.apply_ocr(id, &[page(0, "รายงาน"), page(1, "ประจำปี")]).unwrap(), 2);
+    assert_eq!(page_texts(&s, id), ["รายงาน", "ประจำปี"]);
+    let saved = s.save_bytes(id).unwrap();
+    assert_eq!(saved.get(..original.len()), Some(&original[..]), "the original bytes are kept");
+    assert_eq!(pdfcraft_cos::Document::open(saved).unwrap().revisions().len(), 2);
+    assert_eq!(s.undo(id).unwrap().as_str(), "Recognize text");
+    assert_eq!(s.get(id).unwrap().bytes, original, "one undo removes the text from both pages");
+    assert_eq!(s.undo(id), Err(EditError::NothingToUndo));
+}
+
 #[test]
 fn thai_ocr_layer_is_searchable() {
     let mut s = Session::new().with_clock(|| 1_700_000_000);
@@ -3447,7 +3472,7 @@ fn thai_ocr_layer_is_searchable() {
     let mut r = pdfcraft_render::PageRenderer::new(doc.bytes.clone(), pdfcraft_render::RenderConfig::default());
     let text = r.render(RenderRequestFor::text(0)).text.expect("page has OCR text");
     assert!(text.plain_text().contains("รายงานประจำปี") && text.plain_text().contains("๒๕๖๙"), "{}", text.plain_text());
-    assert!(!text.find("ประจำ").is_empty(), "substring inside a Thai phrase is searchable: {}", text.plain_text());
+    assert_eq!(text.find("ประจำ").len(), 1, "substring inside a Thai phrase is searchable: {}", text.plain_text());
 }
 
 #[test]
