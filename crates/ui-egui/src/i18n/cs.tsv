@@ -2514,3 +2514,6 @@ animation effects	Off	Vypnuto
 	As recognized	Jak bylo rozpoznáno
 	Thai digits	Thajské číslice
 	Arabic digits	Arabské číslice
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 stránka obsahuje nečitelný text. Rozpoznat na ní text? Její text zůstane a změnu lze vrátit jedním krokem.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Stránky s nečitelným textem: {n}. Rozpoznat text jen na nich? Jejich text zůstane a změnu lze vrátit jedním krokem.
+	Recognize these pages	Rozpoznat tyto stránky

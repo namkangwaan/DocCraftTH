@@ -2462,3 +2462,6 @@ animation effects	Off	Вимкнено
 	As recognized	Як розпізнано
 	Thai digits	Тайські цифри
 	Arabic digits	Арабські цифри
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	На 1 сторінці текст нечитабельний. Розпізнати текст на ній? Її текст залишиться, а скасувати це можна одним кроком.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Сторінок із нечитабельним текстом: {n}. Розпізнати текст лише на них? Їхній текст залишиться, а скасувати це можна одним кроком.
+	Recognize these pages	Розпізнати ці сторінки

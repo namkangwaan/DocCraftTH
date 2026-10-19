@@ -2438,3 +2438,6 @@ animation effects	Off	Өшірулі
 	As recognized	Танылған күйінде
 	Thai digits	Тай цифрлары
 	Arabic digits	Араб цифрлары
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 беттегі мәтін оқылмайды. Ондағы мәтінді тану керек пе? Бар мәтін сақталады, ал мұны бір қадаммен болдырмауға болады.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Мәтіні оқылмайтын беттер: {n}. Тек солардағы мәтінді тану керек пе? Бар мәтін сақталады, ал мұны бір қадаммен болдырмауға болады.
+	Recognize these pages	Осы беттерді тану

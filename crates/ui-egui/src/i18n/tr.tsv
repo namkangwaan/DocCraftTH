@@ -2436,3 +2436,6 @@ animation effects	Off	Kapalı
 	As recognized	Tanındığı gibi
 	Thai digits	Tay rakamları
 	Arabic digits	Arap rakamları
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 sayfada okunamayan metin var. Bu sayfadaki metin tanınsın mı? Mevcut metin kalır ve bunu tek adımda geri alabilirsiniz.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} sayfada okunamayan metin var. Yalnızca bu sayfalardaki metin tanınsın mı? Mevcut metin kalır ve bunu tek adımda geri alabilirsiniz.
+	Recognize these pages	Bu sayfaları tanı

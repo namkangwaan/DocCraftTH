@@ -2349,3 +2349,6 @@ animation effects	Off	ఆఫ్
 	As recognized	గుర్తించిన విధంగా
 	Thai digits	థాయ్ అంకెలు
 	Arabic digits	అరబిక్ అంకెలు
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 పేజీలోని టెక్స్ట్ చదవలేనిది. దానిపై టెక్స్ట్‌ను గుర్తించాలా? దాని టెక్స్ట్ అలాగే ఉంటుంది, దీన్ని ఒక్క దశలో రద్దు చేయవచ్చు.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} పేజీల్లోని టెక్స్ట్ చదవలేనిది. ఆ పేజీల్లో మాత్రమే టెక్స్ట్‌ను గుర్తించాలా? వాటి టెక్స్ట్ అలాగే ఉంటుంది, దీన్ని ఒక్క దశలో రద్దు చేయవచ్చు.
+	Recognize these pages	ఈ పేజీలను గుర్తించు

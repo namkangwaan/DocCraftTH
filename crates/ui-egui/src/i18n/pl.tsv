@@ -2416,3 +2416,6 @@ animation effects	Off	Wyłączone
 	As recognized	Jak rozpoznano
 	Thai digits	Cyfry tajskie
 	Arabic digits	Cyfry arabskie
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 strona zawiera nieczytelny tekst. Rozpoznać na niej tekst? Jej tekst pozostanie, a zmianę można cofnąć jednym krokiem.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Liczba stron z nieczytelnym tekstem: {n}. Rozpoznać tekst tylko na nich? Ich tekst pozostanie, a zmianę można cofnąć jednym krokiem.
+	Recognize these pages	Rozpoznaj te strony

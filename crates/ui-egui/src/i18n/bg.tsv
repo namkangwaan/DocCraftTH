@@ -2403,3 +2403,6 @@ animation effects	Off	Изключени
 	As recognized	Както са разпознати
 	Thai digits	Тайландски цифри
 	Arabic digits	Арабски цифри
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 страница съдържа нечетим текст. Да се разпознае ли текстът на нея? Текстът ѝ остава, а промяната може да се отмени с една стъпка.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Страници с нечетим текст: {n}. Да се разпознае ли текстът само на тях? Текстът им остава, а промяната може да се отмени с една стъпка.
+	Recognize these pages	Разпознай тези страници

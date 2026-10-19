@@ -2440,3 +2440,6 @@ animation effects	Off	オフ
 	As recognized	認識されたまま
 	Thai digits	タイ数字
 	Arabic digits	アラビア数字
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 ページのテキストが読み取れません。このページのテキストを認識しますか？既存のテキストは残り、1 回の操作で取り消せます。
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} ページのテキストが読み取れません。これらのページだけテキストを認識しますか？既存のテキストは残り、1 回の操作で取り消せます。
+	Recognize these pages	これらのページを認識

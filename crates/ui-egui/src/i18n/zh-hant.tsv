@@ -2390,3 +2390,6 @@ animation effects	Off	關
 	As recognized	按辨識結果
 	Thai digits	泰文數字
 	Arabic digits	阿拉伯數字
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 個頁面的文字無法讀取。要辨識該頁面的文字嗎？原有文字會保留，並可一步復原。
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} 個頁面的文字無法讀取。只辨識這些頁面的文字嗎？原有文字會保留，並可一步復原。
+	Recognize these pages	辨識這些頁面

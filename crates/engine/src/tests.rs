@@ -3623,6 +3623,36 @@ fn recognize_text_reads_over_unusable_text_only_when_asked() {
     assert!(added.contains("brown") && added.contains("lazy"), "{added}");
 }
 
+/// SRS FR-17: confirming the suggestion reads the pages whose text is unusable and still leaves
+/// a page with good text alone, whichever pages the run covers.
+#[test]
+fn reading_unusable_text_leaves_pages_with_good_text_alone() {
+    if !ocr::available() {
+        eprintln!("skipped: OCR models not installed");
+        return;
+    }
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let text = s.create_from_text("t", "The quick brown fox jumps over the lazy dog.").unwrap();
+    let id = s.open("text.pdf", None, text, None).unwrap();
+    let png = export::Exporter::new(s.get(id).unwrap()).png(0, 300.0).unwrap();
+    // Page 1: a scan under a private-use layer; page 2: the same scan under good text.
+    let scan = s.create_from_images(&[("a.png".into(), png.clone()), ("b.png".into(), png)]).unwrap();
+    let id = s.open("scan.pdf", None, scan, None).unwrap();
+    let (w, h) = {
+        let p = &s.get(id).unwrap().info.pages[0];
+        (p.width as f64, p.height as f64)
+    };
+    s.apply(id, Edit::AddOcrText { page: 0, words: private_use_words(w, h) }).unwrap();
+    let good = ocr::PlacedWord { text: "quick".into(), origin: [72.0, h - 100.0], across: [60.0, 0.0], up: [0.0, 14.0] };
+    s.apply(id, Edit::AddOcrText { page: 1, words: vec![good] }).unwrap();
+
+    let found = s.recognize_text(id, &[], ocr::OcrSettings { read_unusable_text: true, ..Default::default() }).unwrap();
+    assert!(found[0].unusable_text && found[0].skipped.is_none(), "{:?}", found[0]);
+    assert!(found[0].text().to_lowercase().contains("brown"), "{:?}", found[0]);
+    assert!(!found[1].unusable_text, "{:?}", found[1]);
+    assert_eq!(found[1].skipped.as_deref(), Some("the page already contains text"), "good text is never read over");
+}
+
 /// SRS FR-12: recognised text on several pages is one undo step that restores the exact bytes,
 /// and saving it appends a revision to the original file.
 #[test]

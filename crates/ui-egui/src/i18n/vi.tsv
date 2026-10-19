@@ -2709,3 +2709,6 @@ key	Space	Space
 	As recognized	Như nhận dạng được
 	Thai digits	Chữ số Thái
 	Arabic digits	Chữ số Ả Rập
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 trang có văn bản không đọc được. Nhận dạng văn bản trên trang đó? Văn bản hiện có vẫn được giữ, và bạn có thể hoàn tác trong một bước.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} trang có văn bản không đọc được. Chỉ nhận dạng văn bản trên các trang đó? Văn bản hiện có vẫn được giữ, và bạn có thể hoàn tác trong một bước.
+	Recognize these pages	Nhận dạng các trang này

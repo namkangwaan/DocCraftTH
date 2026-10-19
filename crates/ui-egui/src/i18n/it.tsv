@@ -2652,3 +2652,6 @@ certificate	SHA-256 digest	Impronta SHA-256
 	As recognized	Come riconosciute
 	Thai digits	Cifre thailandesi
 	Arabic digits	Cifre arabe
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 pagina contiene testo illeggibile. Riconoscere il testo in questa pagina? Il suo testo resta e puoi annullare in un solo passaggio.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} pagine contengono testo illeggibile. Riconoscere il testo solo in queste pagine? Il loro testo resta e puoi annullare in un solo passaggio.
+	Recognize these pages	Riconosci queste pagine

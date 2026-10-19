@@ -2446,3 +2446,6 @@ animation effects	Off	Ανενεργά
 	As recognized	Όπως αναγνωρίστηκαν
 	Thai digits	Ταϊλανδικά ψηφία
 	Arabic digits	Αραβικά ψηφία
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 σελίδα έχει μη αναγνώσιμο κείμενο. Να γίνει αναγνώριση κειμένου σε αυτήν; Το κείμενό της παραμένει και μπορείτε να το αναιρέσετε σε ένα βήμα.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} σελίδες έχουν μη αναγνώσιμο κείμενο. Να γίνει αναγνώριση κειμένου μόνο σε αυτές; Το κείμενό τους παραμένει και μπορείτε να το αναιρέσετε σε ένα βήμα.
+	Recognize these pages	Αναγνώριση αυτών των σελίδων
