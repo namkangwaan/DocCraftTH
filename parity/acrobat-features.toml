@@ -1395,7 +1395,7 @@ status = "shipped"
 commands = ["edit.find"]
 tools = ["text_find"]
 evidence = ["crates/ui-egui/tests/ui.rs::find_counts_matches_across_pages", "crates/ui-egui/tests/ui.rs::find_reports_no_matches", "crates/automation/tests/automation.rs::open_inspect_render_and_find", "crates/render/src/text.rs::identity_v_columns_are_searchable_in_reading_order", "crates/render/src/text.rs::decomposed_and_composed_sara_am_find_each_other", "crates/render/src/text.rs::spaces_between_thai_letters_do_not_count"]
-notes = "Horizontal and WMode 1 vertical text are grouped independently, including a horizontal heading above right-to-left vertical columns. Complex interleaved flows still use a geometric reading-order heuristic. Thai: the decomposed SARA AM finds SARA AM and back, Thai and ASCII digits find each other, and a space between Thai letters does not count; NFC is not applied, and a hit inside a line drawn with ActualText is the whole line."
+notes = "Horizontal and WMode 1 vertical text are grouped independently, including a horizontal heading above right-to-left vertical columns. Complex interleaved flows still use a geometric reading-order heuristic. Thai: the decomposed SARA AM finds SARA AM and back (a lone NIKHAHIT or SARA AA no longer matches half of it), Thai and ASCII digits find each other in case-insensitive search, and a space between Thai letters does not count; NFC is not applied (marks stored out of canonical order still miss), and a hit inside a line drawn with ActualText is the whole line."
 
 [[feature]]
 id = "view.find-next-previous"
@@ -6469,7 +6469,7 @@ status = "shipped"
 commands = ["ocr.recognize"]
 tools = ["ocr_recognize", "ocr_status"]
 evidence = ["crates/engine/src/tests.rs::recognize_text_makes_a_scanned_page_searchable", "crates/engine/src/tests.rs::recognize_text_reads_over_unusable_text_only_when_asked", "crates/automation/tests/automation.rs::ocr_tools_make_a_scan_searchable", "crates/ui-egui/tests/ocr.rs::recognize_text_dialog_adds_searchable_text"]
-notes = "ocrs engine (MIT/Apache) with CC-BY-SA models fetched by `cargo xtask models`; the desktop release packages ship them (#103; packaging/env.sh stage_models), the web build does not yet; runs on a worker thread with progress; one undoable step; pages with text are skipped unless asked (ocr.skip-renderable-text); a page whose own text is mostly private-use or unmapped characters is reported as unusable_text and read over when asked, its unreadable glyphs hiding no recognised word."
+notes = "ocrs engine (MIT/Apache) with CC-BY-SA models fetched by `cargo xtask models`; the desktop release packages ship them (#103; packaging/env.sh stage_models), the web build does not yet; runs on a worker thread with progress; one undoable step; pages with text are skipped unless asked (ocr.skip-renderable-text); a page whose own text is mostly private-use or unmapped characters is reported as unusable_text by the automation tools and read over when asked, its unreadable glyphs hiding no recognised word; the desktop notice still counts such a page as one that had text and does not suggest reading it."
 
 [[feature]]
 id = "ocr.recognize-range"

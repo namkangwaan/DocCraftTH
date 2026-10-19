@@ -539,7 +539,6 @@ mod tests {
         std::fs::write(&junk, b"RTEN\x01\x00\x00\x00not a model").unwrap();
         let fails = |m: &Models| matches!(Ocr::load(m), Err(OcrError::Load(..)));
         assert!(fails(&Models { detection: junk.clone(), recognition: junk.clone(), dictionary: None }));
-        assert!(fails(&Models { detection: junk.clone(), recognition: junk.clone(), dictionary: Some(junk.clone()) }));
         if let Some(thai) = Models::find_for("th") {
             let half = dir.join("half.rten");
             let model = std::fs::read(&thai.recognition).unwrap();

@@ -80,7 +80,8 @@ pub(super) fn find(page: &PageText, query: &str, sensitive: bool, whole_words: b
 /// The composed entry keeps both glyphs, so a hit still covers the SARA AA glyph.
 /// A space between two Thai letters is dropped: Thai doesn't separate words with spaces, but OCR
 /// and legacy PDFs insert them, so `รายงานประจำปี` finds `รายงาน ประจำปี` and back. Digits
-/// (Thai ones fold to ASCII) and other scripts keep their spaces.
+/// and other scripts keep their spaces. A lone NIKHAHIT or SARA AA no longer matches half of a
+/// decomposed `ํา`: it is one vowel now, as `ำ` always was.
 fn normalise(chars: Vec<Entry>) -> Vec<Entry> {
     // Consonants, vowels, tone marks, ฯ and ๆ; not the baht sign (U+0E3F) or digits.
     let thai = |c: char| matches!(c, '\u{0E01}'..='\u{0E3A}' | '\u{0E40}'..='\u{0E4E}');

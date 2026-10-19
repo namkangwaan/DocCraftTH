@@ -4799,9 +4799,11 @@ fn ocr_tools_make_a_scan_searchable() {
     let scan = ok(&mut a, "doc_create", json!({ "from": "images", "paths": [png.to_string_lossy()] }))["doc"].as_u64().unwrap();
     let r = ok(&mut a, "ocr_recognize", json!({ "doc": scan }));
     assert!(r["pages"][0]["text"].as_str().unwrap().to_lowercase().contains("searchable"), "{r}");
+    assert_eq!(r["pages"][0]["unusable_text"], false, "{r}");
     assert!(r["words"].as_u64().unwrap() >= 4);
     let again = ok(&mut a, "ocr_recognize", json!({ "doc": scan, "pages": [1] }));
     assert!(again["pages"][0]["skipped"].is_string(), "{again}");
+    assert_eq!(again["pages"][0]["unusable_text"], false, "its own OCR text is usable: {again}");
     assert!(matches!(a.call("ocr_recognize", &json!({ "doc": scan, "language": "xx" })), Err(ToolError::InvalidArgs(_))));
 }
 
