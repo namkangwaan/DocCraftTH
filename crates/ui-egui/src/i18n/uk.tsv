@@ -1598,6 +1598,7 @@
 	Recognized {n} words	Розпізнано слів: {n}
 	{words} on {pages}	{words} на {pages}
 	; 1 page already had text	; 1 сторінка вже мала текст
+	; some pages have unreadable text (turn on “{option}” to read them)	; на деяких сторінках текст нечитабельний (увімкніть «{option}», щоб розпізнати їх)
 	; {n} pages already had text	; сторінки ({n}) вже мали текст
 	Recognized {w} words in 1 file	Розпізнано слів ({w}) в 1 файлі
 	Recognized {w} words in {n} files	Розпізнано слів ({w}) у файлах ({n})

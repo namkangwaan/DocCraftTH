@@ -1600,6 +1600,7 @@
 	Recognized {n} words	تم التعرف على {n} كلمات
 	{words} on {pages}	{words} في {pages}
 	; 1 page already had text	؛ صفحة واحدة كان فيها نص بالفعل
+	; some pages have unreadable text (turn on “{option}” to read them)	؛ بعض الصفحات فيها نص لا يمكن قراءته (فعّل «{option}» لقراءتها)
 	; {n} pages already had text	؛ {n} صفحات كان فيها نص بالفعل
 	Recognized {w} words in 1 file	تم التعرف على {w} كلمات في ملف واحد
 	Recognized {w} words in {n} files	تم التعرف على {w} كلمات في {n} ملفات

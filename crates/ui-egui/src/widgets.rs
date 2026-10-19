@@ -423,6 +423,16 @@ pub struct ProgressNotice {
     pub fraction: f32,
     /// Show a Cancel button.
     pub cancellable: bool,
+    /// The job the card belongs to: Cancel stops that one.
+    pub job: ProgressJob,
+}
+
+/// Which background job a [`ProgressNotice`] reports.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProgressJob {
+    Optimize,
+    Print,
+    Ocr,
 }
 
 /// Where the progress notice keeps its height this frame, for placing the toast above it.

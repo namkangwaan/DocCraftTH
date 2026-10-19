@@ -1605,6 +1605,7 @@
 	Recognized {n} words	Riconosciute {n} parole
 	{words} on {pages}	{words} in {pages}
 	; 1 page already had text	; 1 pagina conteneva già testo
+	; some pages have unreadable text (turn on “{option}” to read them)	; alcune pagine contengono testo illeggibile (attiva «{option}» per riconoscerle)
 	; {n} pages already had text	; {n} pagine contenevano già testo
 	Recognized {w} words in 1 file	Riconosciute {w} parole in 1 file
 	Recognized {w} words in {n} files	Riconosciute {w} parole in {n} file

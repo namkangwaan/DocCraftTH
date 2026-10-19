@@ -1610,6 +1610,7 @@
 	Recognized {n} words	{n} 語を認識しました
 	{words} on {pages}	{pages} で{words}
 	; 1 page already had text	、1 ページには既存のテキストがありました
+	; some pages have unreadable text (turn on “{option}” to read them)	、一部のページのテキストは読み取れません（認識するには「{option}」をオンにしてください）
 	; {n} pages already had text	、{n} ページには既存のテキストがありました
 	Recognized {w} words in 1 file	1 ファイルで {w} 語を認識しました
 	Recognized {w} words in {n} files	{n} ファイルで {w} 語を認識しました
