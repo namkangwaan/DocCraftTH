@@ -15,6 +15,7 @@ const OPTIONS: &[OptionSpec] = &[
     OptionSpec { name: "--dpi", takes_value: true },
     OptionSpec { name: "--language", takes_value: true },
     OptionSpec { name: "--ocr-all-pages", takes_value: false },
+    OptionSpec { name: "--digits", takes_value: true },
 ];
 
 pub(super) fn run(args: &[String]) -> Result<(), CliError> {
@@ -47,8 +48,10 @@ pub(super) fn run(args: &[String]) -> Result<(), CliError> {
             params[key] = serde_json::from_str(v).map_err(|_| format!("batch: {option} needs a number"))?;
         }
     }
-    if let Some(lang) = flag(args, "--language") {
-        params["language"] = json!(lang);
+    for (option, key) in [("--language", "language"), ("--digits", "digits")] {
+        if let Some(v) = flag(args, option) {
+            params[key] = json!(v);
+        }
     }
     if seen.contains("--ocr-all-pages") {
         params["skip_text_pages"] = json!(false);

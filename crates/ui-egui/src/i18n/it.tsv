@@ -2648,3 +2648,7 @@ certificate	Self-signed	Autofirmato
 certificate	SHA-1 digest	Impronta SHA-1
 certificate	SHA-256 digest	Impronta SHA-256
 	Continue from previous section	Continue from previous section
+	Digits	Cifre
+	As recognized	Come riconosciute
+	Thai digits	Cifre thailandesi
+	Arabic digits	Cifre arabe

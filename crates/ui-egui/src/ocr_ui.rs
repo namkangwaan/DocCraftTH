@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use egui::{Align, Layout};
 use pdfcraft_engine::DocId;
-use pdfcraft_engine::ocr::{LANGUAGES, OcrError, OcrPage, OcrSettings};
+use pdfcraft_engine::ocr::{Digits, LANGUAGES, OcrError, OcrPage, OcrSettings};
 
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, widgets};
@@ -31,11 +31,13 @@ pub struct OcrDraft {
     pub dpi: u32,
     /// Also recognize pages that already have text (pictures on them; their text isn't added again).
     pub text_pages: bool,
+    /// Whether recognized digits are kept as read or converted to Thai or Arabic numerals.
+    pub digits: Digits,
 }
 
 impl Default for OcrDraft {
     fn default() -> Self {
-        OcrDraft { pages: OcrPages::All, from: 1, to: 1, language: None, dpi: 300, text_pages: false }
+        OcrDraft { pages: OcrPages::All, from: 1, to: 1, language: None, dpi: 300, text_pages: false, digits: Digits::AsRead }
     }
 }
 
@@ -51,7 +53,7 @@ impl OcrDraft {
 
     /// The recognition settings these choices make.
     pub fn settings(&self) -> OcrSettings {
-        OcrSettings { dpi: self.dpi as f32, language: self.language().to_string(), skip_text_pages: !self.text_pages }
+        OcrSettings { dpi: self.dpi as f32, language: self.language().to_string(), skip_text_pages: !self.text_pages, digits: self.digits }
     }
 }
 
@@ -223,6 +225,18 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
                 for v in [600, 300, 150, 72] {
                     ui.selectable_value(&mut d.dpi, v, format!("{v} dpi"));
                 }
+            });
+            ui.end_row();
+            ui.label(tl!("Digits"));
+            let digits_label = match d.digits {
+                Digits::AsRead => tl!("As recognized"),
+                Digits::Thai => tl!("Thai digits"),
+                Digits::Arabic => tl!("Arabic digits"),
+            };
+            egui::ComboBox::from_id_salt("ocr-digits").selected_text(digits_label).width(220.0).show_ui(ui, |ui| {
+                ui.selectable_value(&mut d.digits, Digits::AsRead, tl!("As recognized"));
+                ui.selectable_value(&mut d.digits, Digits::Thai, tl!("Thai digits"));
+                ui.selectable_value(&mut d.digits, Digits::Arabic, tl!("Arabic digits"));
             });
             ui.end_row();
         });
