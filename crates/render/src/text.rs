@@ -76,6 +76,12 @@ pub fn fold_case(s: &str) -> String {
     out
 }
 
+/// A character extracted text can't stand for: a private-use code point (no standard meaning) or
+/// U+FFFD (a code the font couldn't map).
+pub fn unreadable(c: char) -> bool {
+    matches!(c, '\u{E000}'..='\u{F8FF}' | '\u{F0000}'..='\u{FFFFD}' | '\u{100000}'..='\u{10FFFD}' | '\u{FFFD}')
+}
+
 /// The text of one page, in content order, with line structure.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PageText {
@@ -112,6 +118,18 @@ impl PageText {
 
     pub fn plain_text(&self) -> String {
         self.text_of(0..self.glyphs.len())
+    }
+
+    /// Whether the page's text can't be searched or copied: at least half of its characters are
+    /// [`unreadable`], as when a legacy font maps its glyphs to private-use code points. OCR treats
+    /// such a page as having no text of its own (SRS FR-17).
+    pub fn is_unusable(&self) -> bool {
+        let (mut all, mut bad) = (0usize, 0usize);
+        for c in self.glyphs.iter().flat_map(|g| g.text.chars()).filter(|c| !c.is_whitespace()) {
+            all = all.saturating_add(1);
+            bad = bad.saturating_add(usize::from(unreadable(c)));
+        }
+        all > 0 && bad.saturating_mul(2) >= all
     }
 
     /// Case-insensitive search. Returns glyph ranges of every match (words may span line breaks,
@@ -1994,6 +2012,17 @@ mod tests {
         assert_eq!(decomposed.find("\u{0E33}"), vec![2..4]);
         assert_eq!(parts(&["น\u{0E49}\u{0E4D}\u{0E32}"]).find("น\u{0E49}\u{0E33}"), vec![0..1]);
         assert_eq!(decomposed.text_of(0..4), "น\u{0E49}\u{0E4D}\u{0E32}", "only the comparison changes");
+    }
+
+    #[test]
+    fn text_mostly_private_use_or_replacement_characters_is_unusable() {
+        assert!(parts(&["\u{F700}\u{F701}", "\u{F702}", " ", "\u{F710}"]).is_unusable());
+        assert!(parts(&["\u{FFFD}\u{FFFD}", "ab"]).is_unusable(), "half is enough");
+        assert!(parts(&["\u{F0001}"]).is_unusable(), "supplementary private use");
+        assert!(!parts(&["รายงานประจำปี", "\u{F700}"]).is_unusable(), "a stray private-use mark");
+        assert!(!parts(&["\u{FFFD}", "abc"]).is_unusable());
+        assert!(!parts(&[" ", ""]).is_unusable(), "no text is not unusable text");
+        assert!(!PageText::default().is_unusable());
     }
 
     #[test]

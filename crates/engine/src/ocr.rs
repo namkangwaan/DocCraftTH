@@ -7,7 +7,7 @@
 
 use std::sync::{Arc, Mutex};
 
-use pdfcraft_render::{PageInfo, PageRenderer, RenderConfig, RenderRequest, RequestKind};
+use pdfcraft_render::{PageInfo, PageRenderer, RenderConfig, RenderRequest, RequestKind, text::unreadable};
 
 pub use pdfcraft_ocr::{LANGUAGES, Models, Ocr, OcrError, PlacedWord};
 
@@ -29,6 +29,10 @@ pub struct OcrSettings {
 /// A recognised word whose box is at least this much covered by the page's own text is that
 /// text read again, not a word in a picture.
 const ALREADY_ON_PAGE: f32 = 0.5;
+
+/// Why a page whose own text is unusable was skipped.
+pub const UNUSABLE_TEXT: &str =
+    "the page's text is unreadable (private-use or unmapped characters); recognise it with skip_text_pages off to make it searchable";
 
 /// The long side of an A4 sheet in points (a letter page's, 792, is shorter): "Downsample to"
 /// is a resolution on paper this size or smaller.
@@ -64,6 +68,8 @@ pub struct OcrPage {
     pub already_on_page: usize,
     /// Why the page was not read, if it was skipped.
     pub skipped: Option<String>,
+    /// The page's own text is unusable ([`pdfcraft_render::PageText::is_unusable`]) and was treated as no text.
+    pub unusable_text: bool,
 }
 
 impl OcrPage {
@@ -130,13 +136,20 @@ impl OcrJob {
                 break;
             }
             let Some(info) = self.infos.get(page) else { continue };
-            let skip = |why: &str| OcrPage { page, words: Vec::new(), already_on_page: 0, skipped: Some(why.into()) };
-            // The boxes of the page's own text (an earlier OCR layer's included), in view space.
-            let existing: Vec<[f32; 4]> = r
-                .render(RenderRequest { page, kind: RequestKind::Text, scale: 1.0, ..Default::default() })
-                .text
-                .map(|t| t.glyphs.iter().filter(|g| !g.text.trim().is_empty()).map(|g| g.rect).collect())
+            let own = r.render(RenderRequest { page, kind: RequestKind::Text, scale: 1.0, ..Default::default() }).text;
+            let unusable_text = own.as_ref().is_some_and(|t| t.is_unusable());
+            let skip = |why: &str| OcrPage { page, words: Vec::new(), already_on_page: 0, skipped: Some(why.into()), unusable_text };
+            // The boxes of the page's own readable text (an earlier OCR layer's included), in view
+            // space. Unreadable glyphs don't count: their boxes would hide the words read over them.
+            let existing: Vec<[f32; 4]> = own
+                .map(|t| t.glyphs.iter().filter(|g| g.text.chars().any(|c| !c.is_whitespace() && !unreadable(c))).map(|g| g.rect).collect())
                 .unwrap_or_default();
+            // The user confirms replacing unusable text (SRS D11) by reading the page again with
+            // `skip_text_pages` off.
+            if self.settings.skip_text_pages && unusable_text {
+                out.push(skip(UNUSABLE_TEXT));
+                continue;
+            }
             if self.settings.skip_text_pages && !existing.is_empty() {
                 out.push(skip("the page already contains text"));
                 continue;
@@ -162,7 +175,7 @@ impl OcrJob {
             let (fresh, already): (Vec<_>, Vec<_>) =
                 lines.iter().flat_map(|l| &l.words).partition(|w| covered(w.rect.map(|v| v / scale), &existing) < ALREADY_ON_PAGE);
             let words = fresh.into_iter().map(|w| PlacedWord::place(w, to_user)).collect();
-            out.push(OcrPage { page, words, already_on_page: already.len(), skipped: None });
+            out.push(OcrPage { page, words, already_on_page: already.len(), skipped: None, unusable_text });
         }
         progress(total, total);
         out

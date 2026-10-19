@@ -4799,9 +4799,11 @@ fn ocr_tools_make_a_scan_searchable() {
     let scan = ok(&mut a, "doc_create", json!({ "from": "images", "paths": [png.to_string_lossy()] }))["doc"].as_u64().unwrap();
     let r = ok(&mut a, "ocr_recognize", json!({ "doc": scan }));
     assert!(r["pages"][0]["text"].as_str().unwrap().to_lowercase().contains("searchable"), "{r}");
+    assert_eq!(r["pages"][0]["unusable_text"], false, "{r}");
     assert!(r["words"].as_u64().unwrap() >= 4);
     let again = ok(&mut a, "ocr_recognize", json!({ "doc": scan, "pages": [1] }));
     assert!(again["pages"][0]["skipped"].is_string(), "{again}");
+    assert_eq!(again["pages"][0]["unusable_text"], false, "its own OCR text is usable: {again}");
     assert!(matches!(a.call("ocr_recognize", &json!({ "doc": scan, "language": "xx" })), Err(ToolError::InvalidArgs(_))));
 }
 
@@ -5846,6 +5848,16 @@ fn thai_text_through_tools_saves_reopens_extracts_and_renders() {
     let reopened = ok(&mut a, "doc_open", json!({"path": "thai.pdf"}))["doc"].as_u64().unwrap();
     assert_eq!(ok(&mut a, "content_list", json!({"doc": reopened}))["items"][0]["text"], text);
     assert!(page_text(&mut a, reopened)[0].contains(text));
+    // SRS FR-19: search finds each Thai word of the saved file once, and the decomposed spelling
+    // of น้ำ too (FR-15). The line's ActualText is one extracted glyph, so a hit is the whole line.
+    for word in ["สวัสดี", "น้ำ", "ผู้ใช้", "ปู่", "ใช้", "น\u{0E49}\u{0E4D}\u{0E32}"] {
+        let found = ok(&mut a, "text_find", json!({"doc": reopened, "query": word}));
+        assert_eq!(found["count"], 1, "{word}: {found}");
+        assert_eq!(found["matches"][0]["text"], text, "{word}");
+    }
+    // FR-16: the space between Thai words doesn't count; between Latin letters and digits it does.
+    assert_eq!(ok(&mut a, "text_find", json!({"doc": reopened, "query": "สวัสดีน้ำ"}))["count"], 1);
+    assert_eq!(ok(&mut a, "text_find", json!({"doc": reopened, "query": "Hello123"}))["count"], 0);
     let rendered = a.call("page_render", &json!({"doc": reopened, "page": 1, "dpi": 144})).unwrap();
     assert!(rendered.iter().any(|c| matches!(c, Content::Png { data, width, height } if !data.is_empty() && *width > 0 && *height > 0)));
     ok(&mut a, "content_update", json!({"doc": reopened, "page": 1, "index": 1, "text": "แก้ไข น้ำ"}));

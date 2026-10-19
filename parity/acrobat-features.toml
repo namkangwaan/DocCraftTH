@@ -1394,8 +1394,8 @@ milestone = "M3"
 status = "shipped"
 commands = ["edit.find"]
 tools = ["text_find"]
-evidence = ["crates/ui-egui/tests/ui.rs::find_counts_matches_across_pages", "crates/ui-egui/tests/ui.rs::find_reports_no_matches", "crates/automation/tests/automation.rs::open_inspect_render_and_find", "crates/render/src/text.rs::identity_v_columns_are_searchable_in_reading_order"]
-notes = "Horizontal and WMode 1 vertical text are grouped independently, including a horizontal heading above right-to-left vertical columns. Complex interleaved flows still use a geometric reading-order heuristic."
+evidence = ["crates/ui-egui/tests/ui.rs::find_counts_matches_across_pages", "crates/ui-egui/tests/ui.rs::find_reports_no_matches", "crates/automation/tests/automation.rs::open_inspect_render_and_find", "crates/render/src/text.rs::identity_v_columns_are_searchable_in_reading_order", "crates/render/src/text.rs::decomposed_and_composed_sara_am_find_each_other", "crates/render/src/text.rs::spaces_between_thai_letters_do_not_count"]
+notes = "Horizontal and WMode 1 vertical text are grouped independently, including a horizontal heading above right-to-left vertical columns. Complex interleaved flows still use a geometric reading-order heuristic. Thai: the decomposed SARA AM finds SARA AM and back (a lone NIKHAHIT or SARA AA no longer matches half of it), Thai and ASCII digits find each other in case-insensitive search, and a space between Thai letters does not count; NFC is not applied (marks stored out of canonical order still miss), and a hit inside a line drawn with ActualText is the whole line."
 
 [[feature]]
 id = "view.find-next-previous"
@@ -6468,8 +6468,8 @@ milestone = "M10"
 status = "shipped"
 commands = ["ocr.recognize"]
 tools = ["ocr_recognize", "ocr_status"]
-evidence = ["crates/engine/src/tests.rs::recognize_text_makes_a_scanned_page_searchable", "crates/automation/tests/automation.rs::ocr_tools_make_a_scan_searchable", "crates/ui-egui/tests/ocr.rs::recognize_text_dialog_adds_searchable_text"]
-notes = "ocrs engine (MIT/Apache) with CC-BY-SA models fetched by `cargo xtask models`; the desktop release packages ship them (#103; packaging/env.sh stage_models), the web build does not yet; runs on a worker thread with progress; one undoable step; pages with text are skipped unless asked (ocr.skip-renderable-text)."
+evidence = ["crates/engine/src/tests.rs::recognize_text_makes_a_scanned_page_searchable", "crates/engine/src/tests.rs::recognize_text_reads_over_unusable_text_only_when_asked", "crates/automation/tests/automation.rs::ocr_tools_make_a_scan_searchable", "crates/ui-egui/tests/ocr.rs::recognize_text_dialog_adds_searchable_text"]
+notes = "ocrs engine (MIT/Apache) with CC-BY-SA models fetched by `cargo xtask models`; the desktop release packages ship them (#103; packaging/env.sh stage_models), the web build does not yet; runs on a worker thread with progress; one undoable step; pages with text are skipped unless asked (ocr.skip-renderable-text); a page whose own text is mostly private-use or unmapped characters is reported as unusable_text by the automation tools and read over when asked, its unreadable glyphs hiding no recognised word; the desktop notice still counts such a page as one that had text and does not suggest reading it."
 
 [[feature]]
 id = "ocr.recognize-range"
@@ -6504,8 +6504,8 @@ milestone = "M10"
 status = "partial"
 commands = ["ocr.recognize"]
 tools = ["ocr_recognize"]
-evidence = ["crates/ui-egui/tests/ocr.rs::recognize_text_dialog_adds_searchable_text"]
-notes = "Document language choice reads English (Latin alphabet, no accents) and Thai (DocCraftTH: PP-OCRv5 Thai mobile recognizer, Apache-2.0, fetched by cargo xtask models; the dialog starts on Thai in a Thai interface). Missing: other languages; the web build has no models; no deskew; the Thai error rate (mean CER 0.0136 on 5 synthetic 300 dpi sentences) comes from synthetic pages only, the real-scan gate is pending."
+evidence = ["crates/ui-egui/tests/ocr.rs::recognize_text_dialog_adds_searchable_text", "crates/automation/tests/automation.rs::ocr_status_reports_thai"]
+notes = "Document language choice reads English (Latin alphabet, no accents) and Thai (DocCraftTH: PP-OCRv5 Thai mobile recognizer, Apache-2.0, fetched by cargo xtask models; the dialog starts on Thai in a Thai interface). Missing: other languages; the web build has no models; no deskew; Thai is measured at mean CER 0.0136 on 5 synthetic 300 dpi sentences, but fails the real-scan gate (CER <= 0.10): on 3 scanned pages of Thai government documents, scored against unreviewed draft truth, the mean is 0.20 and still 0.15 with line order ignored (about half the differing characters are missed or misplaced blocks, most of the rest misread characters; Thai digits are 1-2 %); on 25 re-OCR'd born-digital pages (about 17 distinct) it is 0.26, but 0.06 by line, so there the error is mostly reading order, tables above all (local corpus, 2026-10-19; not committed)."
 
 [[feature]]
 id = "ocr.searchable-image"
