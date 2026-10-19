@@ -81,7 +81,8 @@ fn a_missing_language_model_is_reported_in_the_interface_language() {
     let mut h = recognize_dialog("th");
     h.state_mut().ocr_draft.language = Some("xx".into());
     h.state_mut().start_ocr();
-    let toast = h.state().toast.clone().unwrap().0;
+    // Thai interface text carries U+200B at word boundaries for wrapping (i18n/th_breaks.rs).
+    let toast = h.state().toast.clone().unwrap().0.replace('\u{200B}', "");
     assert!(toast.contains("xx") && toast.contains("โมเดลการรู้จำข้อความ") && toast.contains("PDFCRAFT_MODELS"), "{toast}");
     assert!(h.state().ocr_run.is_none(), "nothing started");
 }
