@@ -391,8 +391,9 @@ impl PdfCraftApp {
         self.run_ocr(offer.doc, &offer.pages, settings);
     }
 
-    /// Draw the offer to read pages with unreadable text, bottom right, while no OCR job runs.
-    /// It goes when its document closes.
+    /// Draw the offer to read pages with unreadable text at the top right of the document area
+    /// (clear of the summary toast and the progress card at the bottom, and of the side rails),
+    /// while no OCR job runs. It goes when its document closes.
     pub(crate) fn show_unreadable_offer(&mut self, ctx: &egui::Context) {
         let Some(offer) = &self.ocr_offer else { return };
         if self.session.get(offer.doc).is_none() {
@@ -404,17 +405,17 @@ impl PdfCraftApp {
         }
         let message = offer.message();
         let t = Tokens::get(ctx);
-        let screen = ctx.content_rect();
+        let area = self.document_rect.filter(|r| r.is_positive()).unwrap_or_else(|| ctx.content_rect());
         let (mut go, mut later) = (false, false);
         egui::Area::new(egui::Id::new("ocr-unreadable-offer"))
             .order(egui::Order::Foreground)
-            .pivot(egui::Align2::RIGHT_BOTTOM)
-            .fixed_pos(screen.right_bottom() - egui::vec2(20.0, 28.0))
+            .pivot(egui::Align2::RIGHT_TOP)
+            .fixed_pos(area.right_top() + egui::vec2(-16.0, 16.0))
             .show(ctx, |ui| {
                 egui::Frame::popup(ui.style()).fill(t.card).corner_radius(egui::CornerRadius::same(10)).inner_margin(egui::Margin::same(14)).show(
                     ui,
                     |ui| {
-                        ui.set_width(340.0_f32.min(screen.width() - 64.0).max(160.0));
+                        ui.set_width(340.0_f32.min(area.width() - 32.0).max(160.0));
                         ui.label(egui::RichText::new(message).color(t.text));
                         ui.add_space(8.0);
                         ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
