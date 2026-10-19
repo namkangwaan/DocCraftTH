@@ -460,7 +460,8 @@ pub fn unicode_text_layer(words: &[PlacedWord]) -> (Vec<u8>, Vec<LayerFont>) {
         }
     }
 
-    let mut out = b"/OCR BMC\nBT\n3 Tr\n".to_vec();
+    // `3 Tr` and fonts are graphics state: wrap in `q … Q` so text added after OCR is not drawn invisibly (#3029).
+    let mut out = b"/OCR BMC\nq\nBT\n3 Tr\n".to_vec();
     let mut current_font: Option<usize> = None;
     let (top, bottom) = (BOX_EM - DESCENT, -DESCENT);
     for w in words {
@@ -507,7 +508,7 @@ pub fn unicode_text_layer(words: &[PlacedWord]) -> (Vec<u8>, Vec<LayerFont>) {
             advance_em += (run_bases as f64) * 0.5;
         }
     }
-    out.extend_from_slice(b"ET\nEMC\n");
+    out.extend_from_slice(b"ET\nQ\nEMC\n");
     (out, fonts)
 }
 
@@ -593,6 +594,26 @@ mod tests {
         assert_eq!(fonts[0].chars.len(), 255);
         assert_eq!(fonts[1].chars.len(), 45);
         assert!(String::from_utf8_lossy(&content).contains("/PCOcrU2 1 Tf"));
+    }
+
+    /// #3029 for the Unicode layer: its `3 Tr` and fonts end with the layer, so text added to the
+    /// page after OCR is not drawn invisibly.
+    #[test]
+    fn unicode_layer_restores_the_graphics_state_it_changes() {
+        let w = PlacedWord { text: "น้ำ".into(), origin: [10.0, 20.0], across: [30.0, 0.0], up: [0.0, 9.3] };
+        let (content, _) = unicode_text_layer(&[w]);
+        let s = String::from_utf8(content).unwrap();
+        let mut depth = 0_i32;
+        for token in s.split_ascii_whitespace() {
+            match token {
+                "q" => depth += 1,
+                "Q" => depth -= 1,
+                "Tr" | "Tf" | "Tm" => assert!(depth > 0, "`{token}` outside q … Q in {s:?}"),
+                _ => {}
+            }
+            assert!(depth >= 0, "unbalanced Q in {s:?}");
+        }
+        assert_eq!(depth, 0, "the layer leaves a q open: {s:?}");
     }
 
     #[test]
