@@ -1601,6 +1601,7 @@
 	Recognized {n} words	Распознано {n} слов
 	{words} on {pages}	{words} на {pages}
 	; 1 page already had text	; 1 страница уже имела текст
+	; some pages have unreadable text (turn on “{option}” to read them)	; на некоторых страницах текст нечитаем (включите «{option}», чтобы распознать их)
 	; {n} pages already had text	; {n} страниц уже имели текст
 	Recognized {w} words in 1 file	Распознано {w} слов в 1 файле
 	Recognized {w} words in {n} files	Распознано {w} слов в {n} файлах

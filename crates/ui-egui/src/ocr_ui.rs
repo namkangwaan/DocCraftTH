@@ -79,12 +79,94 @@ pub struct OcrProgress {
     pub cancel: bool,
 }
 
-/// Recognize text in multiple files: files done, total, and the summary once finished.
+/// Recognize text in multiple files: files done, total, the summary once finished, and a cancel
+/// request.
 #[derive(Default)]
 pub struct BatchProgress {
     pub done: usize,
     pub total: usize,
     pub message: Option<String>,
+    pub cancel: bool,
+}
+
+/// The summary's note when pages were skipped because their own text can't be read (SRS FR-17):
+/// it names the dialog option that reads them, which is the user's confirmation.
+fn unreadable_note() -> String {
+    crate::i18n::fmt(
+        tl!("; some pages have unreadable text (turn on “{option}” to read them)"),
+        &[("option", tl!("Also recognize pages that already have text"))],
+    )
+}
+
+/// Pages skipped because their own text is unusable.
+fn unreadable_pages(pages: &[OcrPage]) -> usize {
+    pages.iter().filter(|p| p.unusable_text && p.skipped.is_some()).count()
+}
+
+/// Recognize `files` one at a time and write each searchable copy (into `dir` on the desktop),
+/// returning the summary. Cancel in `p` stops between files and inside one; a file cut short is
+/// not written, so every file written is complete.
+fn recognize_batch(
+    files: Vec<(String, Vec<u8>)>,
+    settings: &OcrSettings,
+    #[cfg(not(target_arch = "wasm32"))] dir: &std::path::Path,
+    p: &Mutex<BatchProgress>,
+) -> String {
+    // A poisoned lock means the UI side is gone: stop as if cancelled.
+    let cancelled = || p.lock().map_or(true, |s| s.cancel);
+    let (mut ok, mut words, mut unreadable, mut failed, mut stopped) = (0, 0, 0, Vec::new(), false);
+    match pdfcraft_engine::ocr::engine_for(&settings.language) {
+        Err(e) => failed.push(e),
+        Ok(ocr) => {
+            for (i, (name, bytes)) in files.into_iter().enumerate() {
+                if cancelled() {
+                    stopped = true;
+                    break;
+                }
+                if let Ok(mut s) = p.lock() {
+                    s.done = i;
+                }
+                let r = pdfcraft_engine::ocr::recognize_file(&name, Arc::new(bytes), None, settings.clone(), &ocr, |_, _| !cancelled());
+                if cancelled() {
+                    stopped = true;
+                    break;
+                }
+                let saved = r.and_then(|r| {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    crate::editing::write_atomically(&dir.join(&name).to_string_lossy(), &r.bytes).map_err(|e| e.to_string())?;
+                    #[cfg(target_arch = "wasm32")]
+                    crate::editing::download(&name, &r.bytes)?;
+                    Ok((r.words(), unreadable_pages(&r.pages)))
+                });
+                match saved {
+                    Ok((n, u)) => {
+                        ok += 1;
+                        words += n;
+                        unreadable += u;
+                    }
+                    Err(e) => failed.push(format!("{name}: {}", e)),
+                }
+            }
+        }
+    }
+    let mut msg = if stopped && ok == 0 {
+        tl!("Cancelled").to_string()
+    } else if ok == 1 {
+        crate::i18n::fmt(tl!("Recognized {w} words in 1 file"), &[("w", &words.to_string())])
+    } else {
+        crate::i18n::fmt(tl!("Recognized {w} words in {n} files"), &[("w", &words.to_string()), ("n", &ok.to_string())])
+    };
+    if stopped && ok > 0 {
+        msg.push_str("; ");
+        msg.push_str(tl!("Cancelled"));
+    }
+    if unreadable > 0 {
+        msg.push_str(&unreadable_note());
+    }
+    if !failed.is_empty() {
+        msg.push_str(&crate::i18n::fmt(tl!("; failed: {list}"), &[("list", &failed.join("; "))]));
+    }
+    msg
 }
 
 pub struct OcrRun {
@@ -262,41 +344,10 @@ impl PdfCraftApp {
         let lang = crate::i18n::current();
         let work = move || {
             crate::i18n::set_current(lang);
-            let (mut ok, mut words, mut failed) = (0, 0, Vec::new());
-            match pdfcraft_engine::ocr::engine_for(&settings.language) {
-                Err(e) => failed.push(e),
-                Ok(ocr) => {
-                    for (i, (name, bytes)) in files.into_iter().enumerate() {
-                        if let Ok(mut s) = p.lock() {
-                            s.done = i;
-                        }
-                        let r = pdfcraft_engine::ocr::recognize_file(&name, Arc::new(bytes), None, settings.clone(), &ocr, |_, _| true);
-                        let saved = r.and_then(|r| {
-                            #[cfg(not(target_arch = "wasm32"))]
-                            crate::editing::write_atomically(&dir.join(&name).to_string_lossy(), &r.bytes).map_err(|e| e.to_string())?;
-                            #[cfg(target_arch = "wasm32")]
-                            crate::editing::download(&name, &r.bytes)?;
-                            Ok(r.words())
-                        });
-                        match saved {
-                            Ok(n) => {
-                                ok += 1;
-                                words += n;
-                            }
-                            Err(e) => failed.push(format!("{name}: {}", e)),
-                        }
-                    }
-                }
-            }
-            let done = if ok == 1 {
-                crate::i18n::fmt(tl!("Recognized {w} words in 1 file"), &[("w", &words.to_string())])
-            } else {
-                crate::i18n::fmt(tl!("Recognized {w} words in {n} files"), &[("w", &words.to_string()), ("n", &ok.to_string())])
-            };
-            let mut msg = done;
-            if !failed.is_empty() {
-                msg.push_str(&crate::i18n::fmt(tl!("; failed: {list}"), &[("list", &failed.join("; "))]));
-            }
+            #[cfg(not(target_arch = "wasm32"))]
+            let msg = recognize_batch(files, &settings, &dir, &p);
+            #[cfg(target_arch = "wasm32")]
+            let msg = recognize_batch(files, &settings, &p);
             if let Ok(mut s) = p.lock() {
                 s.done = s.total;
                 s.message = Some(msg);
@@ -314,58 +365,90 @@ impl PdfCraftApp {
         self.poll_ocr();
     }
 
-    /// Stop a running recognition (the pages read so far are kept).
+    /// Stop the running recognition: a document is left as it was (SRS §8.2), and a batch keeps
+    /// only the files already written.
     pub fn cancel_ocr(&mut self) {
         if let Some(r) = &self.ocr_run
             && let Ok(mut s) = r.progress.lock()
         {
             s.cancel = true;
         }
+        if let Some(b) = &self.ocr_batch
+            && let Ok(mut s) = b.lock()
+        {
+            s.cancel = true;
+        }
+    }
+
+    /// Show the OCR progress card, unless another job's card is showing.
+    fn show_ocr_progress(&mut self, label: String, done: usize, total: usize, cancelling: bool) {
+        if self.progress_notice.as_ref().is_some_and(|n| n.job != widgets::ProgressJob::Ocr) {
+            return;
+        }
+        let label = if cancelling { tl!("Cancelling…").to_string() } else { label };
+        let fraction = done as f32 / total.max(1) as f32;
+        self.progress_notice = Some(widgets::ProgressNotice { label, fraction, cancellable: !cancelling, job: widgets::ProgressJob::Ocr });
+        if let Some(ctx) = &self.ctx {
+            ctx.request_repaint_after(std::time::Duration::from_millis(200));
+        }
+    }
+
+    fn hide_ocr_progress(&mut self) {
+        if self.progress_notice.as_ref().is_some_and(|n| n.job == widgets::ProgressJob::Ocr) {
+            self.progress_notice = None;
+        }
     }
 
     /// Show progress; apply the result once the worker is done.
     pub(crate) fn poll_ocr(&mut self) {
         if let Some(b) = self.ocr_batch.clone() {
-            let msg = b.lock().ok().map(|mut s| s.message.take().ok_or((s.done, s.total)));
+            let msg = b.lock().ok().map(|mut s| s.message.take().ok_or((s.done, s.total, s.cancel)));
             match msg {
                 Some(Ok(m)) => {
                     self.ocr_batch = None;
+                    self.hide_ocr_progress();
                     self.notify(m);
                 }
-                Some(Err((done, total))) => {
-                    let m = crate::i18n::fmt(
+                Some(Err((done, total, cancelling))) => {
+                    let label = crate::i18n::fmt(
                         tl!("Recognizing text… file {d} of {t}"),
                         &[("d", &(done + 1).min(total.max(1)).to_string()), ("t", &total.max(1).to_string())],
                     );
-                    if self.toast.as_ref().is_none_or(|t| t.0 != m) {
-                        self.notify(m);
-                    }
-                    if let Some(ctx) = &self.ctx {
-                        ctx.request_repaint_after(std::time::Duration::from_millis(200));
-                    }
+                    self.show_ocr_progress(label, done, total, cancelling);
                 }
-                None => self.ocr_batch = None,
+                None => {
+                    self.ocr_batch = None;
+                    self.hide_ocr_progress();
+                }
             }
         }
         let Some(run) = self.ocr_run.as_ref() else { return };
         let (doc, progress) = (run.doc, run.progress.clone());
-        let Ok(mut s) = progress.lock() else { return };
+        let Ok(mut s) = progress.lock() else {
+            // The worker panicked while holding the lock: it will never report back.
+            self.ocr_run = None;
+            self.hide_ocr_progress();
+            return;
+        };
+        let cancelled = s.cancel;
         let Some(result) = s.result.take() else {
-            let msg = crate::i18n::fmt(
-                tl!("Recognizing text… page {d} of {t}"),
-                &[("d", &(s.done + 1).min(s.total.max(1)).to_string()), ("t", &s.total.max(1).to_string())],
-            );
+            let (done, total) = (s.done, s.total);
             drop(s);
-            if self.toast.as_ref().is_none_or(|t| t.0 != msg) {
-                self.notify(msg);
-            }
-            if let Some(ctx) = &self.ctx {
-                ctx.request_repaint_after(std::time::Duration::from_millis(200));
-            }
+            let label = crate::i18n::fmt(
+                tl!("Recognizing text… page {d} of {t}"),
+                &[("d", &(done + 1).min(total.max(1)).to_string()), ("t", &total.max(1).to_string())],
+            );
+            self.show_ocr_progress(label, done, total, cancelled);
             return;
         };
         drop(s);
         self.ocr_run = None;
+        self.hide_ocr_progress();
+        // SRS §8.2: Cancel leaves the document as it was, the pages read so far included.
+        if cancelled {
+            self.notify_tr("Cancelled");
+            return;
+        }
         let found = match result {
             Ok(f) => f,
             Err(e) => {
@@ -374,7 +457,8 @@ impl PdfCraftApp {
             }
         };
         let read = found.iter().filter(|p| p.skipped.is_none()).count();
-        let skipped = found.len() - read;
+        let unreadable = unreadable_pages(&found);
+        let skipped = found.len().saturating_sub(read).saturating_sub(unreadable);
         match self.session.apply_ocr(doc, &found) {
             Ok(words) => {
                 if let Some(info) = self.session.get(doc).map(|d| d.info.clone())
@@ -396,9 +480,107 @@ impl PdfCraftApp {
                         crate::i18n::fmt(tl!("; {n} pages already had text"), &[("n", &skipped.to_string())])
                     });
                 }
+                if unreadable > 0 {
+                    msg.push_str(&unreadable_note());
+                }
                 self.notify(msg);
             }
             Err(e) => self.notify_error(e),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+    use pdfcraft_engine::ocr::{PlacedWord, UNUSABLE_TEXT};
+
+    use super::*;
+
+    fn page(page: usize, skipped: Option<&str>, unusable_text: bool) -> OcrPage {
+        let words = if skipped.is_some() {
+            Vec::new()
+        } else {
+            vec![PlacedWord { text: "word".into(), origin: [72.0, 700.0], across: [40.0, 0.0], up: [0.0, 12.0] }]
+        };
+        OcrPage { page, words, already_on_page: 0, skipped: skipped.map(Into::into), unusable_text }
+    }
+
+    /// A blank three-page document with `progress` as its running recognition.
+    fn running(progress: Arc<Mutex<OcrProgress>>) -> Harness<'static, PdfCraftApp> {
+        Harness::builder().with_size(egui::vec2(1200.0, 800.0)).build_eframe(move |_cc| {
+            let mut app = PdfCraftApp::new();
+            app.set_option("language", "en").unwrap();
+            let blank = pdfcraft_engine::Session::new().create_blank(612.0, 792.0, 3).unwrap().to_vec();
+            app.open_bytes("scan.pdf", None, blank).unwrap();
+            let (_, doc) = app.active_ids().unwrap();
+            app.ocr_run = Some(OcrRun { doc, progress });
+            app
+        })
+    }
+
+    /// SRS FR-08 and §8.2: the run shows a card with Cancel, and a cancelled run leaves the
+    /// document as it was, even with pages already read.
+    #[test]
+    fn cancel_stops_recognition_and_leaves_the_document_unchanged() {
+        let progress = Arc::new(Mutex::new(OcrProgress { done: 1, total: 3, ..Default::default() }));
+        let mut h = running(progress.clone());
+        h.run_steps(4);
+        h.get_by_label("Recognizing text… page 2 of 3");
+        let shown = h.state().progress_notice.clone().unwrap();
+        assert!(shown.cancellable && shown.job == widgets::ProgressJob::Ocr, "{shown:?}");
+
+        h.get_by_label("Cancel").click();
+        h.run_steps(2);
+        assert!(progress.lock().unwrap().cancel, "the worker is asked to stop");
+        h.get_by_label("Cancelling…");
+        assert!(h.query_by_label("Cancel").is_none(), "Cancel is not offered twice");
+
+        progress.lock().unwrap().result = Some(Ok(vec![page(0, None, false), page(1, None, false)]));
+        h.run_steps(2);
+        let app = h.state();
+        assert!(app.ocr_run.is_none() && app.progress_notice.is_none());
+        assert_eq!(app.toast.as_ref().map(|t| t.0.as_str()), Some("Cancelled"));
+        let (_, doc) = app.active_ids().unwrap();
+        assert_eq!(app.session.get(doc).unwrap().can_undo(), None, "nothing was added");
+    }
+
+    /// SRS FR-17: pages skipped for unreadable text are told apart from pages that had text, and
+    /// the summary names the option that reads them.
+    #[test]
+    fn the_summary_names_pages_with_unreadable_text() {
+        let found = vec![page(0, None, false), page(1, Some("the page already contains text"), false), page(2, Some(UNUSABLE_TEXT), true)];
+        let progress = Arc::new(Mutex::new(OcrProgress { done: 3, total: 3, result: Some(Ok(found)), ..Default::default() }));
+        let mut h = running(progress);
+        h.run_steps(2);
+        let app = h.state();
+        assert_eq!(
+            app.toast.as_ref().map(|t| t.0.as_str()),
+            Some(
+                "Recognized 1 word on 1 page; 1 page already had text; some pages have unreadable text (turn on “Also recognize pages that already have text” to read them)"
+            )
+        );
+        let (_, doc) = app.active_ids().unwrap();
+        assert_eq!(app.session.get(doc).unwrap().can_undo(), Some("Recognize text"));
+    }
+
+    /// A batch cancelled before its next file writes nothing more.
+    #[test]
+    fn a_cancelled_batch_writes_no_more_files() {
+        let dir = std::env::temp_dir().join(format!("pdfcraft-ocr-batch-cancel-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let blank = pdfcraft_engine::Session::new().create_blank(612.0, 792.0, 1).unwrap().to_vec();
+        let p = Mutex::new(BatchProgress { total: 2, cancel: true, ..Default::default() });
+        let settings = OcrSettings::default();
+        let msg = recognize_batch(vec![("one.pdf".into(), blank.clone()), ("two.pdf".into(), blank)], &settings, &dir, &p);
+        if pdfcraft_engine::ocr::available() {
+            assert_eq!(msg, "Cancelled");
+        } else {
+            assert!(msg.contains("failed"), "{msg}");
+        }
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 0, "no file was written");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

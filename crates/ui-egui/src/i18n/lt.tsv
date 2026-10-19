@@ -218,6 +218,7 @@
 	9 digit, A letter, O letter or digit, X any character	9 – skaitmuo, A – raidė, O – raidė arba skaitmuo, X – bet kuris simbolis
 	; 1 page already had text	; 1 puslapyje tekstas jau buvo
 	; failed: {list}	; nepavyko: {list}
+	; some pages have unreadable text (turn on “{option}” to read them)	; kai kuriuose puslapiuose tekstas neįskaitomas (norėdami juos atpažinti, įjunkite „{option}“)
 	; {n} pages already had text	; {n} puslapiuose tekstas jau buvo
 	? of {n}	? iš {n}
 	A clean-room, open-source PDF application written in Rust. MIT OR Apache-2.0.	Švarių patalpų principu kuriama atvirojo kodo PDF programa, parašyta „Rust“ kalba. MIT OR Apache-2.0.
