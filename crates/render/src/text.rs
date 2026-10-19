@@ -120,7 +120,8 @@ impl PageText {
         self.find_opts(needle, false, false)
     }
 
-    /// Search with Acrobat's find options: case-sensitive, whole words only.
+    /// Search with Acrobat's find options: case-sensitive, whole words only. In either mode the
+    /// decomposed Thai SARA AM (`ํา`) and `ำ` find each other.
     pub fn find_opts(&self, needle: &str, case_sensitive: bool, whole_words: bool) -> Vec<std::ops::Range<usize>> {
         self.find_opts_limited(needle, case_sensitive, whole_words, usize::MAX)
     }
@@ -1968,6 +1969,30 @@ mod tests {
         assert_eq!(thai.find("ปี๒๕"), vec![0..4]);
         assert!(thai.find_opts("2569", true, false).is_empty(), "case-sensitive search matches digits as typed");
         assert_eq!(fold_case("๐๑๒๓๔๕๖๗๘๙"), "0123456789");
+    }
+
+    /// One glyph per part on one line, without the layout heuristics (Thai marks share an x).
+    fn parts(parts: &[&str]) -> PageText {
+        PageText {
+            glyphs: parts.iter().map(|t| g(t, 0.0, 0.0, 1.0)).collect(),
+            line_of: vec![0; parts.len()],
+            space_before: vec![false; parts.len()],
+        }
+    }
+
+    #[test]
+    fn decomposed_and_composed_sara_am_find_each_other() {
+        // Word export stores น้ำ as NIKHAHIT + SARA AA (U+0E4D U+0E32) after the tone mark.
+        let decomposed = parts(&["น", "\u{0E49}", "\u{0E4D}", "\u{0E32}"]);
+        let composed = parts(&["น", "\u{0E49}", "\u{0E33}"]);
+        for sensitive in [false, true] {
+            // The hit must end on the SARA AA glyph, or redaction would leave it visible.
+            assert_eq!(decomposed.find_opts("น\u{0E49}\u{0E33}", sensitive, false), vec![0..4], "sensitive={sensitive}");
+            assert_eq!(composed.find_opts("น\u{0E49}\u{0E4D}\u{0E32}", sensitive, false), vec![0..3], "sensitive={sensitive}");
+        }
+        assert_eq!(decomposed.find("\u{0E33}"), vec![2..4]);
+        assert_eq!(parts(&["น\u{0E49}\u{0E4D}\u{0E32}"]).find("น\u{0E49}\u{0E33}"), vec![0..1]);
+        assert_eq!(decomposed.text_of(0..4), "น\u{0E49}\u{0E4D}\u{0E32}", "only the comparison changes");
     }
 
     fn g(t: &str, x0: f32, y0: f32, x1: f32) -> TextGlyph {
