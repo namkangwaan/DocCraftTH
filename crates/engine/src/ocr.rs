@@ -237,7 +237,10 @@ impl OcrJob {
     /// The render scale (pixels per point) `page` is read at. A scan is read at its own
     /// resolution (enlarging it only blurs the letters), at most the chosen one.
     fn scale(&self, page: usize, info: &PageInfo) -> f32 {
-        let wanted = self.settings.dpi.clamp(72.0, 600.0) / 72.0;
+        // A NaN resolution (OcrSettings is public) made `wanted` NaN, and `native.clamp(fit, NaN)`
+        // below panics: read it at the default resolution instead.
+        let dpi = if self.settings.dpi.is_nan() { OcrSettings::default().dpi } else { self.settings.dpi };
+        let wanted = dpi.clamp(72.0, 600.0) / 72.0;
         let Some(native) = self.native.get(page).copied().flatten() else { return wanted };
         // A scan whose page is larger than a sheet (often a box given in pixels, one point per
         // pixel, #1848) is measured as if shrunk to one: otherwise 1 px/pt is already its full
@@ -359,6 +362,29 @@ mod tests {
         assert!(covered([131.0, 52.0, 170.0, 61.0], &glyphs) < ALREADY_ON_PAGE);
         // A page without text has nothing to cover a word.
         assert_eq!(covered([100.5, 52.0, 134.0, 61.0], &[]), 0.0);
+    }
+
+    /// A resolution that is not a number reads at the default one instead of panicking in
+    /// `f32::clamp`, on a scan (which has a native resolution) and on a page without images.
+    #[test]
+    fn a_nan_resolution_reads_at_the_default() {
+        let mut s = Session::new();
+        let png = export::encode_png(612, 792, &vec![255; 612 * 792 * 4]).unwrap();
+        let bytes = s.create_from_images(&[("scan.png".into(), png)]).unwrap();
+        let scan = s.open("scan.pdf", None, bytes, None).unwrap();
+        let blank = s.create_blank(612.0, 792.0, 1).unwrap();
+        let blank = s.open("blank.pdf", None, blank, None).unwrap();
+        for id in [scan, blank] {
+            let default = s.ocr_job(id, &[], OcrSettings::default()).unwrap();
+            for dpi in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+                let job = s.ocr_job(id, &[], OcrSettings { dpi, ..Default::default() }).unwrap();
+                let scale = job.scale(0, &job.infos[0]);
+                assert!(scale.is_finite() && scale > 0.0, "{dpi}: {scale}");
+                if dpi.is_nan() {
+                    assert_eq!(scale, default.scale(0, &default.infos[0]));
+                }
+            }
+        }
     }
 
     /// #1848: an A4 scan at 300 dpi whose page box is its pixel size (2480 x 3508 pt, one pixel
