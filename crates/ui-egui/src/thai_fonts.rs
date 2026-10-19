@@ -149,7 +149,11 @@ pub fn preferences_section(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
     });
     ui.add(widgets::checkbox(&mut app.thai_optional_fonts, say("Show optional fonts")));
     ui.label(RichText::new("English และภาษาไทย").font(theme::regular(16.0)));
-    ui.label(RichText::new("สวัสดี ภาษาไทย").font(FontId::new(16.0, FontFamily::Name(TEXT_FACE.into()))));
+    // The named family exists only once a Thai text face has loaded (`install`). Without the
+    // font files epaint panics on an unbound family, so the sample falls back to proportional.
+    let family = FontFamily::Name(TEXT_FACE.into());
+    let family = if ui.ctx().fonts(|f| f.families().contains(&family)) { family } else { FontFamily::Proportional };
+    ui.label(RichText::new("สวัสดี ภาษาไทย").font(FontId::new(16.0, family)));
     ui.label(RichText::new(say("Operating system fonts are drawn on screen only. They are not written into a PDF.")).small().color(t.text_muted));
 }
 
