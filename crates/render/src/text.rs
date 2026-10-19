@@ -121,7 +121,8 @@ impl PageText {
     }
 
     /// Search with Acrobat's find options: case-sensitive, whole words only. In either mode the
-    /// decomposed Thai SARA AM (`ํา`) and `ำ` find each other.
+    /// decomposed Thai SARA AM (`ํา`) and `ำ` find each other, and a space between two Thai
+    /// letters doesn't count (it still ends a word for whole-word search).
     pub fn find_opts(&self, needle: &str, case_sensitive: bool, whole_words: bool) -> Vec<std::ops::Range<usize>> {
         self.find_opts_limited(needle, case_sensitive, whole_words, usize::MAX)
     }
@@ -1993,6 +1994,36 @@ mod tests {
         assert_eq!(decomposed.find("\u{0E33}"), vec![2..4]);
         assert_eq!(parts(&["น\u{0E49}\u{0E4D}\u{0E32}"]).find("น\u{0E49}\u{0E33}"), vec![0..1]);
         assert_eq!(decomposed.text_of(0..4), "น\u{0E49}\u{0E4D}\u{0E32}", "only the comparison changes");
+    }
+
+    #[test]
+    fn spaces_between_thai_letters_do_not_count() {
+        // OCR and legacy PDFs put spaces between Thai words; Thai itself doesn't use them.
+        let mut spaced = parts(&["รายงาน", "ประจำปี"]);
+        spaced.space_before[1] = true;
+        assert_eq!(spaced.find("รายงานประจำปี"), vec![0..2]);
+        assert_eq!(spaced.find_opts("รายงานประจำปี", true, false), vec![0..2]);
+        assert_eq!(parts(&["รายงานประจำปี"]).find("รายงาน ประจำปี"), vec![0..1]);
+        assert_eq!(parts(&["รายงาน ประจำปี"]).find("รายงานประจำปี"), vec![0..1]);
+        // OCR may also split SARA AM's two halves.
+        assert_eq!(parts(&["น\u{0E49}\u{0E4D} \u{0E32}"]).find("น\u{0E49}\u{0E33}"), vec![0..1]);
+        let mut wrapped = parts(&["รายงาน", "ประจำปี"]);
+        wrapped.line_of[1] = 1;
+        assert_eq!(wrapped.find("รายงานประจำปี"), vec![0..2]);
+        // The dropped space still ends a word.
+        assert_eq!(spaced.find_opts("รายงาน", false, true), vec![0..1]);
+        assert_eq!(spaced.find_opts("ประจำปี", false, true), vec![1..2]);
+
+        // Anything that isn't a Thai letter on both sides keeps its space.
+        let mut latin = parts(&["foo", "bar"]);
+        latin.space_before[1] = true;
+        assert!(latin.find("foobar").is_empty());
+        assert_eq!(latin.find("foo bar"), vec![0..2]);
+        let mut mixed = parts(&["ไทย", "abc"]);
+        mixed.space_before[1] = true;
+        assert!(mixed.find("ไทยabc").is_empty());
+        assert!(parts(&["ราคา ฿ ๑๐๐"]).find("ราคา฿").is_empty(), "the baht sign is not a letter");
+        assert!(parts(&["ปี ๒๕๖๙"]).find("ปี2569").is_empty(), "Thai digits fold to ASCII and keep their space");
     }
 
     fn g(t: &str, x0: f32, y0: f32, x1: f32) -> TextGlyph {
