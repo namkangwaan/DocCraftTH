@@ -187,15 +187,7 @@ impl Ocr {
 
     /// Recognise the text in an RGBA (or RGB, or grey) image, `width` × `height` pixels.
     pub fn recognize(&self, pixels: &[u8], width: u32, height: u32) -> Result<Vec<Line>, OcrError> {
-        if width == 0 || height == 0 || pixels.is_empty() {
-            return Err(OcrError::EmptyImage);
-        }
-        // ocrs wants 1 or 3 channels.
-        let rgb: std::borrow::Cow<[u8]> = if pixels.len() == (width as usize).saturating_mul(height as usize).saturating_mul(4) {
-            pixels.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect::<Vec<u8>>().into()
-        } else {
-            pixels.into()
-        };
+        let rgb = channels_for_ocrs(pixels, width, height)?;
         let err = |e: &dyn std::fmt::Display| OcrError::Recognize(e.to_string());
         match &self.recognizer {
             Recognizer::Ocrs(engine) => {
@@ -294,21 +286,41 @@ impl Ocr {
     /// The rectangle is clipped to the image; one that is empty after clipping (or inverted)
     /// reads as `None`, as does any crop under the default (non-CTC) models.
     pub fn recognize_crop(&self, pixels: &[u8], width: u32, height: u32, rect: [u32; 4]) -> Result<Option<String>, OcrError> {
-        if width == 0 || height == 0 || pixels.is_empty() {
-            return Err(OcrError::EmptyImage);
-        }
+        let rgb = channels_for_ocrs(pixels, width, height)?;
         let Some(rect) = clip_crop(rect, width, height) else {
             return Ok(None);
-        };
-        let rgb: std::borrow::Cow<[u8]> = if pixels.len() == (width as usize).saturating_mul(height as usize).saturating_mul(4) {
-            pixels.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect::<Vec<u8>>().into()
-        } else {
-            pixels.into()
         };
         match &self.recognizer {
             Recognizer::Ocrs(_) => Ok(None),
             Recognizer::Ctc { model, dict, .. } => recognize_ctc_crop(&rgb, width, height, rect, model, dict),
         }
+    }
+}
+
+/// The most pixels an image to recognise may have: four times the renderer's page budget.
+/// Larger images are refused before they reach `ocrs`, which multiplies the dimensions as `u32`.
+const MAX_PIXELS: u64 = 1 << 28;
+
+/// `pixels` in the 1 or 3 channels `ocrs` and the CTC crops read (RGBA loses its alpha), once it
+/// is known to hold exactly `width` × `height` grey, RGB or RGBA pixels. `ocrs` computed
+/// `width * height` in `u32`, so 65536 × 65537 overflowed (a panic in debug builds; a wrapped
+/// length, then a shape mismatch, in release).
+fn channels_for_ocrs(pixels: &[u8], width: u32, height: u32) -> Result<std::borrow::Cow<'_, [u8]>, OcrError> {
+    if width == 0 || height == 0 || pixels.is_empty() {
+        return Err(OcrError::EmptyImage);
+    }
+    // Two u32 factors cannot overflow a u64.
+    let count = u64::from(width) * u64::from(height);
+    let too_large = || OcrError::Recognize(format!("the image is too large to recognise ({width} × {height} pixels)"));
+    if count > MAX_PIXELS {
+        return Err(too_large());
+    }
+    let count = usize::try_from(count).map_err(|_| too_large())?;
+    // count ≤ 2^28, so four times it fits a 32-bit usize.
+    match pixels.len() {
+        n if n == count.saturating_mul(4) => Ok(pixels.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect::<Vec<u8>>().into()),
+        n if n == count || n == count.saturating_mul(3) => Ok(pixels.into()),
+        n => Err(OcrError::Recognize(format!("{n} bytes are not {width} × {height} grey, RGB or RGBA pixels"))),
     }
 }
 
@@ -1073,6 +1085,47 @@ mod tests {
             for b in valid {
                 proptest::prop_assert!(merged.iter().any(|m| m[0] <= b[0] && m[1] <= b[1] && m[2] >= b[2] && m[3] >= b[3]), "{b:?} lost");
             }
+        }
+    }
+
+    #[test]
+    fn pixel_buffers_must_match_their_dimensions() {
+        assert!(matches!(channels_for_ocrs(&[], 2, 2), Err(OcrError::EmptyImage)));
+        assert!(matches!(channels_for_ocrs(&[0; 4], 0, 2), Err(OcrError::EmptyImage)));
+        assert_eq!(channels_for_ocrs(&[1, 2, 3, 4], 2, 2).unwrap().as_ref(), &[1, 2, 3, 4], "grey");
+        assert_eq!(channels_for_ocrs(&[9; 12], 2, 2).unwrap().len(), 12, "RGB");
+        assert_eq!(channels_for_ocrs(&[1, 2, 3, 255, 4, 5, 6, 255], 2, 1).unwrap().as_ref(), &[1, 2, 3, 4, 5, 6], "RGBA");
+        for (len, w, h) in [(5, 2, 2), (8, 2, 2), (13, 2, 2), (65536 * 3, 65536, 65537), (16, u32::MAX, u32::MAX), (16, u32::MAX, 1)] {
+            assert!(matches!(channels_for_ocrs(&vec![0; len], w, h), Err(OcrError::Recognize(_))), "{len} bytes for {w} × {h}");
+        }
+    }
+
+    /// Dimensions whose product overflows `u32` reached `ocrs` unchecked, which panicked in its
+    /// `width * height`. Runs when the models are installed.
+    #[test]
+    fn recognize_refuses_dimensions_that_overflow() {
+        let Some(models) = Models::find() else {
+            eprintln!("skipped: OCR models not installed");
+            return;
+        };
+        let ocr = Ocr::load(&models).unwrap();
+        let px = vec![255u8; 65536 * 3];
+        assert!(ocr.recognize(&px, 65536, 65537).is_err());
+        assert!(ocr.recognize(&px, 65537, 65536).is_err());
+        assert!(ocr.recognize_crop(&px, 65536, 65537, [0, 0, 10, 10]).is_err());
+    }
+
+    /// Images one pixel wide or tall, and thin strips, read as nothing rather than failing.
+    #[test]
+    fn recognize_takes_degenerate_images() {
+        let Some(models) = Models::find() else {
+            eprintln!("skipped: OCR models not installed");
+            return;
+        };
+        let ocr = Ocr::load(&models).unwrap();
+        for (w, h) in [(1u32, 1u32), (1, 3000), (3000, 1), (2, 2), (7, 4000), (4000, 7)] {
+            let px = vec![0u8; (w * h) as usize];
+            let _ = ocr.recognize(&px, w, h);
         }
     }
 
