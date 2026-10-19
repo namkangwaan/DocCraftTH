@@ -589,6 +589,10 @@ impl Automation {
         if let Some(s) = a.opt_bool("skip_text_pages")? {
             settings.skip_text_pages = s;
         }
+        if let Some(d) = a.opt_str("digits")? {
+            settings.digits = pdfcraft_engine::ocr::Digits::from_code(d)
+                .ok_or_else(|| ToolError::InvalidArgs(format!("unsupported digits {d:?}: use as_read, thai or arabic")))?;
+        }
         Ok(settings)
     }
 

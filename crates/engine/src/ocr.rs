@@ -13,6 +13,50 @@ pub use pdfcraft_ocr::{LANGUAGES, Models, Ocr, OcrError, PlacedWord};
 
 use crate::{DocId, Edit, EditError, Session};
 
+/// How recognised digits are written into the OCR text layer.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Digits {
+    /// Keep whatever numeral script the recogniser read.
+    #[default]
+    AsRead,
+    /// Write ASCII digits `0..=9` as Thai digits `๐..=๙` (`U+0E50..=U+0E59`).
+    Thai,
+    /// Write Thai digits `๐..=๙` as ASCII digits `0..=9`.
+    Arabic,
+}
+
+impl Digits {
+    pub fn from_code(code: &str) -> Option<Self> {
+        match code {
+            "as_read" => Some(Self::AsRead),
+            "thai" => Some(Self::Thai),
+            "arabic" => Some(Self::Arabic),
+            _ => None,
+        }
+    }
+
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::AsRead => "as_read",
+            Self::Thai => "thai",
+            Self::Arabic => "arabic",
+        }
+    }
+
+    pub fn apply(self, text: &str) -> String {
+        match self {
+            Self::AsRead => text.to_string(),
+            Self::Thai => {
+                text.chars().map(|c| if c.is_ascii_digit() { char::from_u32(0x0E50 + (c as u32 - b'0' as u32)).unwrap_or(c) } else { c }).collect()
+            }
+            Self::Arabic => text
+                .chars()
+                .map(|c| if ('\u{0E50}'..='\u{0E59}').contains(&c) { char::from_u32(b'0' as u32 + (c as u32 - 0x0E50)).unwrap_or(c) } else { c })
+                .collect(),
+        }
+    }
+}
+
 /// Recognize Text settings.
 #[derive(Clone, Debug, PartialEq)]
 pub struct OcrSettings {
@@ -24,6 +68,8 @@ pub struct OcrSettings {
     /// text" and skips them). When `false`, such pages are read too (a picture on a page that
     /// also has text, #1028) and only the words that aren't already there are added.
     pub skip_text_pages: bool,
+    /// How recognised digits are written into the text layer.
+    pub digits: Digits,
 }
 
 /// A recognised word whose box is at least this much covered by the page's own text is that
@@ -55,7 +101,7 @@ fn covered(word: [f32; 4], text: &[[f32; 4]]) -> f32 {
 
 impl Default for OcrSettings {
     fn default() -> Self {
-        OcrSettings { dpi: 300.0, language: "en".into(), skip_text_pages: true }
+        OcrSettings { dpi: 300.0, language: "en".into(), skip_text_pages: true, digits: Digits::AsRead }
     }
 }
 
@@ -174,7 +220,14 @@ impl OcrJob {
             // Words the page's own text already has are not added a second time.
             let (fresh, already): (Vec<_>, Vec<_>) =
                 lines.iter().flat_map(|l| &l.words).partition(|w| covered(w.rect.map(|v| v / scale), &existing) < ALREADY_ON_PAGE);
-            let words = fresh.into_iter().map(|w| PlacedWord::place(w, to_user)).collect();
+            let words = fresh
+                .into_iter()
+                .map(|w| {
+                    let mut placed = PlacedWord::place(w, to_user);
+                    placed.text = self.settings.digits.apply(&placed.text);
+                    placed
+                })
+                .collect();
             out.push(OcrPage { page, words, already_on_page: already.len(), skipped: None, unusable_text });
         }
         progress(total, total);
@@ -188,8 +241,10 @@ impl OcrJob {
         let Some(native) = self.native.get(page).copied().flatten() else { return wanted };
         // A scan whose page is larger than a sheet (often a box given in pixels, one point per
         // pixel, #1848) is measured as if shrunk to one: otherwise 1 px/pt is already its full
-        // image, and no "Downsample to" choice could ask for less.
-        let fit = (SHEET / info.width.max(info.height).max(1e-3)).min(1.0);
+        // image, and no "Downsample to" choice could ask for less. Tolerate a page a hair over a
+        // sheet (up to 1 %, e.g. 2493 x 3510 px at 300 dpi = 842.4 pt) at its own resolution.
+        let long = info.width.max(info.height).max(1e-3);
+        let fit = if long > SHEET * 1.01 { SHEET / long } else { 1.0 };
         native.clamp(fit, wanted * fit)
     }
 }
@@ -328,6 +383,22 @@ mod tests {
         }
     }
 
+    /// A 300 dpi A4 scan whose page box is a hair taller than a sheet (2493 x 3510 px on
+    /// 598.32 x 842.4 pt) is read at its own 300 dpi, not shrunk to 299.86 dpi (a 1 px smaller
+    /// image that changed what the Thai recognizer read).
+    #[test]
+    fn a_page_a_hair_over_a_sheet_is_read_at_its_own_resolution() {
+        let mut s = Session::new();
+        let png = export::encode_png(2493, 3510, &vec![255; 2493 * 3510 * 4]).unwrap();
+        let bytes = s.create_from_images_with_resolution(&[("a4.png".into(), png)], crate::ImageResolution::Dpi(300.0)).unwrap();
+        let id = s.open("scan.pdf", None, bytes, None).unwrap();
+        let job = s.ocr_job(id, &[], OcrSettings::default()).unwrap();
+        let info = &job.infos[0];
+        assert!((info.height - 842.4).abs() < 0.01, "page height {}", info.height);
+        let scale = job.scale(0, info);
+        assert!((scale - 300.0 / 72.0).abs() < 1e-4, "read at {} dpi", scale * 72.0);
+    }
+
     #[test]
     fn coverage_of_overlapping_or_broken_boxes_stays_between_zero_and_one() {
         // A glyph drawn twice (fake bold) does not cover more than the whole word.
@@ -340,5 +411,17 @@ mod tests {
         let broken = [[f32::NAN; 4], [f32::NEG_INFINITY, f32::NEG_INFINITY, f32::INFINITY, f32::INFINITY]];
         let c = covered([0.0, 0.0, 10.0, 10.0], &broken);
         assert!((0.0..=1.0).contains(&c), "{c}");
+    }
+
+    #[test]
+    fn digits_option_converts_between_thai_and_arabic_numerals() {
+        for (code, d) in [("as_read", Digits::AsRead), ("thai", Digits::Thai), ("arabic", Digits::Arabic)] {
+            assert_eq!(Digits::from_code(code), Some(d));
+            assert_eq!(d.code(), code);
+        }
+        assert_eq!(Digits::from_code("roman"), None);
+        assert_eq!(Digits::AsRead.apply("พ.ศ. 2569 / ๒๕๖๙ (0123456789)"), "พ.ศ. 2569 / ๒๕๖๙ (0123456789)");
+        assert_eq!(Digits::Thai.apply("พ.ศ. 2569 / ๒๕๖๙ (0123456789)"), "พ.ศ. ๒๕๖๙ / ๒๕๖๙ (๐๑๒๓๔๕๖๗๘๙)");
+        assert_eq!(Digits::Arabic.apply("พ.ศ. 2569 / ๒๕๖๙ (๐๑๒๓๔๕๖๗๘๙)"), "พ.ศ. 2569 / 2569 (0123456789)");
     }
 }

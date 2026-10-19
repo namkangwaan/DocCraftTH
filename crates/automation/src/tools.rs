@@ -127,7 +127,8 @@ pub fn tools() -> Vec<ToolDef> {
                 "ppi": {"type":"number","minimum":9,"maximum":1600},
                 "quality": {"type":"integer","minimum":1,"maximum":100},
                 "dpi": {"type":"number","minimum":72,"maximum":600},
-                "language": {"type":"string"}, "skip_text_pages": {"type":"boolean"}
+                "language": {"type":"string"}, "skip_text_pages": {"type":"boolean"},
+                "digits": {"type":"string","enum":["as_read","thai","arabic"]}
             }), &["paths","out_dir","steps"])),
         t("doc_open", "Open a PDF", "Open a PDF file and return its document id, page count and whether it can be edited.")
             .cmd("file.open")
@@ -1128,6 +1129,7 @@ pub fn tools() -> Vec<ToolDef> {
                     "dpi": { "type": "number", "minimum": 72, "maximum": 600, "description": "Resolution pages are read at (default 300; a scanned page is read at most at its own resolution)." },
                     "language": { "type": "string", "enum": ["en", "th"], "description": "Document language (default en; th reads Thai with the Thai recognizer)." },
                     "skip_text_pages": { "type": "boolean", "description": "Leave pages that already contain text alone (default true). false also reads pictures on such pages, without adding their text again." },
+                    "digits": { "type": "string", "enum": ["as_read", "thai", "arabic"], "description": "How recognised digits are written: as_read (default) keeps what the recognizer read, thai writes ๐-๙, arabic writes 0-9." },
                 }),
                 &["doc"],
             )),
@@ -1140,6 +1142,7 @@ pub fn tools() -> Vec<ToolDef> {
                     "dpi": { "type": "number", "minimum": 72, "maximum": 600 },
                     "language": { "type": "string", "enum": ["en", "th"] },
                     "skip_text_pages": { "type": "boolean", "description": "Leave pages that already contain text alone (default true); see ocr_recognize." },
+                    "digits": { "type": "string", "enum": ["as_read", "thai", "arabic"], "description": "How recognised digits are written (default as_read); see ocr_recognize." },
                 }),
                 &["paths", "folder"],
             )),

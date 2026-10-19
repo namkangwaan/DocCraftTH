@@ -2694,3 +2694,7 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 	Operating system	ระบบปฏิบัติการ
 	Not installed	ไม่ได้ติดตั้ง
 	Operating system fonts are drawn on screen only. They are not written into a PDF.	ฟอนต์จากระบบปฏิบัติการใช้แสดงบนหน้าจอเท่านั้น และจะไม่ถูกเขียนลงในไฟล์ PDF
+	Digits	ตัวเลข
+	As recognized	ตามที่อ่านได้
+	Thai digits	เลขไทย (๐๑๒)
+	Arabic digits	เลขอารบิก (012)

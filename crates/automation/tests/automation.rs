@@ -4869,6 +4869,34 @@ fn ocr_recognize_files_writes_searchable_copies() {
 }
 
 #[test]
+fn ocr_digits_option_is_in_schemas_validates_and_converts_digits() {
+    for name in ["ocr_recognize", "ocr_recognize_files", "doc_batch"] {
+        let tool = tools().into_iter().find(|t| t.name == name).unwrap_or_else(|| panic!("missing tool {name}"));
+        assert_eq!(tool.input_schema["properties"]["digits"]["enum"], json!(["as_read", "thai", "arabic"]), "{name}");
+    }
+    let dir = workdir("ocr-digits");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
+    assert!(matches!(a.call("ocr_recognize", &json!({ "doc": doc, "digits": "roman" })), Err(ToolError::InvalidArgs(_))));
+    if ok(&mut a, "ocr_status", json!({}))["available"] != true {
+        eprintln!("skipped: OCR models not installed");
+        return;
+    }
+    let text = ok(&mut a, "doc_create", json!({ "from": "text", "text": "Invoice 2569 total 120" }))["doc"].as_u64().unwrap();
+    ok(&mut a, "doc_export_images", json!({ "doc": text, "folder": "scan", "dpi": 150, "pages": [1] }));
+    let png = std::fs::read_dir(dir.join("scan")).unwrap().next().unwrap().unwrap().path();
+    let scan = ok(&mut a, "doc_create", json!({ "from": "images", "paths": [png.to_string_lossy()] }))["doc"].as_u64().unwrap();
+    let r = ok(&mut a, "ocr_recognize", json!({ "doc": scan, "digits": "thai" }));
+    let page_txt = r["pages"][0]["text"].as_str().unwrap();
+    assert!(page_txt.chars().any(|c| ('\u{0E50}'..='\u{0E59}').contains(&c)), "expected Thai digits in {page_txt:?}");
+    assert!(!page_txt.chars().any(|c| c.is_ascii_digit()), "expected no ASCII digits in {page_txt:?}");
+    ok(&mut a, "doc_save", json!({ "doc": scan, "path": "out/thai-digits.pdf" }));
+    let reopened = ok(&mut a, "doc_open", json!({ "path": "out/thai-digits.pdf" }))["doc"].as_u64().unwrap();
+    let extracted = ok(&mut a, "text_extract", json!({ "doc": reopened, "pages": [1] }))["pages"][0]["text"].as_str().unwrap().to_string();
+    assert!(extracted.chars().any(|c| ('\u{0E50}'..='\u{0E59}').contains(&c)), "extracted {extracted:?}");
+}
+
+#[test]
 fn javascript_through_tools() {
     let dir = workdir("js");
     let mut a = auto(&dir);
