@@ -445,6 +445,7 @@ theme	Appearance	รูปลักษณ์
 	Current page	หน้าปัจจุบัน
 	Current page ({n})	หน้าปัจจุบัน ({n})
 	Current page — type a page number or label (such as iv) and press Enter	หน้าปัจจุบัน พิมพ์เลขหน้าหรือป้ายหน้า (เช่น iv) แล้วกด Enter
+	Zoom — type a percentage and press Enter	ซูม พิมพ์เปอร์เซ็นต์แล้วกด Enter
 	Custom	กำหนดเอง
 	Custom scale:	มาตราส่วนกำหนดเอง:
 	Custom text:	ข้อความกำหนดเอง:
@@ -1972,6 +1973,7 @@ comment menu	Edit	แก้ไข
 	Couldn't use the photo: {e}	ใช้รูปถ่ายไม่ได้: {e}
 	Couldn't use {name}: {e}	ใช้ {name} ไม่ได้: {e}
 	Couldn't write {name}: {e}	เขียน {name} ไม่ได้: {e}
+	the name is not a plain file name	ชื่อนี้ไม่ใช่ชื่อไฟล์ธรรมดา
 	Couldn't write {path}: {e}	เขียน {path} ไม่ได้: {e}
 	Create link	สร้างลิงก์
 	Created 1 link	สร้างลิงก์ 1 รายการแล้ว
