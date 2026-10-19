@@ -307,31 +307,20 @@ fn recognize_ctc_crop(
     if padded_w > MAX_CTC_WIDTH {
         return Ok(None);
     }
-    let channels = if rgb.len() >= (width as usize).saturating_mul(height as usize).saturating_mul(3) { 3usize } else { 1usize };
     let plane = CTC_HEIGHT * padded_w;
     let mut tensor = vec![0.0f32; 3 * plane];
-    for dy in 0..CTC_HEIGHT {
-        let sy = (y0 as usize).saturating_add((dy * crop_h) / CTC_HEIGHT).min((height as usize).saturating_sub(1));
-        for dx in 0..dst_w {
-            let sx = (x0 as usize).saturating_add((dx * crop_w) / dst_w).min((width as usize).saturating_sub(1));
-            let base = (sy * (width as usize) + sx) * channels;
-            let (r, g, b) = if channels == 3 {
-                (rgb.get(base).copied().unwrap_or(255), rgb.get(base + 1).copied().unwrap_or(255), rgb.get(base + 2).copied().unwrap_or(255))
-            } else {
-                let v = rgb.get(base).copied().unwrap_or(255);
-                (v, v, v)
-            };
-            // PaddleOCR DecodeImage(BGR) + RecResizeImg: (pixel / 255.0 - 0.5) / 0.5.
-            let idx = dy * padded_w + dx;
-            if let Some(slot) = tensor.get_mut(idx) {
-                *slot = (f32::from(b) / 255.0 - 0.5) / 0.5;
-            }
-            if let Some(slot) = tensor.get_mut(plane + idx) {
-                *slot = (f32::from(g) / 255.0 - 0.5) / 0.5;
-            }
-            if let Some(slot) = tensor.get_mut(2 * plane + idx) {
-                *slot = (f32::from(r) / 255.0 - 0.5) / 0.5;
-            }
+    let pixels = resize_crop(rgb, width, height, [x0, y0, x1, y1], dst_w, CTC_HEIGHT);
+    for (i, [r, g, b]) in pixels.into_iter().enumerate() {
+        // PaddleOCR DecodeImage(BGR) + RecResizeImg: (pixel / 255.0 - 0.5) / 0.5.
+        let idx = (i / dst_w) * padded_w + i % dst_w;
+        if let Some(slot) = tensor.get_mut(idx) {
+            *slot = (b / 255.0 - 0.5) / 0.5;
+        }
+        if let Some(slot) = tensor.get_mut(plane + idx) {
+            *slot = (g / 255.0 - 0.5) / 0.5;
+        }
+        if let Some(slot) = tensor.get_mut(2 * plane + idx) {
+            *slot = (r / 255.0 - 0.5) / 0.5;
         }
     }
     let input = rten::Value::from_shape([1, 3, CTC_HEIGHT, padded_w], tensor).map_err(|e| OcrError::Recognize(e.to_string()))?;
@@ -339,6 +328,60 @@ fn recognize_ctc_crop(
     let (shape, probs): ([usize; 3], Vec<f32>) = output.into_shape_vec().map_err(|e| OcrError::Recognize(e.to_string()))?;
     let classes = shape[2];
     Ok(Some(ctc::decode(&probs, classes, dict)))
+}
+
+/// The `[x0, y0, x1, y1]` crop of `rgb` (`width` × `height`, 3 or 1 channels) resized to
+/// `dst_w` × `dst_h`, row by row, as RGB values from 0 to 255. Enlarged crops (`crop_h < dst_h`)
+/// are sampled bilinearly; shrunk crops keep nearest sampling. Pixels outside the image read as
+/// white.
+fn resize_crop(rgb: &[u8], width: u32, height: u32, [x0, y0, x1, y1]: [u32; 4], dst_w: usize, dst_h: usize) -> Vec<[f32; 3]> {
+    let (width, height) = (width as usize, height as usize);
+    let channels = if rgb.len() >= width.saturating_mul(height).saturating_mul(3) { 3usize } else { 1usize };
+    let crop_w = x1.saturating_sub(x0) as usize;
+    let crop_h = y1.saturating_sub(y0) as usize;
+    let mut out = Vec::with_capacity(dst_w.saturating_mul(dst_h));
+    if crop_w == 0 || crop_h == 0 || dst_w == 0 || dst_h == 0 {
+        return out;
+    }
+    let pixel = |sx: usize, sy: usize| -> [f32; 3] {
+        let base = sy.saturating_mul(width).saturating_add(sx).saturating_mul(channels);
+        let at = |i: usize| f32::from(rgb.get(i).copied().unwrap_or(255));
+        if channels == 3 { [at(base), at(base + 1), at(base + 2)] } else { [at(base); 3] }
+    };
+    if crop_h < dst_h {
+        let map = |d: usize, src: usize, dst: usize, origin: u32, bound: usize| -> (usize, usize, f32) {
+            let u = ((d as f32 + 0.5) * (src as f32) / (dst as f32) - 0.5).clamp(0.0, src.saturating_sub(1) as f32);
+            let i0 = u.floor() as usize;
+            let i1 = (i0 + 1).min(src.saturating_sub(1));
+            let s0 = (origin as usize).saturating_add(i0).min(bound.saturating_sub(1));
+            let s1 = (origin as usize).saturating_add(i1).min(bound.saturating_sub(1));
+            (s0, s1, u - i0 as f32)
+        };
+        let xs: Vec<(usize, usize, f32)> = (0..dst_w).map(|dx| map(dx, crop_w, dst_w, x0, width)).collect();
+        for dy in 0..dst_h {
+            let (sy0, sy1, ty) = map(dy, crop_h, dst_h, y0, height);
+            for &(sx0, sx1, tx) in &xs {
+                let p00 = pixel(sx0, sy0);
+                let p10 = pixel(sx1, sy0);
+                let p01 = pixel(sx0, sy1);
+                let p11 = pixel(sx1, sy1);
+                out.push(std::array::from_fn(|c| {
+                    let top = p00[c] + (p10[c] - p00[c]) * tx;
+                    let bot = p01[c] + (p11[c] - p01[c]) * tx;
+                    top + (bot - top) * ty
+                }));
+            }
+        }
+        return out;
+    }
+    for dy in 0..dst_h {
+        let sy = (y0 as usize).saturating_add((dy * crop_h) / dst_h).min(height.saturating_sub(1));
+        for dx in 0..dst_w {
+            let sx = (x0 as usize).saturating_add((dx * crop_w) / dst_w).min(width.saturating_sub(1));
+            out.push(pixel(sx, sy));
+        }
+    }
+    out
 }
 
 /// A word placed on a page, in PDF user space: the bottom-left corner of its box, and the
@@ -511,6 +554,44 @@ pub fn unicode_text_layer(words: &[PlacedWord]) -> (Vec<u8>, Vec<LayerFont>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A crop shorter than the recognizer's 48 rows (a line on a ~96 dpi scan) is enlarged
+    /// smoothly: a black-to-white edge gets grey rows between, not a staircase of copied rows.
+    #[test]
+    fn an_enlarged_crop_is_sampled_smoothly() {
+        // 4 x 2, one channel: a black row over a white row.
+        let img = [0, 0, 0, 0, 255, 255, 255, 255];
+        let out = resize_crop(&img, 4, 2, [0, 0, 4, 2], 96, 48);
+        assert_eq!(out.len(), 96 * 48);
+        let column: Vec<f32> = (0..48).map(|y| out[y * 96][0]).collect();
+        assert!(column.iter().any(|v| *v > 10.0 && *v < 245.0), "no grey between the rows: {column:?}");
+        assert!(column.windows(2).all(|w| w[0] <= w[1]), "not monotonic: {column:?}");
+        assert_eq!((column[0], column[47]), (0.0, 255.0));
+        // Three channels, and a crop inside a larger image, read the same way.
+        let rgb: Vec<u8> = [9, 9, 9, 9, 0, 0, 255, 255, 9, 9, 9, 9].iter().flat_map(|v| [*v; 3]).collect();
+        let out = resize_crop(&rgb, 2, 6, [0, 2, 2, 4], 4, 48);
+        assert_eq!(out[0], [0.0; 3]);
+        assert_eq!(out[47 * 4], [255.0; 3]);
+        assert!(out.iter().any(|p| p[0] > 10.0 && p[0] < 245.0));
+    }
+
+    /// A crop taller than 48 rows keeps nearest sampling (blur and area resampling did not help
+    /// there): every value is one of the source pixels, at the same place as before.
+    #[test]
+    fn a_shrunk_crop_keeps_nearest_sampling() {
+        let (w, h) = (7u32, 100u32);
+        let img: Vec<u8> = (0..w * h).map(|i| (i * 37 % 251) as u8).collect();
+        let out = resize_crop(&img, w, h, [1, 3, 6, 99], 10, 48);
+        for (i, p) in out.iter().enumerate() {
+            let (dx, dy) = (i % 10, i / 10);
+            let (sx, sy) = (1 + dx * 5 / 10, 3 + dy * 96 / 48);
+            assert_eq!(p[0], f32::from(img[sy * w as usize + sx]), "at {dx},{dy}");
+        }
+        // An empty crop or an out-of-range one never panics.
+        assert!(resize_crop(&img, w, h, [3, 3, 3, 9], 10, 48).is_empty());
+        assert_eq!(resize_crop(&img, w, h, [5, 90, 900, 9000], 4, 48).len(), 4 * 48);
+        assert_eq!(resize_crop(&[], 0, 0, [0, 0, 2, 2], 4, 48).len(), 4 * 48);
+    }
 
     #[test]
     fn places_words_through_the_mapping() {
