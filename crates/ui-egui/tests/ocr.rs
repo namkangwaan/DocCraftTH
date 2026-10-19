@@ -74,6 +74,17 @@ fn recognize_text_dialog_defaults_to_thai_in_a_thai_interface() {
     assert_eq!(h.state().ocr_draft.settings().language, "en", "no German model: English");
 }
 
+#[test]
+fn recognize_text_dialog_offers_digits_choice() {
+    use pdfcraft_engine::ocr::Digits;
+    let mut h = recognize_dialog("en");
+    h.get_by_label("Digits");
+    assert_eq!(h.state().ocr_draft.settings().digits, Digits::AsRead);
+    h.state_mut().ocr_draft.digits = Digits::Thai;
+    h.run_steps(2);
+    assert_eq!(h.state().ocr_draft.settings().digits, Digits::Thai);
+}
+
 /// FR-05: a language without models is reported in the interface language, naming the language,
 /// and nothing starts.
 #[test]

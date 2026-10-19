@@ -32,7 +32,8 @@ only `.pdf` inputs are processed. Unsupported extensions are reported as skipped
   These settings can lose image detail. A candidate that is not smaller retains
   the bytes entering that step. This is not an images-only or lossless preset.
 - `ocr` uses the installed engine and its supported languages. `--dpi` (72–600,
-  default 300), `--language` (default `en`) and `--ocr-all-pages` configure it.
+  default 300), `--language` (default `en`), `--ocr-all-pages` and `--digits`
+  (`as_read`, the default, `thai` for ๐–๙ or `arabic` for 0–9) configure it.
   By default pages already containing text are skipped. Missing models are
   reported as file errors; nothing is downloaded or installed by the batch.
 - `--stop-on-error` stops processing after the first file error. By default the
@@ -69,7 +70,7 @@ The same implementation is available as `doc_batch`:
 In `pdfcraft-cli run --script`, put this object in the `args` of a `doc_batch`
 step. MCP marks a report with failed files as `isError: true` and retains the
 structured report. Tool names and OCR settings match the existing automation API
-(`skip_text_pages: false` corresponds to `--ocr-all-pages`).
+(`skip_text_pages: false` corresponds to `--ocr-all-pages`, `digits` to `--digits`).
 
 ## Boundaries
 
