@@ -225,8 +225,11 @@ impl Ocr {
                 let source = ocrs::ImageSource::from_bytes(&rgb, (width, height)).map_err(|e| err(&e))?;
                 let input = detector.prepare_input(source).map_err(|e| err(&e))?;
                 let found = detector.detect_words(&input).map_err(|e| err(&e))?;
-                let line_polys = detector.find_text_lines(&input, &found);
-                let mut out = Vec::new();
+
+                let (filtered_words, median_h) = filter_seal_words(found);
+                let line_polys = detector.find_text_lines(&input, &filtered_words);
+
+                let mut raw_boxes = Vec::new();
                 for poly_line in line_polys {
                     let mut left = f32::INFINITY;
                     let mut top = f32::INFINITY;
@@ -240,9 +243,14 @@ impl Ocr {
                             bottom = bottom.max(p.y);
                         }
                     }
-                    if !left.is_finite() || !top.is_finite() || right <= left || bottom <= top {
-                        continue;
+                    if left.is_finite() && top.is_finite() && right > left && bottom > top {
+                        raw_boxes.push([left, top, right, bottom]);
                     }
+                }
+                let merged_boxes = merge_colinear_line_boxes(raw_boxes, width, median_h);
+
+                let mut out = Vec::new();
+                for [left, top, right, bottom] in merged_boxes {
                     let box_h = bottom - top;
                     // Pad vertical bounds (25% above, 15% below) so Thai marks above/below the base
                     // line are never clipped by the Latin-trained detector, plus a small horizontal margin.
@@ -281,6 +289,105 @@ impl Ocr {
             }
         }
     }
+
+    /// Recognise text directly from a crop `[x0, y0, x1, y1]` using the recognition model.
+    /// The rectangle is clipped to the image; one that is empty after clipping (or inverted)
+    /// reads as `None`, as does any crop under the default (non-CTC) models.
+    pub fn recognize_crop(&self, pixels: &[u8], width: u32, height: u32, rect: [u32; 4]) -> Result<Option<String>, OcrError> {
+        if width == 0 || height == 0 || pixels.is_empty() {
+            return Err(OcrError::EmptyImage);
+        }
+        let Some(rect) = clip_crop(rect, width, height) else {
+            return Ok(None);
+        };
+        let rgb: std::borrow::Cow<[u8]> = if pixels.len() == (width as usize).saturating_mul(height as usize).saturating_mul(4) {
+            pixels.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect::<Vec<u8>>().into()
+        } else {
+            pixels.into()
+        };
+        match &self.recognizer {
+            Recognizer::Ocrs(_) => Ok(None),
+            Recognizer::Ctc { model, dict, .. } => recognize_ctc_crop(&rgb, width, height, rect, model, dict),
+        }
+    }
+}
+
+/// Filter out non-text connected components (e.g. large circular seals, stamps, or logos)
+/// that merge with text words and prevent line grouping. Returns `(filtered_words, median_height)`.
+fn filter_seal_words(words: Vec<rten_imageproc::RotatedRect>) -> (Vec<rten_imageproc::RotatedRect>, f32) {
+    if words.is_empty() {
+        return (words, 20.0);
+    }
+    // `total_cmp`, not `partial_cmp`: a NaN-sized word from a degenerate detection made the
+    // comparator inconsistent, which `sort_by` may answer with a panic. Words without a finite
+    // size are left out of the median and dropped.
+    let mut heights: Vec<f32> = words.iter().filter_map(word_size).collect();
+    heights.sort_by(f32::total_cmp);
+    let median_h = heights.get(heights.len() / 2).copied().unwrap_or(20.0);
+    let max_word_h = (median_h * 2.0).max(12.0);
+
+    let filtered = words.into_iter().filter(|r| word_size(r).is_some_and(|h| h <= max_word_h)).collect();
+    (filtered, median_h)
+}
+
+/// A detected word's size across its reading direction (the shorter side), when both sides are
+/// finite: `f32::min` ignores a NaN, so a NaN-wide word would otherwise pass as its height.
+fn word_size(r: &rten_imageproc::RotatedRect) -> Option<f32> {
+    let (w, h) = (r.width(), r.height());
+    (w.is_finite() && h.is_finite()).then_some(w.min(h))
+}
+
+/// Merge co-linear line segments that were split by stamps, seals, or column separators,
+/// and align right margins for lines that stop prematurely due to ink from a stamp.
+/// Boxes are `[left, top, right, bottom]`; non-finite or empty ones are dropped.
+fn merge_colinear_line_boxes(mut raw_boxes: Vec<[f32; 4]>, page_width: u32, median_h: f32) -> Vec<[f32; 4]> {
+    raw_boxes.retain(|b| b.iter().all(|v| v.is_finite()) && b[2] > b[0] && b[3] > b[1]);
+    raw_boxes.sort_by(|a, b| a[1].total_cmp(&b[1]));
+    let mut merged: Vec<[f32; 4]> = Vec::new();
+    for b in raw_boxes {
+        let b_h = b[3] - b[1];
+        let b_mid = (b[1] + b[3]) * 0.5;
+        let mut did_merge = false;
+        for m in merged.iter_mut() {
+            let m_h = m[3] - m[1];
+            let m_mid = (m[1] + m[3]) * 0.5;
+            let avg_h = (b_h + m_h) * 0.5;
+            let v_overlap = m[3].min(b[3]) - m[1].max(b[1]);
+            if v_overlap >= avg_h * 0.4 || (b_mid - m_mid).abs() <= avg_h * 0.35 {
+                m[0] = m[0].min(b[0]);
+                m[1] = m[1].min(b[1]);
+                m[2] = m[2].max(b[2]);
+                m[3] = m[3].max(b[3]);
+                did_merge = true;
+                break;
+            }
+        }
+        if !did_merge {
+            merged.push(b);
+        }
+    }
+    merged.sort_by(|a, b| a[1].total_cmp(&b[1]));
+
+    // Align right margin if a full line stops short due to stamp / seal ink.
+    let long_line_rights: Vec<f32> = merged.iter().filter(|b| (b[2] - b[0]) > (page_width as f32) * 0.5).map(|b| b[2]).collect();
+    if let Some(&max_right) = long_line_rights.iter().max_by(|a, b| a.total_cmp(b)) {
+        for b in merged.iter_mut() {
+            let span = b[2] - b[0];
+            if b[0] < (page_width as f32) * 0.35 && span > (page_width as f32) * 0.35 && b[2] < max_right {
+                let diff = max_right - b[2];
+                if diff <= median_h * 3.0 {
+                    b[2] = max_right;
+                }
+            }
+        }
+    }
+    merged
+}
+
+/// `[x0, y0, x1, y1]` clipped to a `width` × `height` image, or `None` when nothing is left.
+fn clip_crop([x0, y0, x1, y1]: [u32; 4], width: u32, height: u32) -> Option<[u32; 4]> {
+    let (x1, y1) = (x1.min(width), y1.min(height));
+    (x0 < x1 && y0 < y1).then_some([x0, y0, x1, y1])
 }
 
 /// Crop `[x0, y0, x1, y1]` from `rgb` (`width` × `height`, 3 or 1 channels), resize to height
@@ -293,12 +400,12 @@ fn recognize_ctc_crop(
     model: &rten::Model,
     dict: &[char],
 ) -> Result<Option<String>, OcrError> {
-    let crop_w = (x1 - x0) as usize;
-    let crop_h = (y1 - y0) as usize;
+    let crop_w = x1.saturating_sub(x0) as usize;
+    let crop_h = y1.saturating_sub(y0) as usize;
     if crop_w == 0 || crop_h == 0 {
         return Ok(None);
     }
-    let dst_w = ((crop_w * CTC_HEIGHT) / crop_h.max(1)).max(16);
+    let dst_w = (crop_w.saturating_mul(CTC_HEIGHT) / crop_h).max(16);
     if dst_w > MAX_CTC_WIDTH {
         return Ok(None);
     }
@@ -798,6 +905,175 @@ mod tests {
     fn missing_models_message_is_for_end_users() {
         let message = OcrError::NoModels.to_string();
         assert!(!message.contains("cargo") && message.contains("PDFCRAFT_MODELS"), "{message}");
+    }
+
+    #[test]
+    fn seal_filter_removes_oversized_components_while_keeping_words() {
+        use rten_imageproc::{PointF, RotatedRect, Vec2};
+        let make_word = |w: f32, h: f32| RotatedRect::new(PointF::from_yx(0.0, 0.0), Vec2::from_yx(-1.0, 0.0), w, h);
+        let words = vec![
+            make_word(100.0, 30.0),
+            make_word(120.0, 32.0),
+            make_word(80.0, 28.0),
+            make_word(400.0, 150.0), // Giant stamp/seal
+            make_word(90.0, 31.0),
+        ];
+        let (filtered, median_h) = filter_seal_words(words);
+        assert!((median_h - 31.0).abs() < 2.0);
+        assert_eq!(filtered.len(), 4);
+        assert!(filtered.iter().all(|r| r.height().min(r.width()) <= 65.0));
+    }
+
+    #[test]
+    fn merge_colinear_line_boxes_combines_split_segments_and_aligns_margin() {
+        let raw = vec![
+            [100.0, 100.0, 400.0, 130.0], // Line 1: left piece
+            [600.0, 102.0, 900.0, 132.0], // Line 1: right piece (separated by seal)
+            [100.0, 150.0, 900.0, 180.0], // Line 2: normal full line
+            [100.0, 200.0, 850.0, 230.0], // Line 3: cut slightly short by seal
+        ];
+        let merged = merge_colinear_line_boxes(raw, 1000, 30.0);
+        assert_eq!(merged.len(), 3);
+        // Line 1 merged across the gap
+        assert_eq!(merged[0][0], 100.0);
+        assert_eq!(merged[0][2], 900.0);
+        // Line 3 right margin aligned to 900.0
+        assert_eq!(merged[2][2], 900.0);
+    }
+
+    fn rotated(w: f32, h: f32) -> rten_imageproc::RotatedRect {
+        use rten_imageproc::{PointF, RotatedRect, Vec2};
+        RotatedRect::new(PointF::from_yx(0.0, 0.0), Vec2::from_yx(-1.0, 0.0), w, h)
+    }
+
+    #[test]
+    fn seal_filter_handles_empty_and_single_inputs() {
+        let (none, median) = filter_seal_words(Vec::new());
+        assert!(none.is_empty());
+        assert_eq!(median, 20.0);
+        let (one, median) = filter_seal_words(vec![rotated(300.0, 150.0)]);
+        assert_eq!(one.len(), 1, "a lone component is the norm, not a seal");
+        assert_eq!(median, 150.0);
+    }
+
+    #[test]
+    fn seal_filter_drops_non_finite_sizes_and_keeps_zero_sized_words() {
+        let words =
+            vec![rotated(f32::NAN, 30.0), rotated(100.0, f32::INFINITY), rotated(0.0, 0.0), rotated(100.0, 30.0), rotated(f32::MAX, f32::MAX)];
+        let (kept, median) = filter_seal_words(words);
+        assert!(median.is_finite(), "{median}");
+        assert!(kept.iter().all(|r| r.height().is_finite() && r.width().is_finite()), "non-finite sizes never reach line grouping");
+        assert!(kept.iter().any(|r| r.width() == 0.0), "a zero-sized word is under the cap");
+        assert!(kept.iter().all(|r| r.width() < f32::MAX), "the f32::MAX component is oversized");
+    }
+
+    #[test]
+    fn seal_filter_keeps_everything_when_all_components_are_large() {
+        // Large print: every word is "oversized" against a small-text page, but they are the
+        // page's own median, so nothing is a seal.
+        let words: Vec<_> = (0..7).map(|i| rotated(400.0, 150.0 + i as f32)).collect();
+        let (kept, median) = filter_seal_words(words);
+        assert_eq!(kept.len(), 7);
+        assert_eq!(median, 153.0);
+    }
+
+    #[test]
+    fn seal_filter_sorts_many_nan_sizes_without_panicking() {
+        // A NaN in a `partial_cmp`-based sort broke the total order `sort_by` requires (it may
+        // panic, though this input does not trip the check on every toolchain).
+        let words: Vec<_> = (0..200).map(|i| if i % 3 == 0 { rotated(f32::NAN, f32::NAN) } else { rotated(100.0, 20.0 + (i % 17) as f32) }).collect();
+        let (kept, median) = filter_seal_words(words);
+        assert!((20.0..=37.0).contains(&median), "{median}");
+        assert!(kept.iter().all(|r| !r.height().is_nan()));
+    }
+
+    #[test]
+    fn merge_line_boxes_handles_empty_single_and_degenerate_boxes() {
+        assert!(merge_colinear_line_boxes(Vec::new(), 1000, 30.0).is_empty());
+        assert_eq!(merge_colinear_line_boxes(vec![[10.0, 10.0, 200.0, 40.0]], 1000, 30.0), vec![[10.0, 10.0, 200.0, 40.0]]);
+        let junk = vec![
+            [f32::NAN, 0.0, 10.0, 10.0],
+            [0.0, 0.0, f32::INFINITY, 10.0],
+            [5.0, 5.0, 5.0, 20.0],   // zero width
+            [5.0, 20.0, 50.0, 10.0], // inverted
+            [10.0, 10.0, 200.0, 40.0],
+        ];
+        assert_eq!(merge_colinear_line_boxes(junk, 1000, 30.0), vec![[10.0, 10.0, 200.0, 40.0]]);
+    }
+
+    #[test]
+    fn merge_line_boxes_absorbs_nested_and_overlapping_duplicates() {
+        let raw = vec![[100.0, 100.0, 900.0, 140.0], [300.0, 105.0, 500.0, 135.0], [120.0, 101.0, 880.0, 139.0], [100.0, 200.0, 900.0, 240.0]];
+        assert_eq!(merge_colinear_line_boxes(raw, 1000, 30.0), vec![[100.0, 100.0, 900.0, 140.0], [100.0, 200.0, 900.0, 240.0]]);
+    }
+
+    #[test]
+    fn merge_line_boxes_takes_extreme_page_widths_and_medians() {
+        let raw = vec![[0.0, 0.0, 100.0, 30.0], [0.0, 50.0, 90.0, 80.0]];
+        for (width, median) in [(0, 30.0), (u32::MAX, 30.0), (1000, f32::NAN), (1000, f32::INFINITY), (1000, 0.0), (1000, -5.0)] {
+            let merged = merge_colinear_line_boxes(raw.clone(), width, median);
+            assert_eq!(merged.len(), 2, "{width} {median}");
+            assert!(merged.iter().flatten().all(|v| v.is_finite()));
+        }
+        // On a zero-width page every line is "long" and starts at the left margin, but nothing
+        // aligns to a right edge farther away than three median heights.
+        let merged = merge_colinear_line_boxes(raw.clone(), 0, 1.0);
+        assert_eq!(merged[1][2], 90.0);
+    }
+
+    #[test]
+    fn crops_are_clipped_to_the_image() {
+        assert_eq!(clip_crop([10, 10, 20, 20], 100, 100), Some([10, 10, 20, 20]));
+        assert_eq!(clip_crop([10, 10, 500, 500], 100, 100), Some([10, 10, 100, 100]));
+        assert_eq!(clip_crop([20, 10, 10, 20], 100, 100), None, "inverted");
+        assert_eq!(clip_crop([10, 10, 10, 20], 100, 100), None, "empty");
+        assert_eq!(clip_crop([100, 0, u32::MAX, u32::MAX], 100, 100), None, "starts past the edge");
+        assert_eq!(clip_crop([0, 0, u32::MAX, u32::MAX], u32::MAX, u32::MAX), Some([0, 0, u32::MAX, u32::MAX]));
+    }
+
+    /// The recogniser's crop maths with an inverted rectangle (`x1 < x0` underflowed) and an
+    /// enormous one, when the Thai models are installed.
+    #[test]
+    fn recognize_crop_rejects_inverted_and_huge_rectangles() {
+        let Some(models) = Models::find_for("th") else {
+            eprintln!("skipped: Thai OCR models not installed");
+            return;
+        };
+        let ocr = Ocr::load(&models).unwrap();
+        let px = vec![255u8; 64 * 32 * 3];
+        assert_eq!(ocr.recognize_crop(&px, 64, 32, [40, 0, 10, 32]).unwrap(), None);
+        assert_eq!(ocr.recognize_crop(&px, 64, 32, [0, 40, 64, 10]).unwrap(), None);
+        assert!(ocr.recognize_crop(&px, 64, 32, [0, 0, u32::MAX, u32::MAX]).is_ok());
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn seal_filter_keeps_a_subset_under_the_cap(sizes in proptest::collection::vec((0.0f32..2000.0, 0.0f32..2000.0), 0..60)) {
+            let words: Vec<_> = sizes.iter().map(|&(w, h)| rotated(w, h)).collect();
+            let (kept, median) = filter_seal_words(words);
+            proptest::prop_assert!(kept.len() <= sizes.len());
+            proptest::prop_assert!(median.is_finite());
+            proptest::prop_assert!(sizes.is_empty() || !kept.is_empty(), "the median word always survives");
+            let cap = (median * 2.0).max(12.0);
+            proptest::prop_assert!(kept.iter().all(|r| r.height().min(r.width()) <= cap));
+        }
+
+        #[test]
+        fn merged_line_boxes_cover_every_input_box(
+            boxes in proptest::collection::vec((-100.0f32..3000.0, -100.0f32..3000.0, 0.0f32..1500.0, 0.0f32..200.0), 0..40),
+            width in proptest::prelude::any::<u32>(),
+            median in -10.0f32..200.0,
+        ) {
+            let raw: Vec<[f32; 4]> = boxes.iter().map(|&(x, y, w, h)| [x, y, x + w, y + h]).collect();
+            let merged = merge_colinear_line_boxes(raw.clone(), width, median);
+            let valid: Vec<_> = raw.iter().filter(|b| b[2] > b[0] && b[3] > b[1]).collect();
+            proptest::prop_assert!(merged.len() <= valid.len());
+            proptest::prop_assert!(merged.iter().all(|m| m.iter().all(|v| v.is_finite()) && m[2] > m[0] && m[3] > m[1]));
+            proptest::prop_assert!(merged.windows(2).all(|p| p[0][1] <= p[1][1]), "sorted top to bottom");
+            for b in valid {
+                proptest::prop_assert!(merged.iter().any(|m| m[0] <= b[0] && m[1] <= b[1] && m[2] >= b[2] && m[3] >= b[3]), "{b:?} lost");
+            }
+        }
     }
 
     /// End to end on rendered text, when the models are installed (`cargo xtask models`).
