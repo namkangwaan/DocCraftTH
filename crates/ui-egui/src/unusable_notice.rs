@@ -29,9 +29,9 @@ impl PdfCraftApp {
         view.page_text(view.current).map(|t| t.is_unusable())
     }
 
-    /// Draw the notice over the top of the document area when the current page's text is
-    /// unusable. It steps aside for the offer after a run, a running job and open dialogs, so
-    /// no two cards cover each other.
+    /// Draw the notice over the top of the page view when the current page's text is unusable,
+    /// right of the quick tools. It steps aside for the offer after a run, a running job, the
+    /// find bar and open dialogs, so no two cards cover each other.
     pub(crate) fn show_unusable_page_notice(&mut self, ctx: &egui::Context) {
         if self.ocr_offer.is_some() || self.ocr_run.is_some() || self.progress_notice.is_some() || self.modal_open() {
             return;
@@ -43,9 +43,21 @@ impl PdfCraftApp {
         if ctx.data(|d| d.get_temp::<Dismissed>(dismissed_id())).is_some_and(|d| d.0.contains(&doc)) {
             return;
         }
-        let Some(page) = self.views.get(vi).map(|v| v.current) else { return };
+        let Some(view) = self.views.get(vi) else { return };
+        if view.find.is_some() {
+            return;
+        }
+        let page = view.current;
         let t = Tokens::get(ctx);
-        let area = self.document_rect.filter(|r| r.is_positive()).unwrap_or_else(|| ctx.content_rect());
+        let mut area = [Some(view.viewport_rect()), self.document_rect]
+            .into_iter()
+            .flatten()
+            .find(egui::Rect::is_positive)
+            .unwrap_or_else(|| ctx.content_rect());
+        // The quick tools run down the page view's left edge: keep clear of them.
+        if let Some(bar) = ctx.memory(|m| m.area_rect(egui::Id::new("quick-bar"))).filter(|b| b.intersects(area)) {
+            area.min.x = (bar.max.x + 8.0).min(area.max.x);
+        }
         let width = 420.0_f32.min(area.width() - 32.0).max(160.0);
         let (mut open, mut later) = (false, false);
         egui::Area::new(egui::Id::new("ocr-unusable-page-notice"))

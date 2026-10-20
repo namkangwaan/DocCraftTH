@@ -319,6 +319,17 @@ fn the_notice_opens_recognize_text_for_the_page_without_reading_it() {
     assert!(!h.state().ocr_draft.read_unusable_text, "the next run skips unusable pages again unless asked");
 }
 
+/// The find bar sits at the top of the page view too: the notice steps aside while it is open.
+#[test]
+fn the_notice_steps_aside_for_the_find_bar() {
+    let mut h = browsing(legacy_text_page(), "en", egui::vec2(760.0, 640.0));
+    h.get_by_label(NOTICE);
+    assert!(h.state_mut().execute("edit.find"));
+    h.run_steps(3);
+    assert!(h.state().views[0].find.is_some());
+    assert!(h.query_by_label(NOTICE).is_none());
+}
+
 /// "Not now" hides the notice for the document.
 #[test]
 fn not_now_dismisses_the_notice() {
