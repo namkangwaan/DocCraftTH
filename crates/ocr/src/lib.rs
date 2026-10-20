@@ -217,29 +217,7 @@ impl Ocr {
                 let source = ocrs::ImageSource::from_bytes(&rgb, (width, height)).map_err(|e| err(&e))?;
                 let input = detector.prepare_input(source).map_err(|e| err(&e))?;
                 let found = detector.detect_words(&input).map_err(|e| err(&e))?;
-
-                let (filtered_words, median_h) = filter_seal_words(found);
-                let line_polys = detector.find_text_lines(&input, &filtered_words);
-
-                let mut raw_boxes = Vec::new();
-                for poly_line in line_polys {
-                    let mut left = f32::INFINITY;
-                    let mut top = f32::INFINITY;
-                    let mut right = f32::NEG_INFINITY;
-                    let mut bottom = f32::NEG_INFINITY;
-                    for r in &poly_line {
-                        for p in r.corners() {
-                            left = left.min(p.x);
-                            top = top.min(p.y);
-                            right = right.max(p.x);
-                            bottom = bottom.max(p.y);
-                        }
-                    }
-                    if left.is_finite() && top.is_finite() && right > left && bottom > top {
-                        raw_boxes.push([left, top, right, bottom]);
-                    }
-                }
-                let merged_boxes = merge_colinear_line_boxes(raw_boxes, width, median_h);
+                let merged_boxes = ctc_line_boxes(detector, &input, found, width);
 
                 let mut out = Vec::new();
                 for [left, top, right, bottom] in merged_boxes {
@@ -324,9 +302,47 @@ fn channels_for_ocrs(pixels: &[u8], width: u32, height: u32) -> Result<std::borr
     }
 }
 
+/// The CTC path's text-line boxes `[left, top, right, bottom]` in image pixels, top to bottom:
+/// `words` (from the detector) without seal-sized components, grouped into lines, the lines'
+/// bounding boxes, and segments split by a seal merged back.
+fn ctc_line_boxes(detector: &ocrs::OcrEngine, input: &ocrs::OcrInput, words: Vec<rten_imageproc::RotatedRect>, width: u32) -> Vec<[f32; 4]> {
+    let (filtered_words, median_h) = filter_seal_words(words, width);
+    let line_polys = detector.find_text_lines(input, &filtered_words);
+
+    let mut raw_boxes = Vec::new();
+    for poly_line in line_polys {
+        let mut left = f32::INFINITY;
+        let mut top = f32::INFINITY;
+        let mut right = f32::NEG_INFINITY;
+        let mut bottom = f32::NEG_INFINITY;
+        for r in &poly_line {
+            for p in r.corners() {
+                left = left.min(p.x);
+                top = top.min(p.y);
+                right = right.max(p.x);
+                bottom = bottom.max(p.y);
+            }
+        }
+        if left.is_finite() && top.is_finite() && right > left && bottom > top {
+            raw_boxes.push([left, top, right, bottom]);
+        }
+    }
+    merge_colinear_line_boxes(raw_boxes, width, median_h)
+}
+
+/// The smallest short side, as a fraction of the page width, that a component needs before it
+/// can be dropped as a seal: about 1.3 cm on an A4 page. Official circular seals are 3 cm or
+/// more across; text up to ~36 pt stays under it.
+const MIN_SEAL_FRACTION: f32 = 0.06;
+
 /// Filter out non-text connected components (e.g. large circular seals, stamps, or logos)
 /// that merge with text words and prevent line grouping. Returns `(filtered_words, median_height)`.
-fn filter_seal_words(words: Vec<rten_imageproc::RotatedRect>) -> (Vec<rten_imageproc::RotatedRect>, f32) {
+///
+/// A component is a seal when its short side is over twice the median *and* over
+/// [`MIN_SEAL_FRACTION`] of `page_width`. The median alone is not a scale for text: on a form
+/// the dots of fill-in leaders ("......") come out as many tiny components, the median drops
+/// to a dot's height, and every real word would read as a seal.
+fn filter_seal_words(words: Vec<rten_imageproc::RotatedRect>, page_width: u32) -> (Vec<rten_imageproc::RotatedRect>, f32) {
     if words.is_empty() {
         return (words, 20.0);
     }
@@ -336,7 +352,7 @@ fn filter_seal_words(words: Vec<rten_imageproc::RotatedRect>) -> (Vec<rten_image
     let mut heights: Vec<f32> = words.iter().filter_map(word_size).collect();
     heights.sort_by(f32::total_cmp);
     let median_h = heights.get(heights.len() / 2).copied().unwrap_or(20.0);
-    let max_word_h = (median_h * 2.0).max(12.0);
+    let max_word_h = (median_h * 2.0).max(12.0).max(page_width as f32 * MIN_SEAL_FRACTION);
 
     let filtered = words.into_iter().filter(|r| word_size(r).is_some_and(|h| h <= max_word_h)).collect();
     (filtered, median_h)
@@ -365,7 +381,11 @@ fn merge_colinear_line_boxes(mut raw_boxes: Vec<[f32; 4]>, page_width: u32, medi
             let m_mid = (m[1] + m[3]) * 0.5;
             let avg_h = (b_h + m_h) * 0.5;
             let v_overlap = m[3].min(b[3]) - m[1].max(b[1]);
-            if v_overlap >= avg_h * 0.4 || (b_mid - m_mid).abs() <= avg_h * 0.35 {
+            // A box inside the other's vertical band is on its row whatever its height: a run
+            // of fill-in dots ("......") on a form line's baseline is a fraction of the line's
+            // height, so neither test above holds for it and it became a line of its own.
+            let nested = (b[1] >= m[1] && b[3] <= m[3]) || (m[1] >= b[1] && m[3] <= b[3]);
+            if nested || v_overlap >= avg_h * 0.4 || (b_mid - m_mid).abs() <= avg_h * 0.35 {
                 m[0] = m[0].min(b[0]);
                 m[1] = m[1].min(b[1]);
                 m[2] = m[2].max(b[2]);
@@ -930,7 +950,7 @@ mod tests {
             make_word(400.0, 150.0), // Giant stamp/seal
             make_word(90.0, 31.0),
         ];
-        let (filtered, median_h) = filter_seal_words(words);
+        let (filtered, median_h) = filter_seal_words(words, 1000);
         assert!((median_h - 31.0).abs() < 2.0);
         assert_eq!(filtered.len(), 4);
         assert!(filtered.iter().all(|r| r.height().min(r.width()) <= 65.0));
@@ -960,10 +980,10 @@ mod tests {
 
     #[test]
     fn seal_filter_handles_empty_and_single_inputs() {
-        let (none, median) = filter_seal_words(Vec::new());
+        let (none, median) = filter_seal_words(Vec::new(), 1000);
         assert!(none.is_empty());
         assert_eq!(median, 20.0);
-        let (one, median) = filter_seal_words(vec![rotated(300.0, 150.0)]);
+        let (one, median) = filter_seal_words(vec![rotated(300.0, 150.0)], 1000);
         assert_eq!(one.len(), 1, "a lone component is the norm, not a seal");
         assert_eq!(median, 150.0);
     }
@@ -972,7 +992,7 @@ mod tests {
     fn seal_filter_drops_non_finite_sizes_and_keeps_zero_sized_words() {
         let words =
             vec![rotated(f32::NAN, 30.0), rotated(100.0, f32::INFINITY), rotated(0.0, 0.0), rotated(100.0, 30.0), rotated(f32::MAX, f32::MAX)];
-        let (kept, median) = filter_seal_words(words);
+        let (kept, median) = filter_seal_words(words, 1000);
         assert!(median.is_finite(), "{median}");
         assert!(kept.iter().all(|r| r.height().is_finite() && r.width().is_finite()), "non-finite sizes never reach line grouping");
         assert!(kept.iter().any(|r| r.width() == 0.0), "a zero-sized word is under the cap");
@@ -984,7 +1004,7 @@ mod tests {
         // Large print: every word is "oversized" against a small-text page, but they are the
         // page's own median, so nothing is a seal.
         let words: Vec<_> = (0..7).map(|i| rotated(400.0, 150.0 + i as f32)).collect();
-        let (kept, median) = filter_seal_words(words);
+        let (kept, median) = filter_seal_words(words, 1000);
         assert_eq!(kept.len(), 7);
         assert_eq!(median, 153.0);
     }
@@ -994,7 +1014,7 @@ mod tests {
         // A NaN in a `partial_cmp`-based sort broke the total order `sort_by` requires (it may
         // panic, though this input does not trip the check on every toolchain).
         let words: Vec<_> = (0..200).map(|i| if i % 3 == 0 { rotated(f32::NAN, f32::NAN) } else { rotated(100.0, 20.0 + (i % 17) as f32) }).collect();
-        let (kept, median) = filter_seal_words(words);
+        let (kept, median) = filter_seal_words(words, 1000);
         assert!((20.0..=37.0).contains(&median), "{median}");
         assert!(kept.iter().all(|r| !r.height().is_nan()));
     }
@@ -1062,11 +1082,11 @@ mod tests {
         #[test]
         fn seal_filter_keeps_a_subset_under_the_cap(sizes in proptest::collection::vec((0.0f32..2000.0, 0.0f32..2000.0), 0..60)) {
             let words: Vec<_> = sizes.iter().map(|&(w, h)| rotated(w, h)).collect();
-            let (kept, median) = filter_seal_words(words);
+            let (kept, median) = filter_seal_words(words, 1000);
             proptest::prop_assert!(kept.len() <= sizes.len());
             proptest::prop_assert!(median.is_finite());
             proptest::prop_assert!(sizes.is_empty() || !kept.is_empty(), "the median word always survives");
-            let cap = (median * 2.0).max(12.0);
+            let cap = (median * 2.0).max(12.0).max(1000.0 * MIN_SEAL_FRACTION);
             proptest::prop_assert!(kept.iter().all(|r| r.height().min(r.width()) <= cap));
         }
 
@@ -1145,7 +1165,174 @@ mod tests {
         assert!(word.rect[0] >= 10.0 && word.rect[0] < 60.0, "{word:?}");
     }
 
+    /// The detector alone (the line-box pipeline needs no recogniser), when installed.
+    fn detector() -> Option<ocrs::OcrEngine> {
+        let path = Models::search_dirs().into_iter().map(|d| d.join(DETECTION_MODEL)).find(|p| p.is_file())?;
+        let model = rten::Model::load_file(path).ok()?;
+        ocrs::OcrEngine::new(ocrs::OcrEngineParams { detection_model: Some(model), ..Default::default() }).ok()
+    }
+
+    fn line_boxes_of(engine: &ocrs::OcrEngine, (w, h, px): &(u32, u32, Vec<u8>)) -> (Vec<rten_imageproc::RotatedRect>, Vec<[f32; 4]>) {
+        let source = ocrs::ImageSource::from_bytes(px, (*w, *h)).unwrap();
+        let input = engine.prepare_input(source).unwrap();
+        let words = engine.detect_words(&input).unwrap();
+        let boxes = ctc_line_boxes(engine, &input, words.clone(), *w);
+        (words, boxes)
+    }
+
+    #[test]
+    fn seal_filter_keeps_words_when_dot_leaders_dominate() {
+        // A form page: the detector turns fill-in leaders into many short, thin components
+        // (here 73 of them, 7 px tall) beside 22 words 32 px tall. The median is a dot's
+        // height, and twice it used to make every word a "seal".
+        let mut words: Vec<_> = (0..73).map(|i| rotated(20.0 + (i % 5) as f32 * 20.0, 7.0)).collect();
+        words.extend((0..22).map(|i| rotated(60.0 + (i % 4) as f32 * 30.0, 32.0)));
+        let (kept, _) = filter_seal_words(words, 1240);
+        assert_eq!(kept.iter().filter(|r| r.height() == 32.0).count(), 22, "every word survives");
+        // A seal (4 cm across, ~240 px at 150 dpi) on the same page still goes.
+        let mut with_seal = kept;
+        with_seal.push(rotated(260.0, 240.0));
+        let (kept, _) = filter_seal_words(with_seal, 1240);
+        assert!(kept.iter().all(|r| r.height() < 240.0));
+    }
+
+    #[test]
+    fn merge_line_boxes_joins_a_leader_run_to_its_form_line() {
+        // A label and typed value (36 px tall), then the rest of the row's dot leader, 6 px
+        // tall on the baseline, which the line grouper left as a line of its own.
+        let raw = vec![[80.0, 184.0, 793.0, 220.0], [872.0, 208.0, 1154.0, 214.0], [81.0, 273.0, 1153.0, 280.0]];
+        let merged = merge_colinear_line_boxes(raw, 1240, 30.0);
+        assert_eq!(merged, vec![[80.0, 184.0, 1154.0, 220.0], [81.0, 273.0, 1154.0, 280.0]]);
+    }
+
+    /// Forms with dot leaders through the real detector, when its model is installed: every
+    /// text line found without the leaders is still found with them, no line box spans two
+    /// rows, and no leader is left as a separate box on a text row.
+    #[test]
+    fn dot_leaders_keep_form_lines() {
+        let Some(engine) = detector() else {
+            eprintln!("skipped: detection model not installed");
+            return;
+        };
+        let (_, plain) = line_boxes_of(&engine, &test_image::form(false));
+        let (_, dots) = line_boxes_of(&engine, &test_image::form(true));
+        assert_eq!(plain.len(), 5, "{plain:?}");
+        for p in &plain {
+            let mid = (p[1] + p[3]) * 0.5;
+            let row: Vec<_> = dots.iter().filter(|d| d[1] <= mid && mid <= d[3]).collect();
+            assert_eq!(row.len(), 1, "text line {p:?} → {row:?} in {dots:?}");
+            let d = row[0];
+            assert!(d[0] <= p[0] + 4.0 && d[2] >= p[2] - 4.0, "text line {p:?} lost words: {d:?}");
+            assert!(d[3] - d[1] < 66.0, "{d:?} spans two rows");
+        }
+    }
+
     mod test_image {
+        /// Blocky glyphs, 5 dots wide and 7 tall, plus marks above (rows -2..0) or below (7..9),
+        /// standing in for Thai consonants, vowels and tone marks.
+        const SHAPES: [[&str; 7]; 6] = [
+            ["XXXX.", "....X", ".XX.X", "X..XX", "X...X", "X...X", "X...X"],
+            ["X...X", "X...X", "XX..X", "X.X.X", "X..XX", "X...X", ".XXX."],
+            [".XXX.", "X...X", "....X", "..XX.", "....X", "X...X", ".XXX."],
+            ["X.X.X", "XXXXX", "X...X", "X...X", "X...X", "X...X", "X...X"],
+            ["XXXX.", "X...X", "X...X", "X...X", "X...X", "X...X", "X..XX"],
+            ["..X..", "..X..", ".XXX.", "X.X.X", "..X..", "..X..", ".XXX."],
+        ];
+
+        pub struct Canvas {
+            pub w: u32,
+            pub h: u32,
+            pub px: Vec<u8>,
+        }
+
+        impl Canvas {
+            pub fn new(w: u32, h: u32) -> Canvas {
+                Canvas { w, h, px: vec![255; (w * h) as usize] }
+            }
+            pub fn fill(&mut self, x: u32, y: u32, w: u32, h: u32) {
+                for yy in y..(y + h).min(self.h) {
+                    for xx in x..(x + w).min(self.w) {
+                        self.px[(yy * self.w + xx) as usize] = 0;
+                    }
+                }
+            }
+            /// Text of `n` glyphs per word, `dot` pixels per glyph dot, glyph tops at `y`;
+            /// returns the right edge.
+            pub fn text(&mut self, x: u32, y: u32, dot: u32, words: &[usize]) -> u32 {
+                let mut cx = x;
+                let mut k = 0usize;
+                for &n in words {
+                    for _ in 0..n {
+                        let shape = SHAPES[k % SHAPES.len()];
+                        for (ry, row) in shape.iter().enumerate() {
+                            for (rx, b) in row.bytes().enumerate() {
+                                if b == b'X' {
+                                    self.fill(cx + rx as u32 * dot, y + ry as u32 * dot, dot, dot);
+                                }
+                            }
+                        }
+                        // A mark above every third glyph, below every fifth.
+                        if k % 3 == 1 {
+                            self.fill(cx + dot, y - 2 * dot, 3 * dot, dot);
+                        }
+                        if k % 5 == 3 {
+                            self.fill(cx + 2 * dot, y + 8 * dot, 2 * dot, dot);
+                        }
+                        cx += 6 * dot;
+                        k += 1;
+                    }
+                    cx += 4 * dot;
+                }
+                cx
+            }
+            /// A dot leader: `size`-pixel squares every `pitch` pixels from `x0` to `x1`, tops at `y`.
+            pub fn leader(&mut self, x0: u32, x1: u32, y: u32, size: u32, pitch: u32) {
+                let mut x = x0;
+                while x + size <= x1 {
+                    self.fill(x, y, size, size);
+                    x += pitch;
+                }
+            }
+            pub fn rgb(self) -> (u32, u32, Vec<u8>) {
+                (self.w, self.h, self.px.iter().flat_map(|&g| [g, g, g]).collect())
+            }
+        }
+
+        /// A government-form-like page (A4 width at ~150 dpi): a sentence, label + empty dot
+        /// leader, label + leader with a value typed over it + second label + leader, a
+        /// leader-only continuation line, and a closing sentence. `dots: false` leaves the
+        /// leaders out, as the control.
+        pub fn form(dots: bool) -> (u32, u32, Vec<u8>) {
+            let (dot, pitch, line) = (3u32, 9u32, 66u32);
+            let mut c = Canvas::new(1240, 480);
+            let base = |row: u32| 60 + row * line;
+            // Glyph core is 7 dots tall; leader dots sit on the baseline.
+            let leader_y = |row: u32| base(row) + 7 * dot - 3;
+            c.text(80, base(0), dot, &[5, 3, 6, 4, 7, 5, 4, 6]);
+            let end = c.text(80, base(1), dot, &[4, 3]);
+            if dots {
+                c.leader(end + 6, 1160, leader_y(1), 3, pitch);
+            }
+            let end = c.text(80, base(2), dot, &[3]);
+            if dots {
+                c.leader(end + 6, 600, leader_y(2), 3, pitch);
+            }
+            c.text(end + 60, base(2), dot, &[4, 5]);
+            let end2 = c.text(620, base(2), dot, &[5]);
+            if dots {
+                c.leader(end2 + 6, 1160, leader_y(2), 3, pitch);
+            }
+            if dots {
+                c.leader(80, 1160, leader_y(3), 3, pitch);
+            }
+            c.text(80, base(4), dot, &[6, 4, 5, 3, 6, 4]);
+            c.text(80, base(5), dot, &[2, 3]);
+            if dots {
+                c.leader(80 + 6 * dot * 5 + 8 * dot, 1160, leader_y(5), 3, pitch);
+            }
+            c.rgb()
+        }
+
         /// "HELLO WORLD" drawn with blocky 5×7 letters, 4 pixels per dot, black on white.
         pub fn hello() -> (u32, u32, Vec<u8>) {
             const GLYPHS: &[(char, [&str; 7])] = &[
