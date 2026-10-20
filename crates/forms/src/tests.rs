@@ -2413,8 +2413,11 @@ mod thai_never_panics {
     use super::*;
     use proptest::prelude::*;
 
+    /// A field's name, its rectangle and the points of its drawn paths.
+    type Drawn = (&'static str, [f64; 4], Vec<[f64; 2]>);
+
     /// Draw `value` in the `name` and `notes` fields and give each one's path points.
-    fn drawn(value: &str) -> Vec<(&'static str, [f64; 4], Vec<[f64; 2]>)> {
+    fn drawn(value: &str) -> Vec<Drawn> {
         ["name", "notes"]
             .into_iter()
             .filter_map(|name| {
