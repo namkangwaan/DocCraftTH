@@ -53,7 +53,13 @@ impl OcrDraft {
 
     /// The recognition settings these choices make.
     pub fn settings(&self) -> OcrSettings {
-        OcrSettings { dpi: self.dpi as f32, language: self.language().to_string(), skip_text_pages: !self.text_pages, digits: self.digits }
+        OcrSettings {
+            dpi: self.dpi as f32,
+            language: self.language().to_string(),
+            skip_text_pages: !self.text_pages,
+            read_unusable_text: false,
+            digits: self.digits,
+        }
     }
 }
 
@@ -103,6 +109,43 @@ fn unreadable_note() -> String {
 /// Pages skipped because their own text is unusable.
 fn unreadable_pages(pages: &[OcrPage]) -> usize {
     pages.iter().filter(|p| p.unusable_text && p.skipped.is_some()).count()
+}
+
+/// Pages of `doc` that a run skipped because their own text is unusable, offered for
+/// recognition (SRS FR-17, N9, S-09): nothing reads them until the user confirms, and the run
+/// the confirmation starts reads only pages whose text is still unusable.
+#[derive(Clone, Debug, PartialEq)]
+pub struct UnreadableOffer {
+    pub doc: DocId,
+    /// Page indices (0-based), never empty.
+    pub pages: Vec<usize>,
+    /// The settings of the run that found them.
+    pub settings: OcrSettings,
+}
+
+impl UnreadableOffer {
+    /// The offer for a finished run, if it skipped pages for unusable text.
+    fn from_run(doc: DocId, found: &[OcrPage], settings: &OcrSettings) -> Option<UnreadableOffer> {
+        let pages: Vec<usize> = found.iter().filter(|p| p.unusable_text && p.skipped.is_some()).map(|p| p.page).collect();
+        (!pages.is_empty()).then(|| UnreadableOffer { doc, pages, settings: settings.clone() })
+    }
+
+    /// The run the user confirms: these pages, reading over unusable text but still skipping a
+    /// page whose text is fine (should the pages have moved since), as one undoable step.
+    fn confirmed(&self) -> OcrSettings {
+        OcrSettings { skip_text_pages: true, read_unusable_text: true, ..self.settings.clone() }
+    }
+
+    fn message(&self) -> String {
+        if self.pages.len() == 1 {
+            tl!("1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.").to_string()
+        } else {
+            crate::i18n::fmt(
+                tl!("{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step."),
+                &[("n", &self.pages.len().to_string())],
+            )
+        }
+    }
 }
 
 /// Recognize `files` one at a time and write each searchable copy (into `dir` on the desktop),
@@ -174,6 +217,8 @@ fn recognize_batch(
 pub struct OcrRun {
     pub doc: DocId,
     pub progress: Arc<Mutex<OcrProgress>>,
+    /// The run's settings, for the offer to read pages it skipped for unusable text.
+    pub settings: OcrSettings,
 }
 
 pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (bool, bool) {
@@ -287,12 +332,24 @@ impl PdfCraftApp {
             OcrPages::Range => (d.from.saturating_sub(1)..d.to).collect(),
         };
         let settings = d.settings();
+        self.run_ocr(id, &pages, settings);
+    }
+
+    /// Recognize text on `pages` of `id` (all pages when empty) in the background.
+    fn run_ocr(&mut self, id: DocId, pages: &[usize], settings: OcrSettings) {
+        if self.ocr_run.is_some() {
+            self.notify_tr("Text recognition is already running");
+            return;
+        }
         if let Some(why) = missing_models(&settings.language) {
             self.notify(why);
             return;
         }
+        // A new run replaces an offer still showing.
+        self.ocr_offer = None;
         let language = settings.language.clone();
-        let Some(job) = self.session.ocr_job(id, &pages, settings) else { return };
+        let run_settings = settings.clone();
+        let Some(job) = self.session.ocr_job(id, pages, settings) else { return };
         let progress = Arc::new(Mutex::new(OcrProgress { total: job.pages.len(), ..Default::default() }));
         let p = progress.clone();
         let work = move || {
@@ -316,8 +373,63 @@ impl PdfCraftApp {
         }
         #[cfg(target_arch = "wasm32")]
         work();
-        self.ocr_run = Some(OcrRun { doc: id, progress });
+        self.ocr_run = Some(OcrRun { doc: id, progress, settings: run_settings });
         self.poll_ocr();
+    }
+
+    /// The user confirmed the offer: read its pages (see [`UnreadableOffer::confirmed`]).
+    pub fn confirm_unreadable_offer(&mut self) {
+        let Some(offer) = self.ocr_offer.take() else { return };
+        if self.session.get(offer.doc).is_none() || offer.pages.is_empty() {
+            return;
+        }
+        if let Some(why) = self.session.get(offer.doc).and_then(|d| d.read_only_reason.clone()) {
+            self.notify(why);
+            return;
+        }
+        let settings = offer.confirmed();
+        self.run_ocr(offer.doc, &offer.pages, settings);
+    }
+
+    /// Draw the offer to read pages with unreadable text at the top right of the document area
+    /// (clear of the summary toast and the progress card at the bottom, and of the side rails),
+    /// while no OCR job runs. It goes when its document closes.
+    pub(crate) fn show_unreadable_offer(&mut self, ctx: &egui::Context) {
+        let Some(offer) = &self.ocr_offer else { return };
+        if self.session.get(offer.doc).is_none() {
+            self.ocr_offer = None;
+            return;
+        }
+        if self.ocr_run.is_some() {
+            return;
+        }
+        let message = offer.message();
+        let t = Tokens::get(ctx);
+        let area = self.document_rect.filter(|r| r.is_positive()).unwrap_or_else(|| ctx.content_rect());
+        let (mut go, mut later) = (false, false);
+        egui::Area::new(egui::Id::new("ocr-unreadable-offer"))
+            .order(egui::Order::Foreground)
+            .pivot(egui::Align2::RIGHT_TOP)
+            .fixed_pos(area.right_top() + egui::vec2(-16.0, 16.0))
+            .show(ctx, |ui| {
+                egui::Frame::popup(ui.style()).fill(t.card).corner_radius(egui::CornerRadius::same(10)).inner_margin(egui::Margin::same(14)).show(
+                    ui,
+                    |ui| {
+                        ui.set_width(340.0_f32.min(area.width() - 32.0).max(160.0));
+                        ui.label(egui::RichText::new(message).color(t.text));
+                        ui.add_space(8.0);
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            go = widgets::pill_button(ui, tl!("Recognize these pages"), true).clicked();
+                            later = widgets::pill_button(ui, tl!("Not now"), false).clicked();
+                        });
+                    },
+                );
+            });
+        if go {
+            self.confirm_unreadable_offer();
+        } else if later {
+            self.ocr_offer = None;
+        }
     }
 
     /// Recognize text in each file, writing the searchable copies into a folder the user picks
@@ -437,7 +549,7 @@ impl PdfCraftApp {
             }
         }
         let Some(run) = self.ocr_run.as_ref() else { return };
-        let (doc, progress) = (run.doc, run.progress.clone());
+        let (doc, progress, settings) = (run.doc, run.progress.clone(), run.settings.clone());
         let Ok(mut s) = progress.lock() else {
             // The worker panicked while holding the lock: it will never report back.
             self.ocr_run = None;
@@ -498,6 +610,9 @@ impl PdfCraftApp {
                     msg.push_str(&unreadable_note());
                 }
                 self.notify(msg);
+                // SRS FR-17: suggest reading the pages with unreadable text; only the user's
+                // confirmation starts it.
+                self.ocr_offer = UnreadableOffer::from_run(doc, &found, &settings);
             }
             Err(e) => self.notify_error(e),
         }
@@ -529,7 +644,7 @@ mod tests {
             let blank = pdfcraft_engine::Session::new().create_blank(612.0, 792.0, 3).unwrap().to_vec();
             app.open_bytes("scan.pdf", None, blank).unwrap();
             let (_, doc) = app.active_ids().unwrap();
-            app.ocr_run = Some(OcrRun { doc, progress });
+            app.ocr_run = Some(OcrRun { doc, progress, settings: OcrSettings::default() });
             app
         })
     }
@@ -577,6 +692,74 @@ mod tests {
         );
         let (_, doc) = app.active_ids().unwrap();
         assert_eq!(app.session.get(doc).unwrap().can_undo(), Some("Recognize text"));
+    }
+
+    /// SRS FR-17 / N9: a run that skipped pages for unreadable text offers to read them and
+    /// starts nothing by itself; "Not now" drops the offer.
+    #[test]
+    fn unreadable_pages_are_offered_and_wait_for_confirmation() {
+        let found = vec![page(0, None, false), page(1, Some("the page already contains text"), false), page(2, Some(UNUSABLE_TEXT), true)];
+        let progress = Arc::new(Mutex::new(OcrProgress { done: 3, total: 3, result: Some(Ok(found)), ..Default::default() }));
+        let mut h = running(progress);
+        h.run_steps(3);
+        h.get_by_label("1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.");
+        {
+            let app = h.state();
+            assert_eq!(app.ocr_offer.as_ref().map(|o| o.pages.clone()), Some(vec![2]));
+            assert!(app.ocr_run.is_none(), "nothing is read before the user confirms");
+        }
+        h.get_by_label("Not now").click();
+        h.run_steps(2);
+        assert!(h.state().ocr_offer.is_none());
+        assert!(h.query_by_label("Recognize these pages").is_none());
+        let (_, doc) = h.state().active_ids().unwrap();
+        assert_eq!(h.state().session.get(doc).unwrap().can_undo(), Some("Recognize text"), "only the first run was applied");
+    }
+
+    /// A run without unreadable pages offers nothing.
+    #[test]
+    fn no_offer_without_unreadable_pages() {
+        let found = vec![page(0, None, false), page(1, Some("the page already contains text"), false)];
+        let progress = Arc::new(Mutex::new(OcrProgress { done: 2, total: 2, result: Some(Ok(found)), ..Default::default() }));
+        let mut h = running(progress);
+        h.run_steps(3);
+        assert!(h.state().ocr_offer.is_none());
+        assert!(h.query_by_label("Recognize these pages").is_none());
+    }
+
+    /// Confirming reads just the offered pages, skipping any page whose text is fine, as a new
+    /// run with the first run's language and resolution.
+    #[test]
+    fn confirming_reads_only_the_unreadable_pages() {
+        let settings = OcrSettings { dpi: 150.0, language: "th".into(), skip_text_pages: true, ..Default::default() };
+        let found =
+            vec![page(0, Some(UNUSABLE_TEXT), true), page(1, Some("the page already contains text"), false), page(2, Some(UNUSABLE_TEXT), true)];
+        let doc = DocId(1);
+        let offer = UnreadableOffer::from_run(doc, &found, &settings).unwrap();
+        assert_eq!(offer.pages, vec![0, 2]);
+        let confirmed = offer.confirmed();
+        assert!(confirmed.skip_text_pages && confirmed.read_unusable_text, "good pages stay skipped: {confirmed:?}");
+        assert_eq!((confirmed.dpi, confirmed.language.as_str()), (150.0, "th"));
+        assert!(UnreadableOffer::from_run(doc, &found[1..2], &settings).is_none());
+
+        let found = vec![page(0, None, false), page(1, Some(UNUSABLE_TEXT), true), page(2, Some(UNUSABLE_TEXT), true)];
+        let progress = Arc::new(Mutex::new(OcrProgress { done: 3, total: 3, result: Some(Ok(found)), ..Default::default() }));
+        let mut h = running(progress);
+        h.run_steps(3);
+        h.get_by_label("2 pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.");
+        // Inline, so the confirmed run finishes within the click's frame.
+        h.state_mut().run_inline = true;
+        h.get_by_label("Recognize these pages").click();
+        h.run_steps(2);
+        let app = h.state();
+        assert!(app.ocr_offer.is_none(), "the offer is used up");
+        if pdfcraft_engine::ocr::available() {
+            // The blank pages have no text of their own, so both offered pages are read.
+            assert_eq!(app.toast.as_ref().map(|t| t.0.as_str()), Some("Recognized 0 words on 2 pages"), "pages 2 and 3 only");
+        } else {
+            assert!(app.ocr_run.is_none());
+            assert!(app.toast.as_ref().is_some_and(|t| t.0.contains("isn't installed")), "{:?}", app.toast);
+        }
     }
 
     /// A batch cancelled before its next file writes nothing more.

@@ -2717,3 +2717,6 @@ certificate	Version	الإصدار
 	As recognized	كما تم التعرف عليها
 	Thai digits	الأرقام التايلاندية
 	Arabic digits	الأرقام العربية
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	صفحة واحدة فيها نص لا يمكن قراءته. هل تريد التعرف على النص فيها؟ يبقى نصها كما هو، ويمكنك التراجع عن ذلك بخطوة واحدة.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	عدد الصفحات التي فيها نص لا يمكن قراءته: {n}. هل تريد التعرف على النص في هذه الصفحات فقط؟ يبقى نصها كما هو، ويمكنك التراجع عن ذلك بخطوة واحدة.
+	Recognize these pages	التعرف على هذه الصفحات

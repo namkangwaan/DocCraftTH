@@ -2707,3 +2707,6 @@ theme	Appearance	Išvaizda
 	As recognized	Kaip atpažinta
 	Thai digits	Tajų skaitmenys
 	Arabic digits	Arabiški skaitmenys
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 puslapyje tekstas neįskaitomas. Atpažinti jame tekstą? Jo tekstas liks, o atšaukti galėsite vienu žingsniu.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Puslapių su neįskaitomu tekstu: {n}. Atpažinti tekstą tik juose? Jų tekstas liks, o atšaukti galėsite vienu žingsniu.
+	Recognize these pages	Atpažinti šiuos puslapius

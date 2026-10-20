@@ -2700,3 +2700,6 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 	As recognized	ตามที่อ่านได้
 	Thai digits	เลขไทย (๐๑๒)
 	Arabic digits	เลขอารบิก (012)
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	มี 1 หน้าที่ข้อความอ่านไม่ได้ ต้องการรู้จำข้อความในหน้านั้นหรือไม่ ข้อความเดิมจะยังอยู่ และเลิกทำได้ในขั้นตอนเดียว
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	มี {n} หน้าที่ข้อความอ่านไม่ได้ ต้องการรู้จำข้อความเฉพาะหน้าเหล่านั้นหรือไม่ ข้อความเดิมจะยังอยู่ และเลิกทำได้ในขั้นตอนเดียว
+	Recognize these pages	รู้จำข้อความในหน้าเหล่านี้

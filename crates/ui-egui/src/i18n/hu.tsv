@@ -2439,3 +2439,6 @@ animation effects	Off	Ki
 	As recognized	Felismert alakban
 	Thai digits	Thai számjegyek
 	Arabic digits	Arab számjegyek
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 oldalon olvashatatlan a szöveg. Felismeri rajta a szöveget? A meglévő szöveg megmarad, és egy lépésben visszavonható.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} oldalon olvashatatlan a szöveg. Csak ezeken az oldalakon ismeri fel a szöveget? A meglévő szöveg megmarad, és egy lépésben visszavonható.
+	Recognize these pages	Ezen oldalak felismerése

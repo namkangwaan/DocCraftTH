@@ -2441,3 +2441,6 @@ animation effects	Off	Aus
 	As recognized	Wie erkannt
 	Thai digits	Thailändische Ziffern
 	Arabic digits	Arabische Ziffern
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 Seite enthält unlesbaren Text. Text darauf erkennen? Der vorhandene Text bleibt, und Sie können dies in einem Schritt rückgängig machen.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} Seiten enthalten unlesbaren Text. Nur auf diesen Seiten Text erkennen? Der vorhandene Text bleibt, und Sie können dies in einem Schritt rückgängig machen.
+	Recognize these pages	Diese Seiten erkennen

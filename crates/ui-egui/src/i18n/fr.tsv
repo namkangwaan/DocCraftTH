@@ -2440,3 +2440,6 @@ animation effects	Off	Désactivés
 	As recognized	Tels que reconnus
 	Thai digits	Chiffres thaïs
 	Arabic digits	Chiffres arabes
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 page contient du texte illisible. Reconnaître le texte de cette page ? Son texte est conservé, et vous pourrez annuler en une seule étape.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} pages contiennent du texte illisible. Reconnaître le texte de ces pages uniquement ? Leur texte est conservé, et vous pourrez annuler en une seule étape.
+	Recognize these pages	Reconnaître ces pages

@@ -663,6 +663,10 @@ pub struct PdfCraftApp {
     /// Scan & OCR: the Recognize Text choices, the running job, and (tests) run it inline.
     pub ocr_draft: ocr_ui::OcrDraft,
     pub ocr_run: Option<ocr_ui::OcrRun>,
+    /// The offer to read pages a run skipped for unreadable text (SRS FR-17).
+    pub ocr_offer: Option<ocr_ui::UnreadableOffer>,
+    /// Where the central (document) area was last drawn, for cards placed over it.
+    pub document_rect: Option<egui::Rect>,
     pub ocr_batch: Option<std::sync::Arc<std::sync::Mutex<ocr_ui::BatchProgress>>>,
     /// Background jobs (OCR, actions, listing pinned folders) run inline instead (tests).
     pub run_inline: bool,
@@ -998,6 +1002,8 @@ impl PdfCraftApp {
             a11y_options: a11y_ui::A11yOptions::default(),
             ocr_draft: ocr_ui::OcrDraft::default(),
             ocr_run: None,
+            ocr_offer: None,
+            document_rect: None,
             ocr_batch: None,
             run_inline: false,
             custom_actions: Vec::new(),
@@ -2055,6 +2061,7 @@ impl PdfCraftApp {
 
     /// Draw the running job's progress card and pass a Cancel click on to the job.
     fn show_progress(&mut self, ctx: &egui::Context) {
+        self.show_unreadable_offer(ctx);
         if widgets::progress_notice(self, ctx) {
             match self.progress_notice.as_ref().map(|p| p.job) {
                 Some(widgets::ProgressJob::Ocr) => self.cancel_ocr(),
@@ -3197,7 +3204,7 @@ impl eframe::App for PdfCraftApp {
             }
         }
         let t = theme::Tokens::get(&ctx);
-        egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.pasteboard)).show(ui, |ui| {
+        let central = egui::CentralPanel::default().frame(egui::Frame::NONE.fill(t.pasteboard)).show(ui, |ui| {
             if self.mode == Mode::Read {
                 match self.active {
                     None if self.combine_showing() => combine_ui::page(self, ui),
@@ -3211,6 +3218,7 @@ impl eframe::App for PdfCraftApp {
                 docking::show(self, ui);
             }
         });
+        self.document_rect = Some(central.response.rect);
         self.process_pending_edits();
         palette::show(self, &ctx);
         dialogs::show(self, &ctx);

@@ -68,6 +68,10 @@ pub struct OcrSettings {
     /// text" and skips them). When `false`, such pages are read too (a picture on a page that
     /// also has text, #1028) and only the words that aren't already there are added.
     pub skip_text_pages: bool,
+    /// Read pages whose own text is unusable ([`OcrPage::unusable_text`]) even while
+    /// `skip_text_pages` leaves the others alone: the user's confirmation of the suggestion
+    /// (SRS FR-17), which never reaches a page whose text is fine.
+    pub read_unusable_text: bool,
     /// How recognised digits are written into the text layer.
     pub digits: Digits,
 }
@@ -101,7 +105,7 @@ fn covered(word: [f32; 4], text: &[[f32; 4]]) -> f32 {
 
 impl Default for OcrSettings {
     fn default() -> Self {
-        OcrSettings { dpi: 300.0, language: "en".into(), skip_text_pages: true, digits: Digits::AsRead }
+        OcrSettings { dpi: 300.0, language: "en".into(), skip_text_pages: true, read_unusable_text: false, digits: Digits::AsRead }
     }
 }
 
@@ -191,12 +195,13 @@ impl OcrJob {
                 .map(|t| t.glyphs.iter().filter(|g| g.text.chars().any(|c| !c.is_whitespace() && !unreadable(c))).map(|g| g.rect).collect())
                 .unwrap_or_default();
             // The user confirms replacing unusable text (SRS D11) by reading the page again with
-            // `skip_text_pages` off.
-            if self.settings.skip_text_pages && unusable_text {
+            // `skip_text_pages` off, or with `read_unusable_text`, which reads only such pages.
+            let read_over = unusable_text && self.settings.read_unusable_text;
+            if self.settings.skip_text_pages && unusable_text && !read_over {
                 out.push(skip(UNUSABLE_TEXT));
                 continue;
             }
-            if self.settings.skip_text_pages && !existing.is_empty() {
+            if self.settings.skip_text_pages && !read_over && !existing.is_empty() {
                 out.push(skip("the page already contains text"));
                 continue;
             }

@@ -2445,3 +2445,6 @@ animation effects	Off	Izklopljeni
 	As recognized	Kot prepoznano
 	Thai digits	Tajske števke
 	Arabic digits	Arabske števke
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 stran ima neberljivo besedilo. Želite prepoznati besedilo na njej? Njeno besedilo ostane, spremembo pa lahko razveljavite v enem koraku.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Strani z neberljivim besedilom: {n}. Želite prepoznati besedilo samo na njih? Njihovo besedilo ostane, spremembo pa lahko razveljavite v enem koraku.
+	Recognize these pages	Prepoznaj te strani

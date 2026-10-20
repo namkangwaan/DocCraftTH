@@ -2353,3 +2353,6 @@ animation effects	Off	Выкл
 	As recognized	Как распознано
 	Thai digits	Тайские цифры
 	Arabic digits	Арабские цифры
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	На 1 странице текст нечитаем. Распознать текст на ней? Её текст сохранится, а отменить это можно одним шагом.
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Страниц с нечитаемым текстом: {n}. Распознать текст только на них? Их текст сохранится, а отменить это можно одним шагом.
+	Recognize these pages	Распознать эти страницы
