@@ -330,18 +330,23 @@ fn ctc_line_boxes(detector: &ocrs::OcrEngine, input: &ocrs::OcrInput, words: Vec
     merge_colinear_line_boxes(raw_boxes, width, median_h)
 }
 
-/// The smallest short side, as a fraction of the page width, that a component needs before it
-/// can be dropped as a seal: about 1.3 cm on an A4 page. Official circular seals are 3 cm or
-/// more across; text up to ~36 pt stays under it.
-const MIN_SEAL_FRACTION: f32 = 0.06;
+/// The smallest median component size, as a fraction of the page width, that is taken as the
+/// text height: about 2 mm on an A4 page. Scanned body text measures 1.4–1.9 % (FR-21 corpus);
+/// the dots of a fill-in leader about 0.6 %.
+// ponytail: assumes the image is the whole page width; a cropped strip of small text can fall
+// under it, which only raises the median (keeps more components). Measure the text instead if
+// that ever drops words.
+const MIN_TEXT_FRACTION: f32 = 0.01;
 
 /// Filter out non-text connected components (e.g. large circular seals, stamps, or logos)
 /// that merge with text words and prevent line grouping. Returns `(filtered_words, median_height)`.
 ///
-/// A component is a seal when its short side is over twice the median *and* over
-/// [`MIN_SEAL_FRACTION`] of `page_width`. The median alone is not a scale for text: on a form
-/// the dots of fill-in leaders ("......") come out as many tiny components, the median drops
-/// to a dot's height, and every real word would read as a seal.
+/// A component is a seal when its short side is over twice the text height, the median size.
+/// On a form the dots of fill-in leaders ("......") come out as many tiny components and drag
+/// the median down to a dot's height, so that every real word would read as a seal: when the
+/// median is under [`MIN_TEXT_FRACTION`] of `page_width`, it is taken over the components at
+/// least that size instead. A floor on the seal size itself does not work: the detector
+/// returns a seal as fragments of its ring, only two to four times a word's height.
 fn filter_seal_words(words: Vec<rten_imageproc::RotatedRect>, page_width: u32) -> (Vec<rten_imageproc::RotatedRect>, f32) {
     if words.is_empty() {
         return (words, 20.0);
@@ -351,8 +356,14 @@ fn filter_seal_words(words: Vec<rten_imageproc::RotatedRect>, page_width: u32) -
     // size are left out of the median and dropped.
     let mut heights: Vec<f32> = words.iter().filter_map(word_size).collect();
     heights.sort_by(f32::total_cmp);
-    let median_h = heights.get(heights.len() / 2).copied().unwrap_or(20.0);
-    let max_word_h = (median_h * 2.0).max(12.0).max(page_width as f32 * MIN_SEAL_FRACTION);
+    let median = |h: &[f32]| h.get(h.len() / 2).copied();
+    let min_text = page_width as f32 * MIN_TEXT_FRACTION;
+    let mut median_h = median(&heights).unwrap_or(20.0);
+    if median_h < min_text {
+        let text_start = heights.partition_point(|&h| h < min_text);
+        median_h = heights.get(text_start..).and_then(median).unwrap_or(median_h);
+    }
+    let max_word_h = (median_h * 2.0).max(12.0);
 
     let filtered = words.into_iter().filter(|r| word_size(r).is_some_and(|h| h <= max_word_h)).collect();
     (filtered, median_h)
@@ -1086,7 +1097,7 @@ mod tests {
             proptest::prop_assert!(kept.len() <= sizes.len());
             proptest::prop_assert!(median.is_finite());
             proptest::prop_assert!(sizes.is_empty() || !kept.is_empty(), "the median word always survives");
-            let cap = (median * 2.0).max(12.0).max(1000.0 * MIN_SEAL_FRACTION);
+            let cap = (median * 2.0).max(12.0);
             proptest::prop_assert!(kept.iter().all(|r| r.height().min(r.width()) <= cap));
         }
 
@@ -1194,6 +1205,19 @@ mod tests {
         with_seal.push(rotated(260.0, 240.0));
         let (kept, _) = filter_seal_words(with_seal, 1240);
         assert!(kept.iter().all(|r| r.height() < 240.0));
+    }
+
+    #[test]
+    fn seal_filter_drops_seal_fragments_smaller_than_a_whole_seal() {
+        // The detector does not return a seal whole: it returns pieces of its ring and lettering,
+        // a few times a word's height, which then join two text lines into one crop. Shapes from
+        // real scans: w2 (W 2413 px at 300 dpi, words ~35 px) and rk (W 1080 px, words ~20 px).
+        for (page_width, word_h, fragment) in [(2413, 35.0, 110.0), (1080, 20.0, 50.0)] {
+            let mut words: Vec<_> = (0..40).map(|i| rotated(word_h * (3.0 + (i % 5) as f32), word_h)).collect();
+            words.push(rotated(fragment * 1.5, fragment));
+            let (kept, _) = filter_seal_words(words, page_width);
+            assert_eq!(kept.len(), 40, "W {page_width}: the {fragment} px fragment survived");
+        }
     }
 
     #[test]
