@@ -39,6 +39,8 @@ The export is opset 9. Its eight `Slice` nodes store `axes`, `starts`, and `ends
 | `th_PP-OCRv5_mobile_rec_opset11.onnx` | `9d323430ec82b04f09c347a1de4159d19a0e3b7cf170881335116341bd5cc298` |
 | `th_PP-OCRv5_mobile_rec.rten` (`text-recognition-th.rten`) | `8b70e6d18967e93fccb32e045e0f80ee3859efe7ccdd67586a9d136a284e834a` |
 
+The model card publishes only the Paddle weights, so the converted `.rten` is hosted as the `text-recognition-th.rten` asset of this fork's `models-th-v1` release. `cargo xtask models` fetches it from there.
+
 ## Load check and class map
 
 A scratch program outside the repository, `K:\tmp\thai-ocr-probe`, loads `th_PP-OCRv5_mobile_rec.rten` with `rten` 0.26.0, feature `rten_format` only.
