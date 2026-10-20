@@ -4271,7 +4271,9 @@ version = "0.9.0"
 dependencies = [
  "ocrs",
  "pdfcraft-fonts",
+ "proptest",
  "rten",
+ "rten-imageproc",
  "thiserror 2.0.21",
 ]
 
