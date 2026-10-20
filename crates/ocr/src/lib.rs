@@ -214,12 +214,12 @@ impl Ocr {
                     .collect())
             }
             Recognizer::Ctc { detector, model, dict } => {
-                let cleaned = erase_dot_leaders(&rgb, width, height);
+                let (cleaned, leaders) = erase_dot_leaders(&rgb, width, height).unzip();
                 let rgb: &[u8] = cleaned.as_deref().unwrap_or(&rgb);
                 let source = ocrs::ImageSource::from_bytes(rgb, (width, height)).map_err(|e| err(&e))?;
                 let input = detector.prepare_input(source).map_err(|e| err(&e))?;
                 let found = detector.detect_words(&input).map_err(|e| err(&e))?;
-                let merged_boxes = ctc_line_boxes(detector, &input, found, width);
+                let merged_boxes = ctc_line_boxes(detector, &input, found, width, leaders.as_deref().unwrap_or_default());
 
                 let mut out = Vec::new();
                 for [left, top, right, bottom] in merged_boxes {
@@ -306,12 +306,20 @@ fn channels_for_ocrs(pixels: &[u8], width: u32, height: u32) -> Result<std::borr
 
 /// The CTC path's text-line boxes `[left, top, right, bottom]` in image pixels, top to bottom:
 /// `words` (from the detector) without seal-sized components, grouped into lines, the lines'
-/// bounding boxes, and segments split by a seal merged back.
-fn ctc_line_boxes(detector: &ocrs::OcrEngine, input: &ocrs::OcrInput, words: Vec<rten_imageproc::RotatedRect>, width: u32) -> Vec<[f32; 4]> {
+/// bounding boxes, and segments split by a seal or an erased dot leader (`leaders`, from
+/// [`erase_dot_leaders`]) merged back.
+fn ctc_line_boxes(
+    detector: &ocrs::OcrEngine,
+    input: &ocrs::OcrInput,
+    words: Vec<rten_imageproc::RotatedRect>,
+    width: u32,
+    leaders: &[[f32; 4]],
+) -> Vec<[f32; 4]> {
     let (filtered_words, median_h, seals) = filter_seal_words(words, width);
     let raw_boxes = detector.find_text_lines(input, &filtered_words).iter().filter_map(|line| bounds(line)).collect();
-    let seals: Vec<[f32; 4]> = seals.iter().filter_map(|seal| bounds(std::slice::from_ref(seal))).collect();
-    merge_colinear_line_boxes(raw_boxes, width, median_h, &seals)
+    let mut removed: Vec<[f32; 4]> = seals.iter().filter_map(|seal| bounds(std::slice::from_ref(seal))).collect();
+    removed.extend_from_slice(leaders);
+    merge_colinear_line_boxes(raw_boxes, width, median_h, &removed)
 }
 
 /// The bounding box `[left, top, right, bottom]` of `rects`, when it is finite on the left and
@@ -334,7 +342,8 @@ const MIN_LEADER_DOTS: usize = 3;
 const MAX_LEADER_PIXELS: usize = 1 << 26;
 
 /// Fill-in dot leaders ("..........") on a form, whitened in a copy of `pixels` (`width` ×
-/// `height`, grey or RGB), or `None` when there are none or the image is too large to scan.
+/// `height`, grey or RGB), with each leader's box `[left, top, right, bottom]`; `None` when there
+/// are none or the image is too large to scan.
 ///
 /// The Thai recogniser loses the words between leaders: a form line whose box and pixels are
 /// fine read as 5 of its 49 letters, and a real form page's CER fell from 0.32 to 0.14 once the
@@ -343,7 +352,7 @@ const MAX_LEADER_PIXELS: usize = 1 << 26;
 /// ~0.8 mm across) standing apart, with ~2 mm gaps at most and no ink straight above or below each dot: that
 /// last test keeps Thai marks, which sit on or under a letter. The sizes scale with the image
 /// width, so a page scanned at 96 dpi keeps its (small) letters.
-fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<Vec<u8>> {
+fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<(Vec<u8>, Vec<[f32; 4]>)> {
     let (w, h) = (width as usize, height as usize);
     let n = w.checked_mul(h).filter(|&n| n > 0 && n <= MAX_LEADER_PIXELS)?;
     let channels = match pixels.len() {
@@ -440,20 +449,20 @@ fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<Vec<u8>> 
             });
         if !joins {
             if run.len() >= MIN_LEADER_DOTS {
-                leader.append(&mut run);
+                leader.push(std::mem::take(&mut run));
             }
             run.clear();
         }
         run.push(d.2);
     }
     if run.len() >= MIN_LEADER_DOTS {
-        leader.append(&mut run);
+        leader.push(run);
     }
     if leader.is_empty() {
         return None;
     }
     let mut out = pixels.to_vec();
-    for b in leader.iter().filter_map(|&i| blobs.get(i)) {
+    for b in leader.iter().flatten().filter_map(|&i| blobs.get(i)) {
         for y in b.y0.saturating_sub(margin)..(b.y1 + margin).min(h) {
             let row = y * w;
             let span = (row + b.x0.saturating_sub(margin)) * channels..(row + (b.x1 + margin).min(w)) * channels;
@@ -462,7 +471,16 @@ fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<Vec<u8>> 
             }
         }
     }
-    Some(out)
+    let spans = leader
+        .iter()
+        .filter_map(|run| {
+            let mut dots = run.iter().filter_map(|&i| blobs.get(i));
+            let first = dots.next()?;
+            let span = dots.fold([first.x0, first.y0, first.x1, first.y1], |s, b| [s[0].min(b.x0), s[1].min(b.y0), s[2].max(b.x1), s[3].max(b.y1)]);
+            Some(span.map(|v| v as f32))
+        })
+        .collect();
+    Some((out, spans))
 }
 
 /// The smallest median component size, as a fraction of the page width, that is taken as the
@@ -516,18 +534,19 @@ fn word_size(r: &rten_imageproc::RotatedRect) -> Option<f32> {
 }
 
 /// The widest horizontal gap, in line heights, that [`merge_colinear_line_boxes`] joins across
-/// when no dropped seal lies in it. On the FR-21 pages the widest seal-free join that helps is
-/// 6.3 heights (a heading read in three pieces); seal holes measure 17 to 26 and two columns on
-/// one row (a letterhead's reference and address, a sign-off beside initials) 16 or more.
+/// when no dropped seal or erased leader lies in it. On the FR-21 pages the widest join across
+/// nothing that helps is 6.3 heights (a heading read in three pieces); seal holes measure 17 to
+/// 26, a form row's label and value with its leader erased 10.8, and two columns on one row (a
+/// letterhead's reference and address, a sign-off beside initials) 16 or more.
 // ponytail: one fixed ratio from four real pages; a page-level column detector if it misfires.
 const MAX_ROW_GAP_HEIGHTS: f32 = 10.0;
 
 /// Merge co-linear line segments that were split by stamps, seals, or column separators,
 /// and align right margins for lines that stop prematurely due to ink from a stamp.
-/// Boxes are `[left, top, right, bottom]`; non-finite or empty ones are dropped. `seals` are the
-/// components [`filter_seal_words`] dropped: a gap wider than [`MAX_ROW_GAP_HEIGHTS`] joins only
-/// across one of them.
-fn merge_colinear_line_boxes(mut raw_boxes: Vec<[f32; 4]>, page_width: u32, median_h: f32, seals: &[[f32; 4]]) -> Vec<[f32; 4]> {
+/// Boxes are `[left, top, right, bottom]`; non-finite or empty ones are dropped. `removed` are
+/// what was taken off the page before grouping (seals [`filter_seal_words`] dropped, leaders
+/// [`erase_dot_leaders`] erased): a gap wider than [`MAX_ROW_GAP_HEIGHTS`] joins only across one.
+fn merge_colinear_line_boxes(mut raw_boxes: Vec<[f32; 4]>, page_width: u32, median_h: f32, removed: &[[f32; 4]]) -> Vec<[f32; 4]> {
     raw_boxes.retain(|b| b.iter().all(|v| v.is_finite()) && b[2] > b[0] && b[3] > b[1]);
     raw_boxes.sort_by(|a, b| a[1].total_cmp(&b[1]));
     // Each row is (union, seed): boxes are tested against the row's first box, not the union.
@@ -549,8 +568,8 @@ fn merge_colinear_line_boxes(mut raw_boxes: Vec<[f32; 4]>, page_width: u32, medi
             let nested = (b[1] >= s[1] && b[3] <= s[3]) || (s[1] >= b[1] && s[3] <= b[3]);
             let (gap_left, gap_right) = if b[0] >= m[2] { (m[2], b[0]) } else { (b[2], m[0]) };
             let (top, bottom) = (s[1].min(b[1]), s[3].max(b[3]));
-            let across_seal = || seals.iter().any(|z| z[0] < gap_right && z[2] > gap_left && z[1] < bottom && z[3] > top);
-            let near = gap_right - gap_left <= avg_h * MAX_ROW_GAP_HEIGHTS || across_seal();
+            let across_removed = || removed.iter().any(|z| z[0] < gap_right && z[2] > gap_left && z[1] < bottom && z[3] > top);
+            let near = gap_right - gap_left <= avg_h * MAX_ROW_GAP_HEIGHTS || across_removed();
             if near && (nested || v_overlap >= avg_h * 0.4 || (b_mid - s_mid).abs() <= avg_h * 0.35) {
                 m[0] = m[0].min(b[0]);
                 m[1] = m[1].min(b[1]);
@@ -1168,7 +1187,8 @@ mod tests {
         ink(1708, 50, 1711, 53);
         let dark = |img: &[u8], x0: usize, y0: usize, x1: usize, y1: usize| (y0..y1).any(|y| img[y * w + x0..y * w + x1].iter().any(|&v| v < 128));
 
-        let out = erase_dot_leaders(&img, w as u32, h as u32).expect("a leader to erase");
+        let (out, leaders) = erase_dot_leaders(&img, w as u32, h as u32).expect("a leader to erase");
+        assert_eq!(leaders, vec![[420.0, 150.0, 767.0, 155.0]], "where the leader was, for the line merge");
         assert!(!dark(&out, 418, 148, 785, 157), "the leader is gone");
         assert!(dark(&out, 100, 100, 400, 160) && out[130 * w + 250] == 0, "the word stays");
         assert!(dark(&out, 905, 90, 910, 95) && dark(&out, 945, 90, 950, 95), "marks on letters stay");
@@ -1176,7 +1196,7 @@ mod tests {
         assert!(dark(&out, 1700, 50, 1703, 53) && dark(&out, 1708, 50, 1711, 53), "touching pieces stay");
         // RGB reads the same.
         let rgb: Vec<u8> = img.iter().flat_map(|&v| [v; 3]).collect();
-        let out = erase_dot_leaders(&rgb, w as u32, h as u32).expect("a leader to erase");
+        let (out, _) = erase_dot_leaders(&rgb, w as u32, h as u32).expect("a leader to erase");
         assert_eq!(out.len(), rgb.len());
         assert_eq!(out[(152 * w + 422) * 3..(152 * w + 422) * 3 + 3], [255; 3]);
         // Nothing to erase, or nothing usable, is None and never a panic.
@@ -1390,7 +1410,7 @@ mod tests {
         let source = ocrs::ImageSource::from_bytes(px, (*w, *h)).unwrap();
         let input = engine.prepare_input(source).unwrap();
         let words = engine.detect_words(&input).unwrap();
-        let boxes = ctc_line_boxes(engine, &input, words.clone(), *w);
+        let boxes = ctc_line_boxes(engine, &input, words.clone(), *w, &[]);
         (words, boxes)
     }
 
@@ -1452,6 +1472,17 @@ mod tests {
         // the right, 15 line heights apart with the emblem between them. A seal splits a line
         // by a few heights (see the test above); a gap this wide is two columns.
         let raw = vec![[80.0, 92.0, 175.0, 106.0], [394.0, 96.0, 460.0, 108.0]];
+        assert_eq!(merge_colinear_line_boxes(raw.clone(), 600, 12.0, &[]), raw);
+    }
+
+    #[test]
+    fn merge_line_boxes_joins_a_form_row_across_its_erased_leader() {
+        // FR-21 w2: once its dot leader is erased, a form row's label and typed value sit 10.8
+        // line heights apart with nothing between them, and read as two lines that lost 11-15
+        // letters each. The erased run is reported like a dropped seal.
+        let raw = vec![[276.0, 210.0, 519.0, 224.0], [105.0, 213.0, 141.0, 225.0]];
+        let leader = [150.0, 220.0, 270.0, 223.0];
+        assert_eq!(merge_colinear_line_boxes(raw.clone(), 600, 12.0, &[leader]), vec![[105.0, 210.0, 519.0, 225.0]]);
         assert_eq!(merge_colinear_line_boxes(raw.clone(), 600, 12.0, &[]), raw);
     }
 
