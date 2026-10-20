@@ -348,7 +348,7 @@ const MAX_LEADER_PIXELS: usize = 1 << 26;
 /// fine read as 5 of its 49 letters, and a real form page's CER fell from 0.32 to 0.14 once the
 /// dots were gone. Leaders carry no text worth keeping (the user fills them in), so they are
 /// removed before detection. A leader is a row of [`MIN_LEADER_DOTS`] or more dots (ink blobs at most
-/// ~0.8 mm across) with ~2 mm gaps at most and no ink straight above or below each dot: that
+/// ~0.8 mm across) standing apart, with ~2 mm gaps at most and no ink straight above or below each dot: that
 /// last test keeps Thai marks, which sit on or under a letter. The sizes scale with the image
 /// width, so a page scanned at 96 dpi keeps its (small) letters.
 fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<Vec<u8>> {
@@ -413,6 +413,9 @@ fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<Vec<u8>> 
     let band = (3.0 * k).max(1.0);
     let reach = 3 * dot;
     let margin = ((2.0 * k).round() as usize).max(1);
+    // Leader dots stand apart (5-6 px clear at 300 dpi); a mark broken into pieces by JPEG
+    // has them touching or 1 px apart.
+    let clear = ((2.0 * k).round() as usize).max(1);
     let other_ink = |id: u32, ys: std::ops::Range<usize>, xs: std::ops::Range<usize>| {
         ys.flat_map(|y| xs.clone().map(move |x| y * w + x)).any(|i| label.get(i).is_some_and(|&l| l != 0 && l != id))
     };
@@ -435,7 +438,14 @@ fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<Vec<u8>> 
     let mut leader = Vec::new();
     let mut run: Vec<usize> = Vec::new();
     for (at, d) in dots.iter().enumerate() {
-        let joins = at > 0 && dots.get(at - 1).is_some_and(|p| p.0 == d.0 && d.1 - p.1 <= gap);
+        let joins = at > 0
+            && dots.get(at - 1).is_some_and(|p| {
+                let apart = match (blobs.get(p.2), blobs.get(d.2)) {
+                    (Some(a), Some(b)) => b.x0.saturating_sub(a.x1) >= clear,
+                    _ => false,
+                };
+                p.0 == d.0 && d.1 - p.1 <= gap && apart
+            });
         if !joins {
             if run.len() >= MIN_LEADER_DOTS {
                 leader.append(&mut run);
@@ -1127,6 +1137,11 @@ mod tests {
         }
         ink(1500, 150, 1505, 155); // two dots, not a leader
         ink(1520, 150, 1525, 155);
+        // A mark broken into pieces by JPEG (a 72 dpi gazette page): pieces 1 px apart are
+        // not a row of dots.
+        ink(1700, 50, 1703, 53);
+        ink(1704, 50, 1707, 53);
+        ink(1708, 50, 1711, 53);
         let dark = |img: &[u8], x0: usize, y0: usize, x1: usize, y1: usize| (y0..y1).any(|y| img[y * w + x0..y * w + x1].iter().any(|&v| v < 128));
 
         let out = erase_dot_leaders(&img, w as u32, h as u32).expect("a leader to erase");
@@ -1134,6 +1149,7 @@ mod tests {
         assert!(dark(&out, 100, 100, 400, 160) && out[130 * w + 250] == 0, "the word stays");
         assert!(dark(&out, 905, 90, 910, 95) && dark(&out, 945, 90, 950, 95), "marks on letters stay");
         assert!(dark(&out, 1500, 150, 1525, 155), "a pair of dots stays");
+        assert!(dark(&out, 1700, 50, 1703, 53) && dark(&out, 1708, 50, 1711, 53), "touching pieces stay");
         // RGB reads the same.
         let rgb: Vec<u8> = img.iter().flat_map(|&v| [v; 3]).collect();
         let out = erase_dot_leaders(&rgb, w as u32, h as u32).expect("a leader to erase");
