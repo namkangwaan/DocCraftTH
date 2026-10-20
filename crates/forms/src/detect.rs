@@ -18,11 +18,27 @@ pub struct Word {
     pub rect: [f64; 4],
 }
 
-/// Shapes drawn on the page, in user space: axis-aligned rectangle paths and horizontal segments.
+/// A row of fill-in dots ("..........") read from the pixels of a scan, in user space.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Leader {
+    /// [x0, y0, x1, y1], y up: the box around all the dots.
+    pub rect: [f64; 4],
+    pub dots: usize,
+}
+
+/// The fewest dots in a row that make a field. Text recognition erases rows from 3 dots, but an
+/// ellipsis in prose is 3 dots too, and a field over one would be wrong more often than not.
+pub const MIN_FIELD_DOTS: usize = 5;
+/// The narrowest row of dots (points) that makes a field: the same as for a rule.
+pub const MIN_FIELD_WIDTH: f64 = 40.0;
+
+/// Shapes drawn on the page, in user space: axis-aligned rectangle paths and horizontal segments,
+/// and on a scan the rows of dots that mark where to write.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Shapes {
     pub boxes: Vec<[f64; 4]>,
     pub rules: Vec<[f64; 4]>,
+    pub leaders: Vec<Leader>,
 }
 
 /// What detection proposes.
@@ -314,6 +330,16 @@ fn label_for(words: &[Word], rect: [f64; 4], right_of: bool) -> String {
     clean(&on.iter().map(|w| w.text.as_str()).collect::<Vec<_>>().join(" "))
 }
 
+/// A dot that fills in a form line: a full stop, an ellipsis or a middle dot.
+fn is_dot(c: char) -> bool {
+    matches!(c, '.' | '\u{2026}' | '\u{b7}')
+}
+
+/// How many dots a word of dots stands for (an ellipsis character is three).
+fn dot_count(text: &str) -> usize {
+    text.chars().map(|c| if c == '\u{2026}' { 3 } else { 1 }).sum()
+}
+
 /// Rows of two or more touching cells of one size, as (the row's rect, cell count). Two is
 /// enough: dates split into day and month groups of two cells. Cells are square or taller
 /// than wide; an empty table of wider cells is not a comb.
@@ -361,8 +387,11 @@ pub fn detect(words: &[Word], shapes: &Shapes, existing: &[[f64; 4]], taken: &[S
         }
         out.push(Candidate { kind, rect, name: label });
     };
-    // Text that isn't underscores (labels), and underscore runs (blanks).
-    let (blanks, labels): (Vec<&Word>, Vec<&Word>) = words.iter().partition(|w| w.text.len() >= 3 && w.text.chars().all(|c| c == '_'));
+    // Text that isn't underscores or dots (labels), and underscore and dot runs (blanks).
+    let (blanks, labels): (Vec<&Word>, Vec<&Word>) = words.iter().partition(|w| {
+        (w.text.len() >= 3 && w.text.chars().all(|c| c == '_'))
+            || (w.text.chars().all(is_dot) && dot_count(&w.text) >= MIN_FIELD_DOTS && w.rect[2] - w.rect[0] >= MIN_FIELD_WIDTH)
+    });
     let labels: Vec<Word> = labels.into_iter().cloned().collect();
     for b in blanks {
         let h = (b.rect[3] - b.rect[1]).max(10.0);
@@ -396,6 +425,16 @@ pub fn detect(words: &[Word], shapes: &Shapes, existing: &[[f64; 4]], taken: &[S
             let l = label_for(&labels, *r, false);
             push(Kind::Text, inner, l, &mut out);
         }
+    }
+    // Rows of dots read from a scan: a text field sitting on the dots like on a rule. Recognised
+    // words can run over them (a line's box is cut into words by length), so no label test.
+    for l in &shapes.leaders {
+        if l.dots < MIN_FIELD_DOTS || l.rect[2] - l.rect[0] < MIN_FIELD_WIDTH {
+            continue;
+        }
+        let rect = [l.rect[0], l.rect[1] - 2.0, l.rect[2], l.rect[1] + 14.0];
+        let label = label_for(&labels, rect, false);
+        push(Kind::Text, rect, label, &mut out);
     }
     // Rules: a text field sitting on the line.
     for r in &shapes.rules {

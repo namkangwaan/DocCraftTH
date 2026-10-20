@@ -1504,6 +1504,7 @@ fn detection_finds_blanks_rules_boxes_and_names_them() {
     let shapes = Shapes {
         boxes: vec![[56.0, 600.0, 68.0, 612.0], [50.0, 500.0, 300.0, 540.0], [40.0, 20.0, 560.0, 780.0]],
         rules: vec![[370.0, 699.0, 500.0, 699.0], [50.0, 748.0, 100.0, 748.0]],
+        ..Default::default()
     };
     let found = detect(&words, &shapes, &[], &["Comments".into()]);
     let names: Vec<(&str, &Kind)> = found.iter().map(|c| (c.name.as_str(), &c.kind)).collect();
@@ -1530,7 +1531,7 @@ fn detection_makes_a_row_of_touching_cells_one_comb_field() {
     let mut boxes: Vec<[f64; 4]> = row(5, 120.0, 200.0, 18.0, 22.0).collect();
     boxes.extend(row(10, 120.0, 100.0, 16.0, 20.0).rev());
     boxes.push([50.0, 40.0, 62.0, 52.0]);
-    let found = detect(&words, &Shapes { boxes, rules: Vec::new() }, &[], &[]);
+    let found = detect(&words, &Shapes { boxes, ..Default::default() }, &[], &[]);
     let got: Vec<(&str, &Kind, [f64; 4])> = found.iter().map(|c| (c.name.as_str(), &c.kind, c.rect)).collect();
     assert_eq!(
         got,
@@ -1545,7 +1546,7 @@ fn detection_makes_a_row_of_touching_cells_one_comb_field() {
     // different sizes.
     let apart = Shapes {
         boxes: vec![[50.0, 40.0, 62.0, 52.0], [66.0, 40.0, 78.0, 52.0], [80.0, 40.0, 92.0, 52.0], [92.0, 40.0, 102.0, 52.0]],
-        rules: Vec::new(),
+        ..Default::default()
     };
     let kinds: Vec<Kind> = detect(&[], &apart, &[], &[]).into_iter().map(|c| c.kind).collect();
     assert_eq!(kinds, [Kind::CheckBox, Kind::CheckBox, Kind::CheckBox, Kind::CheckBox]);
@@ -1556,7 +1557,7 @@ fn detection_makes_a_row_of_touching_cells_one_comb_field() {
         })
     };
     for (cw, ch) in [(24.0, 18.0), (28.0, 20.0)] {
-        let table = detect(&[], &Shapes { boxes: grid(cw, ch).collect(), rules: Vec::new() }, &[], &[]);
+        let table = detect(&[], &Shapes { boxes: grid(cw, ch).collect(), ..Default::default() }, &[], &[]);
         assert!(table.is_empty(), "{cw} x {ch}: {table:?}");
     }
 }
@@ -2276,4 +2277,43 @@ fn document_scripts_read_each_name_tree_node_once() {
         "<< /S /JavaScript /JS (var ready = true;) >>".into(),
     ]);
     assert_eq!(document_scripts_named(&doc), [("init".to_string(), "var ready = true;".to_string())]);
+}
+
+#[test]
+fn dot_leaders_in_the_text_layer_and_in_pixels_are_blanks_to_fill() {
+    use crate::detect::*;
+    let w = |t: &str, x0: f64, y0: f64, x1: f64| Word { text: t.into(), rect: [x0, y0, x1, y0 + 10.0] };
+    let dots = |n: usize| ".".repeat(n);
+    let words = vec![
+        w("Name", 50.0, 700.0, 80.0),
+        w(&dots(30), 85.0, 700.0, 250.0), // a typed leader
+        w("Date", 50.0, 660.0, 80.0),
+        w(&dots(3), 82.0, 660.0, 92.0), // an ellipsis
+        w("Town", 50.0, 620.0, 80.0),
+        w(&dots(4), 82.0, 620.0, 142.0), // too few dots, however wide
+        w("Phone", 50.0, 580.0, 90.0),
+        w("Fax", 380.0, 580.0, 440.0), // a recognised word whose box runs over the leader's end
+        w("Notes", 50.0, 540.0, 90.0),
+    ];
+    let leader = |x0: f64, y: f64, x1: f64, dots: usize| Leader { rect: [x0, y, x1, y + 5.0], dots };
+    let shapes = Shapes {
+        leaders: vec![leader(100.0, 580.0, 390.0, 14), leader(100.0, 540.0, 130.0, 10), leader(200.0, 500.0, 300.0, 4)],
+        ..Default::default()
+    };
+    let found = detect(&words, &shapes, &[], &[]);
+    let got: Vec<(&str, f64, f64)> = found.iter().map(|c| (c.name.as_str(), c.rect[0], c.rect[2])).collect();
+    assert_eq!(got, [("Name", 85.0, 250.0), ("Phone", 100.0, 390.0)], "{found:?}");
+    assert!(found.iter().all(|c| c.kind == Kind::Text));
+    // A field on a leader is 12-22 pt tall and sits on its dots.
+    for c in &found {
+        let h = c.rect[3] - c.rect[1];
+        assert!((12.0..=22.0).contains(&h), "{h}");
+    }
+    // An existing field there: nothing new.
+    let rects: Vec<[f64; 4]> = found.iter().map(|c| c.rect).collect();
+    assert!(detect(&words, &shapes, &rects, &[]).is_empty());
+    // Dots and underscores together are all found, once each, top to bottom.
+    let mixed = vec![w("A", 50.0, 700.0, 60.0), w(&dots(12), 65.0, 700.0, 200.0), w("B", 50.0, 650.0, 60.0), w("________", 65.0, 650.0, 200.0)];
+    let names: Vec<String> = detect(&mixed, &Shapes::default(), &[], &[]).into_iter().map(|c| c.name).collect();
+    assert_eq!(names, ["A", "B"]);
 }
