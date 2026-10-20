@@ -241,10 +241,13 @@ impl Session {
     }
 }
 
-/// A page's words for form-field detection, in user space (underscore runs split from the
-/// text around them).
+/// A page's words for form-field detection, in user space (underscore runs and rows of dots
+/// split from the text around them).
 fn detection_words(text: &pdfcraft_render::PageText, info: &pdfcraft_render::PageInfo) -> Vec<pdfcraft_forms::detect::Word> {
-    page_words(text, info).into_iter().map(|(text, rect)| pdfcraft_forms::detect::Word { text, rect }).collect()
+    words_split(text, true, |x, y| info.view_to_user(x, y))
+        .into_iter()
+        .map(|(text, r)| pdfcraft_forms::detect::Word { text, rect: [f64::from(r[0]), f64::from(r[1]), f64::from(r[2]), f64::from(r[3])] })
+        .collect()
 }
 
 /// A page's words in reading order, in user space ([x0, y0, x1, y1]); runs of underscores are
@@ -259,8 +262,37 @@ pub(crate) fn page_words(text: &pdfcraft_render::PageText, info: &pdfcraft_rende
 /// A page's words in reading order, their boxes mapped from view space by `map` (and ordered
 /// again, so that [x0, y0, x1, y1] holds whatever way `map` turns them).
 pub(crate) fn words_with(text: &pdfcraft_render::PageText, map: impl Fn(f32, f32) -> [f32; 2]) -> Vec<(String, [f32; 4])> {
+    words_split(text, false, map)
+}
+
+/// [`words_with`], where `dots` also makes a row of dots that long enough to fill in a form line
+/// (`pdfcraft_forms::detect::MIN_FIELD_DOTS`, side by side on one line) a word of its own, as
+/// underscores always are. A full stop ending a sentence stays with its word.
+pub(crate) fn words_split(text: &pdfcraft_render::PageText, dots: bool, map: impl Fn(f32, f32) -> [f32; 2]) -> Vec<(String, [f32; 4])> {
+    // Whether glyph `i` is a dot, and so whether it belongs to a row of dots long enough.
+    let dot = |i: usize| text.glyphs.get(i).is_some_and(|g| !g.text.trim().is_empty() && g.text.chars().all(pdfcraft_forms::detect::is_dot));
+    let mut in_row = vec![false; if dots { text.glyphs.len() } else { 0 }];
+    let mut i = 0;
+    while dots && i < text.glyphs.len() {
+        if !dot(i) {
+            i += 1;
+            continue;
+        }
+        let (mut end, mut count) = (i, 0);
+        while dot(end) && (end == i || text.line_of.get(end) == text.line_of.get(i)) {
+            count += text.glyphs.get(end).map_or(0, |g| pdfcraft_forms::detect::dot_count(&g.text));
+            end += 1;
+        }
+        if count >= pdfcraft_forms::detect::MIN_FIELD_DOTS {
+            for flag in in_row.iter_mut().take(end).skip(i) {
+                *flag = true;
+            }
+        }
+        i = end;
+    }
     let mut words: Vec<(String, [f32; 4])> = Vec::new();
     let mut last_line = u32::MAX;
+    let mut last_kind = 0u8;
     // A space glyph ends the word before it.
     let mut gap = false;
     for (i, g) in text.glyphs.iter().enumerate() {
@@ -269,11 +301,19 @@ pub(crate) fn words_with(text: &pdfcraft_render::PageText, map: impl Fn(f32, f32
             gap = true;
             continue;
         }
-        let under = g.text.chars().all(|c| c == '_');
+        // 1: underscores, 2: a row of dots, 0: anything else; a word never mixes kinds.
+        let kind = if g.text.chars().all(|c| c == '_') {
+            1
+        } else if in_row.get(i).copied().unwrap_or(false) {
+            2
+        } else {
+            0
+        };
         let breaks = match words.last() {
             None => true,
-            Some((w, _)) => gap || line != last_line || text.space_before.get(i).copied().unwrap_or(false) || w.chars().all(|c| c == '_') != under,
+            Some(_) => gap || line != last_line || text.space_before.get(i).copied().unwrap_or(false) || last_kind != kind,
         };
+        last_kind = kind;
         gap = false;
         last_line = line;
         match words.last_mut() {

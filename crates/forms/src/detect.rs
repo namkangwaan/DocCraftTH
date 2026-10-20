@@ -331,12 +331,12 @@ fn label_for(words: &[Word], rect: [f64; 4], right_of: bool) -> String {
 }
 
 /// A dot that fills in a form line: a full stop, an ellipsis or a middle dot.
-fn is_dot(c: char) -> bool {
+pub fn is_dot(c: char) -> bool {
     matches!(c, '.' | '\u{2026}' | '\u{b7}')
 }
 
 /// How many dots a word of dots stands for (an ellipsis character is three).
-fn dot_count(text: &str) -> usize {
+pub fn dot_count(text: &str) -> usize {
     text.chars().map(|c| if c == '\u{2026}' { 3 } else { 1 }).sum()
 }
 

@@ -8,7 +8,7 @@
 //! stored sideways and turned upright by `/Rotate` reads like any other page. The fields are
 //! mapped back to user space and turned with the page (`/MK /R`), so typed text reads upright.
 
-use pdfcraft_forms::detect::{Candidate, Word, detect, raster};
+use pdfcraft_forms::detect::{Candidate, Leader, Word, detect, raster};
 use pdfcraft_render::{PageInfo, PageRenderer, PageText, RenderRequest};
 
 use crate::{DocId, Document, Session, ocr};
@@ -74,6 +74,31 @@ impl Frame<'_> {
     }
 }
 
+/// The rows of dots on the rendered page, in points with y up (the frame detection works in):
+/// the blanks a form draws with dots. They need no recognition models.
+fn dot_leaders(shot: &pdfcraft_render::RenderedPage, px_per_pt: f64) -> Vec<Leader> {
+    // Premultiplied RGBA over white paper, as grey: a transparent pixel is paper.
+    let grey: Vec<u8> = shot
+        .rgba
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|p| {
+            let sum = u32::from(p[0]) + u32::from(p[1]) + u32::from(p[2]);
+            (sum / 3 + 255 - u32::from(p[3])).min(255) as u8
+        })
+        .collect();
+    let Ok(found) = pdfcraft_ocr::dot_leaders(&grey, shot.width, shot.height) else { return Vec::new() };
+    let h = f64::from(shot.height);
+    found
+        .into_iter()
+        .map(|l| {
+            let [x0, y0, x1, y1] = l.rect.map(f64::from);
+            Leader { rect: [x0 / px_per_pt, (h - y1) / px_per_pt, x1 / px_per_pt, (h - y0) / px_per_pt], dots: l.dots }
+        })
+        .collect()
+}
+
 fn corners(r: [f64; 4]) -> [[f64; 2]; 4] {
     [[r[0], r[1]], [r[2], r[1]], [r[2], r[3]], [r[0], r[3]]]
 }
@@ -98,8 +123,9 @@ impl Session {
             return (Vec::new(), 0);
         }
         let px_per_pt = f64::from(shot.width) / f64::from(info.width.max(1e-3));
-        let shapes = raster::shapes(&shot.rgba, shot.width, shot.height, px_per_pt);
-        if shapes.boxes.is_empty() && shapes.rules.is_empty() {
+        let mut shapes = raster::shapes(&shot.rgba, shot.width, shot.height, px_per_pt);
+        shapes.leaders = dot_leaders(&shot, px_per_pt);
+        if shapes.boxes.is_empty() && shapes.rules.is_empty() && shapes.leaders.is_empty() {
             return (Vec::new(), 0);
         }
         let mut words: Vec<Word> = text
