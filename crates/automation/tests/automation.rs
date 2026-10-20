@@ -5035,6 +5035,88 @@ fn ocr_recognize_files_writes_searchable_copies() {
     assert!(found.to_string().contains("\"page\""), "{found}");
 }
 
+/// SRS FR-17: the batch tools offer the confirmed form of the suggestion, off by default.
+#[test]
+fn ocr_batch_tools_take_read_unusable_text() {
+    for name in ["ocr_recognize", "ocr_recognize_files", "doc_batch"] {
+        let tool = tools().into_iter().find(|t| t.name == name).unwrap_or_else(|| panic!("missing tool {name}"));
+        let arg = &tool.input_schema["properties"]["read_unusable_text"];
+        assert_eq!(arg["type"], "boolean", "{name}");
+        assert!(arg["description"].as_str().is_some_and(|d| d.contains("default false")), "{name}: {arg}");
+    }
+    let dir = workdir("ocr-files-unusable-args");
+    let mut a = auto(&dir);
+    let r = a.call("ocr_recognize_files", &json!({ "paths": ["a.pdf"], "folder": "out", "read_unusable_text": "yes" }));
+    assert!(matches!(r, Err(ToolError::InvalidArgs(_))), "{r:?}");
+    assert!(!dir.join("out").exists(), "refused before anything was written");
+}
+
+/// Two scans of the same words: page 1 under a private-use text layer (as a legacy Thai font
+/// leaves it), page 2 under good text.
+fn unusable_and_good_text_pages() -> Vec<u8> {
+    use pdfcraft_engine::{Edit, Session, export, ocr::PlacedWord};
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let text = s.create_from_text("t", "The quick brown fox jumps over the lazy dog.").unwrap();
+    let id = s.open("text.pdf", None, text, None).unwrap();
+    let png = export::Exporter::new(s.get(id).unwrap()).png(0, 300.0).unwrap();
+    let scan = s.create_from_images(&[("a.png".into(), png.clone()), ("b.png".into(), png)]).unwrap();
+    let id = s.open("scan.pdf", None, scan, None).unwrap();
+    let (w, h) = {
+        let p = &s.get(id).unwrap().info.pages[0];
+        (f64::from(p.width), f64::from(p.height))
+    };
+    let pua = (0..10)
+        .map(|i| PlacedWord {
+            text: "\u{F700}\u{F701}\u{F702}\u{F703}".into(),
+            origin: [0.0, h * 0.1 * f64::from(i)],
+            across: [w, 0.0],
+            up: [0.0, h * 0.1],
+        })
+        .collect();
+    s.apply(id, Edit::AddOcrText { page: 0, words: pua }).unwrap();
+    let good = PlacedWord { text: "quick".into(), origin: [72.0, h - 100.0], across: [60.0, 0.0], up: [0.0, 14.0] };
+    s.apply(id, Edit::AddOcrText { page: 1, words: vec![good] }).unwrap();
+    s.save_bytes(id).unwrap().as_ref().clone()
+}
+
+/// SRS FR-17 in batch: by default both pages are skipped and the unusable one is reported;
+/// `read_unusable_text` reads it while the page with good text is still left alone, in
+/// `ocr_recognize_files` and in `doc_batch` (the CLI `batch --steps ocr`).
+#[test]
+fn batch_ocr_reads_unusable_text_pages_only_when_asked() {
+    let dir = workdir("ocr-files-unusable");
+    let mut a = auto(&dir);
+    if ok(&mut a, "ocr_status", json!({}))["available"] != true {
+        eprintln!("skipped: OCR models not installed");
+        return;
+    }
+    std::fs::create_dir_all(dir.join("in")).unwrap();
+    std::fs::write(dir.join("in/legacy.pdf"), unusable_and_good_text_pages()).unwrap();
+
+    let off = ok(&mut a, "ocr_recognize_files", json!({ "paths": ["in/legacy.pdf"], "folder": "off" }));
+    let file = &off["files"][0];
+    assert_eq!((&file["skipped_pages"], &file["unusable_text_pages"], &file["words"]), (&json!([1, 2]), &json!([1]), &json!(0)), "{off}");
+
+    let on = ok(&mut a, "ocr_recognize_files", json!({ "paths": ["in/legacy.pdf"], "folder": "on", "read_unusable_text": true }));
+    let file = &on["files"][0];
+    assert_eq!((&file["skipped_pages"], &file["unusable_text_pages"]), (&json!([2]), &json!([1])), "good text is never read over: {on}");
+    assert!(file["words"].as_u64().unwrap() >= 4, "{on}");
+    let out = ok(&mut a, "doc_open", json!({ "path": "on/legacy.pdf" }))["doc"].as_u64().unwrap();
+    let found = ok(&mut a, "text_find", json!({ "doc": out, "query": "brown" }));
+    assert_eq!(found["count"], 1, "read on page 1 only: {found}");
+
+    let step = |a: &mut Automation, out_dir: &str, read: bool| {
+        let r = ok(a, "doc_batch", json!({ "paths": ["in/legacy.pdf"], "steps": ["ocr"], "out_dir": out_dir, "read_unusable_text": read }));
+        assert_eq!(r["completed"], 1, "{r}");
+        r["files"][0]["steps"][0].clone()
+    };
+    let off = step(&mut a, "batch-off", false);
+    assert_eq!((&off["skipped_pages"], &off["unusable_text_pages"], &off["words"]), (&json!(2), &json!([1]), &json!(0)), "{off}");
+    let on = step(&mut a, "batch-on", true);
+    assert_eq!((&on["skipped_pages"], &on["unusable_text_pages"]), (&json!(1), &json!([1])), "{on}");
+    assert!(on["words"].as_u64().unwrap() >= 4, "{on}");
+}
+
 #[test]
 fn ocr_digits_option_is_in_schemas_validates_and_converts_digits() {
     for name in ["ocr_recognize", "ocr_recognize_files", "doc_batch"] {

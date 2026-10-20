@@ -15,6 +15,7 @@ const OPTIONS: &[OptionSpec] = &[
     OptionSpec { name: "--dpi", takes_value: true },
     OptionSpec { name: "--language", takes_value: true },
     OptionSpec { name: "--ocr-all-pages", takes_value: false },
+    OptionSpec { name: "--ocr-unusable-text", takes_value: false },
     OptionSpec { name: "--digits", takes_value: true },
 ];
 
@@ -55,6 +56,9 @@ pub(super) fn run(args: &[String]) -> Result<(), CliError> {
     }
     if seen.contains("--ocr-all-pages") {
         params["skip_text_pages"] = json!(false);
+    }
+    if seen.contains("--ocr-unusable-text") {
+        params["read_unusable_text"] = json!(true);
     }
     let mut auto = automation(args)?;
     let content = auto.call("doc_batch", &params).map_err(|e| e.to_string())?;

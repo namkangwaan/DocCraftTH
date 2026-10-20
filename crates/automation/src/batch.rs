@@ -32,7 +32,9 @@ impl<'a> Recipe<'a> {
                 return Err(Args::wrong("steps", "unique convert/ocr/optimize steps, with convert first when present"));
             }
         }
-        for (keys, step) in [(&["ppi", "quality"][..], "optimize"), (&["dpi", "language", "skip_text_pages", "digits"][..], "ocr")] {
+        for (keys, step) in
+            [(&["ppi", "quality"][..], "optimize"), (&["dpi", "language", "skip_text_pages", "read_unusable_text", "digits"][..], "ocr")]
+        {
             if !steps.contains(&step) && keys.iter().any(|k| args.get(k).is_some()) {
                 return Err(failed(format!("{} settings need the {step} step", keys.join("/"))));
             }
@@ -80,9 +82,12 @@ impl<'a> Recipe<'a> {
                 "ocr" => {
                     let engine = ocr::engine_for(&self.ocr.language).map_err(failed)?;
                     let result = ocr::recognize_file(name, bytes, None, self.ocr.clone(), &engine, |_, _| true).map_err(failed)?;
-                    log.push(
-                        json!({"step":"ocr","words":result.words(),"skipped_pages":result.pages.iter().filter(|p| p.skipped.is_some()).count()}),
-                    );
+                    // The pages whose own text is unusable, so a run can be repeated with read_unusable_text.
+                    let unusable: Vec<usize> = result.pages.iter().filter(|p| p.unusable_text).map(|p| p.page.saturating_add(1)).collect();
+                    log.push(json!({
+                        "step":"ocr","words":result.words(),"skipped_pages":result.pages.iter().filter(|p| p.skipped.is_some()).count(),
+                        "unusable_text_pages":unusable,
+                    }));
                     bytes = result.bytes;
                     continue;
                 }

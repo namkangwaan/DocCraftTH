@@ -34,8 +34,12 @@ only `.pdf` inputs are processed. Unsupported extensions are reported as skipped
 - `ocr` uses the installed engine and its supported languages. `--dpi` (72–600,
   default 300), `--language` (default `en`), `--ocr-all-pages` and `--digits`
   (`as_read`, the default, `thai` for ๐–๙ or `arabic` for 0–9) configure it.
-  By default pages already containing text are skipped. Missing models are
-  reported as file errors; nothing is downloaded or installed by the batch.
+  By default pages already containing text are skipped. A page whose own text
+  is unusable (mostly private-use or unmapped characters, as a legacy Thai font
+  leaves it) is skipped too and listed in the step's `unusable_text_pages`;
+  `--ocr-unusable-text` reads those pages while pages with good text stay
+  skipped. Missing models are reported as file errors; nothing is downloaded or
+  installed by the batch.
 - `--stop-on-error` stops processing after the first file error. By default the
   remaining files continue. Earlier successful outputs stay, and unprocessed
   files are listed as skipped. A file is published only after all its steps succeed.
@@ -70,7 +74,8 @@ The same implementation is available as `doc_batch`:
 In `pdfcraft-cli run --script`, put this object in the `args` of a `doc_batch`
 step. MCP marks a report with failed files as `isError: true` and retains the
 structured report. Tool names and OCR settings match the existing automation API
-(`skip_text_pages: false` corresponds to `--ocr-all-pages`, `digits` to `--digits`).
+(`skip_text_pages: false` corresponds to `--ocr-all-pages`, `read_unusable_text: true`
+to `--ocr-unusable-text`, `digits` to `--digits`).
 
 ## Boundaries
 
