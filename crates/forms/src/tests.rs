@@ -2413,25 +2413,44 @@ mod thai_never_panics {
     use super::*;
     use proptest::prelude::*;
 
+    /// Draw `value` in the `name` and `notes` fields and give each one's path points.
+    fn drawn(value: &str) -> Vec<(&'static str, [f64; 4], Vec<[f64; 2]>)> {
+        ["name", "notes"]
+            .into_iter()
+            .filter_map(|name| {
+                let mut doc = fixture();
+                set_value(&mut doc, name, &FieldValue::Text(value.into())).ok()?;
+                let w = field(&fields(&doc), name).widgets[0].clone();
+                Some((name, w.rect, path_points(&ap(&doc, &w))))
+            })
+            .collect()
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(48))]
+        /// Whatever is typed, even marks with no letter under them, filling the field works.
         #[test]
-        fn any_thai_block_text_draws_inside_the_field(text in proptest::collection::vec(prop_oneof![6 => 0x0e01u32..0x0e3b, 3 => 0x0e3fu32..0x0e5c, 1 => 0x0e00u32..0x0e80, 1 => Just(0x20u32), 1 => Just(0x41u32), 1 => Just(0x0au32)], 0..120)) {
+        fn any_thai_block_text_can_be_typed(text in proptest::collection::vec(prop_oneof![6 => 0x0e01u32..0x0e3b, 3 => 0x0e3fu32..0x0e5c, 1 => 0x0e00u32..0x0e80, 1 => Just(0x20u32), 1 => Just(0x41u32), 1 => Just(0x0au32)], 0..120)) {
             let value: String = text.into_iter().filter_map(char::from_u32).collect();
-            for name in ["name", "notes"] {
-                let mut doc = fixture();
-                if set_value(&mut doc, name, &FieldValue::Text(value.clone())).is_err() {
-                    continue;
-                }
-                let w = field(&fields(&doc), name).widgets[0].clone();
-                let rect = w.rect;
-                for [x, y] in path_points(&ap(&doc, &w)) {
-                    // A lone mark's outline starts left of its pen (up to ~0.3 em: a combining mark
-                    // has a negative bearing), and a single line longer than the box runs on to
-                    // the right, where the field's clip cuts it, as Latin text does. Wrapped
-                    // lines and every line's height stay inside.
+            let _ = drawn(&value);
+        }
+
+        /// Well-formed Thai (a consonant with up to a vowel mark and a tone mark, spaces and
+        /// Latin between) stays inside the box vertically, and wrapped lines horizontally.
+        #[test]
+        fn well_formed_thai_draws_inside_the_field(
+            syllables in proptest::collection::vec((0x0e01u32..0x0e2f, proptest::option::of(prop_oneof![Just(0x0e31u32), 0x0e34u32..0x0e3b]), proptest::option::of(0x0e48u32..0x0e4d), prop_oneof![8 => Just(0u32), 1 => Just(0x20u32), 1 => Just(0x41u32)]), 0..60)
+        ) {
+            let mut value = String::new();
+            for (base, vowel, tone, sep) in syllables {
+                value.extend([base].into_iter().chain(vowel).chain(tone).chain((sep != 0).then_some(sep)).filter_map(char::from_u32));
+            }
+            for (name, rect, points) in drawn(&value) {
+                for [x, y] in points {
+                    // A single line longer than the box runs on to the right, where the field's
+                    // clip cuts it, as Latin text does.
                     let right = if name == "name" { f64::INFINITY } else { rect[2] - rect[0] + 0.5 };
-                    prop_assert!(x >= -4.0 && x <= right && y >= -0.5 && y <= rect[3] - rect[1] + 0.5, "{name}: ({x}, {y}) in {value:?}");
+                    prop_assert!(x >= -0.5 && x <= right && y >= -0.5 && y <= rect[3] - rect[1] + 0.5, "{name}: ({x}, {y}) in {value:?}");
                 }
             }
         }
