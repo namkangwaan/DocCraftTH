@@ -33,11 +33,23 @@ pub struct OcrDraft {
     pub text_pages: bool,
     /// Whether recognized digits are kept as read or converted to Thai or Arabic numerals.
     pub digits: Digits,
+    /// Also read pages whose own text is unusable (SRS FR-17): the user's tick, or the browsing
+    /// notice's for such a page. Used for one run only, so it never carries over to the next.
+    pub read_unusable_text: bool,
 }
 
 impl Default for OcrDraft {
     fn default() -> Self {
-        OcrDraft { pages: OcrPages::All, from: 1, to: 1, language: None, dpi: 300, text_pages: false, digits: Digits::AsRead }
+        OcrDraft {
+            pages: OcrPages::All,
+            from: 1,
+            to: 1,
+            language: None,
+            dpi: 300,
+            text_pages: false,
+            digits: Digits::AsRead,
+            read_unusable_text: false,
+        }
     }
 }
 
@@ -57,7 +69,7 @@ impl OcrDraft {
             dpi: self.dpi as f32,
             language: self.language().to_string(),
             skip_text_pages: !self.text_pages,
-            read_unusable_text: false,
+            read_unusable_text: self.read_unusable_text,
             digits: self.digits,
         }
     }
@@ -288,6 +300,8 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
         ui.add_space(4.0);
         ui.add(crate::widgets::checkbox(&mut d.text_pages, tl!("Also recognize pages that already have text")))
             .on_hover_text(tl!("Pictures on those pages are recognized too; words already in the page's text are not added again"));
+        // Pages that already have text include these, so the choice only matters without it.
+        ui.add_enabled(!d.text_pages, crate::widgets::checkbox(&mut d.read_unusable_text, tl!("Also recognize pages whose text is unusable")));
     });
     if language != app.ocr_draft.language() {
         app.ocr_draft.language = Some(language.clone());
@@ -316,6 +330,8 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
 impl PdfCraftApp {
     /// Recognize text on the pages chosen in the dialog, in the background.
     pub fn start_ocr(&mut self) {
+        // Reading over unusable text is confirmed for one run only (SRS N9).
+        let read_unusable_text = std::mem::take(&mut self.ocr_draft.read_unusable_text);
         let Some((vi, id)) = self.active_ids() else { return };
         if self.ocr_run.is_some() {
             self.notify_tr("Text recognition is already running");
@@ -331,7 +347,7 @@ impl PdfCraftApp {
             OcrPages::Current => vec![self.views[vi].current],
             OcrPages::Range => (d.from.saturating_sub(1)..d.to).collect(),
         };
-        let settings = d.settings();
+        let settings = OcrSettings { read_unusable_text, ..d.settings() };
         self.run_ocr(id, &pages, settings);
     }
 

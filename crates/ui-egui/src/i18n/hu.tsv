@@ -2442,3 +2442,7 @@ animation effects	Off	Ki
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 oldalon olvashatatlan a szöveg. Felismeri rajta a szöveget? A meglévő szöveg megmarad, és egy lépésben visszavonható.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} oldalon olvashatatlan a szöveg. Csak ezeken az oldalakon ismeri fel a szöveget? A meglévő szöveg megmarad, és egy lépésben visszavonható.
 	Recognize these pages	Ezen oldalak felismerése
+	This page has unusable text	Ezen az oldalon használhatatlan szöveg van
+	It can't be searched or copied. Recognizing text on this page can fix that.	Nem kereshető és nem másolható. Az oldal szövegfelismerése ezt megoldhatja.
+	Recognize text on this page…	Szövegfelismerés ezen az oldalon…
+	Also recognize pages whose text is unusable	A használhatatlan szövegű oldalak felismerése is

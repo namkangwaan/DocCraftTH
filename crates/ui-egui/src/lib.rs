@@ -139,6 +139,7 @@ mod tab_context;
 mod thai_fonts;
 pub mod theme;
 pub mod ui_scale;
+mod unusable_notice;
 pub mod updates;
 mod wheel_boost;
 mod wheel_pager;
@@ -2062,6 +2063,7 @@ impl PdfCraftApp {
     /// Draw the running job's progress card and pass a Cancel click on to the job.
     fn show_progress(&mut self, ctx: &egui::Context) {
         self.show_unreadable_offer(ctx);
+        self.show_unusable_page_notice(ctx);
         if widgets::progress_notice(self, ctx) {
             match self.progress_notice.as_ref().map(|p| p.job) {
                 Some(widgets::ProgressJob::Ocr) => self.cancel_ocr(),

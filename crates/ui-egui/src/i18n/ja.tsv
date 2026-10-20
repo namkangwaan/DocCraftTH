@@ -2443,3 +2443,7 @@ animation effects	Off	オフ
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 ページのテキストが読み取れません。このページのテキストを認識しますか？既存のテキストは残り、1 回の操作で取り消せます。
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} ページのテキストが読み取れません。これらのページだけテキストを認識しますか？既存のテキストは残り、1 回の操作で取り消せます。
 	Recognize these pages	これらのページを認識
+	This page has unusable text	このページには使用できないテキストがあります
+	It can't be searched or copied. Recognizing text on this page can fix that.	検索やコピーができません。このページのテキストを認識すると解決できます。
+	Recognize text on this page…	このページのテキストを認識…
+	Also recognize pages whose text is unusable	使用できないテキストのページも認識

@@ -2465,3 +2465,7 @@ animation effects	Off	Вимкнено
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	На 1 сторінці текст нечитабельний. Розпізнати текст на ній? Її текст залишиться, а скасувати це можна одним кроком.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Сторінок із нечитабельним текстом: {n}. Розпізнати текст лише на них? Їхній текст залишиться, а скасувати це можна одним кроком.
 	Recognize these pages	Розпізнати ці сторінки
+	This page has unusable text	На цій сторінці непридатний текст
+	It can't be searched or copied. Recognizing text on this page can fix that.	Його не можна знайти пошуком чи скопіювати. Розпізнавання тексту на цій сторінці може це виправити.
+	Recognize text on this page…	Розпізнати текст на цій сторінці…
+	Also recognize pages whose text is unusable	Розпізнавати й сторінки з непридатним текстом

@@ -2655,3 +2655,7 @@ certificate	SHA-256 digest	Impronta SHA-256
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 pagina contiene testo illeggibile. Riconoscere il testo in questa pagina? Il suo testo resta e puoi annullare in un solo passaggio.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} pagine contengono testo illeggibile. Riconoscere il testo solo in queste pagine? Il loro testo resta e puoi annullare in un solo passaggio.
 	Recognize these pages	Riconosci queste pagine
+	This page has unusable text	Questa pagina contiene testo inutilizzabile
+	It can't be searched or copied. Recognizing text on this page can fix that.	Non può essere cercato né copiato. Il riconoscimento del testo su questa pagina può risolvere il problema.
+	Recognize text on this page…	Riconosci testo in questa pagina…
+	Also recognize pages whose text is unusable	Riconosci anche le pagine con testo inutilizzabile

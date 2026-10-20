@@ -217,3 +217,126 @@ fn an_ocr_word_opens_for_editing_and_stays_open() {
     h.run_steps(4);
     assert_eq!(opened(&h).as_deref(), Some("Recognize"), "moving the pointer away keeps the word open");
 }
+
+/// One page whose text maps to private-use code points, as a legacy Thai font's ToUnicode does
+/// (SRS FR-17): rows of such words over the whole page, saved and reopened.
+fn legacy_text_page() -> Vec<u8> {
+    let mut s = Session::new();
+    let blank = s.create_blank(612.0, 792.0, 1).unwrap();
+    let id = s.open("legacy.pdf", None, blank, None).unwrap();
+    let words = (0..10)
+        .map(|i| pdfcraft_engine::ocr::PlacedWord {
+            text: "\u{F700}\u{F701}\u{F702}\u{F703}".into(),
+            origin: [0.0, 79.2 * f64::from(i)],
+            across: [612.0, 0.0],
+            up: [0.0, 79.2],
+        })
+        .collect();
+    s.apply(id, Edit::AddOcrText { page: 0, words }).unwrap();
+    s.save_bytes(id).unwrap().to_vec()
+}
+
+/// Opens `pdf` at `size` with the interface in `ui`, and runs frames until the current page's
+/// text has been read.
+fn browsing(pdf: Vec<u8>, ui: &'static str, size: egui::Vec2) -> Harness<'static, PdfCraftApp> {
+    let mut h = Harness::builder().with_size(size).build_eframe(move |_cc| {
+        let mut app = PdfCraftApp::new();
+        app.set_option("language", ui).unwrap();
+        app.open_bytes("page.pdf", None, pdf).unwrap();
+        app.run_inline = true;
+        app
+    });
+    for _ in 0..400 {
+        h.run_steps(1);
+        if h.state().current_page_text_unusable().is_some() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    assert!(h.state().current_page_text_unusable().is_some(), "the page's text was read");
+    h.run_steps(2);
+    h
+}
+
+const NOTICE: &str = "This page has unusable text";
+const OPEN: &str = "Recognize text on this page…";
+
+/// SRS §5.5: browsing a page whose text is unusable shows the notice, and nothing is read.
+#[test]
+fn a_page_with_unusable_text_shows_the_notice() {
+    let h = browsing(legacy_text_page(), "en", egui::vec2(1400.0, 900.0));
+    assert_eq!(h.state().current_page_text_unusable(), Some(true));
+    h.get_by_label(NOTICE);
+    h.get_by_label(OPEN);
+    let app = h.state();
+    assert!(app.ocr_run.is_none() && app.dialog.is_none(), "the notice starts nothing by itself");
+    assert_eq!(app.session.get(app.views[0].id).unwrap().can_undo(), None);
+}
+
+/// Pages with good text, or with no text at all, show no notice.
+#[test]
+fn pages_with_good_or_no_text_show_no_notice() {
+    let s = Session::new();
+    for (what, pdf) in [
+        ("good text", s.create_from_text("t", "Ordinary searchable words").unwrap().to_vec()),
+        ("no text", s.create_blank(612.0, 792.0, 1).unwrap().to_vec()),
+    ] {
+        let h = browsing(pdf, "en", egui::vec2(1400.0, 900.0));
+        assert_eq!(h.state().current_page_text_unusable(), Some(false), "{what}");
+        assert!(h.query_by_label(NOTICE).is_none(), "{what}");
+    }
+}
+
+/// The button opens Recognize Text for this page with reading over its unusable text ticked,
+/// and still reads nothing until the user confirms there; the tick lasts one run.
+#[test]
+fn the_notice_opens_recognize_text_for_the_page_without_reading_it() {
+    let mut h = browsing(legacy_text_page(), "en", egui::vec2(1400.0, 900.0));
+    h.get_by_label(OPEN).click();
+    h.run_steps(3);
+    {
+        let app = h.state();
+        assert!(matches!(app.dialog, Some(pdfcraft_ui_egui::Dialog::RecognizeText)));
+        let d = &app.ocr_draft;
+        assert_eq!((format!("{:?}", d.pages).as_str(), d.from, d.to), ("Range", 1, 1), "set to this page");
+        let settings = d.settings();
+        assert!(settings.read_unusable_text && settings.skip_text_pages, "only unusable text is read over: {settings:?}");
+        assert!(app.ocr_run.is_none(), "nothing is read before the user confirms");
+        assert_eq!(app.session.get(app.views[0].id).unwrap().can_undo(), None);
+    }
+    h.get_by_label("Also recognize pages whose text is unusable");
+    assert!(h.query_by_label(NOTICE).is_none(), "the dialog covers the page, so the notice steps aside");
+
+    // Confirming uses the tick for this run only.
+    if pdfcraft_engine::ocr::available() {
+        h.get_by_label("Recognize text").click();
+        h.run_steps(3);
+        let toast = h.state().toast.clone().unwrap().0;
+        assert!(toast.starts_with("Recognized ") && toast.contains("on 1 page"), "the page was read, not skipped: {toast}");
+    } else {
+        h.state_mut().start_ocr();
+    }
+    assert!(!h.state().ocr_draft.read_unusable_text, "the next run skips unusable pages again unless asked");
+}
+
+/// "Not now" hides the notice for the document.
+#[test]
+fn not_now_dismisses_the_notice() {
+    let mut h = browsing(legacy_text_page(), "en", egui::vec2(1400.0, 900.0));
+    h.get_by_label("Not now").click();
+    h.run_steps(3);
+    assert!(h.query_by_label(NOTICE).is_none());
+    assert!(h.state().dialog.is_none() && h.state().ocr_run.is_none());
+}
+
+/// The notice in Thai (SRS §5.5 wording).
+#[test]
+fn the_notice_reads_in_thai() {
+    let h = browsing(legacy_text_page(), "th", egui::vec2(1400.0, 900.0));
+    // Thai is drawn with zero-width spaces between words, for line breaking; a label and its
+    // text node both carry it.
+    let shows =
+        |text: &str| h.query_all_by(|n| [n.label(), n.value()].into_iter().flatten().any(|l| l.replace('\u{200b}', "") == text)).next().is_some();
+    assert!(shows("หน้านี้มีข้อความที่ใช้ไม่ได้"));
+    assert!(shows("รู้จำข้อความในหน้านี้…"));
+}

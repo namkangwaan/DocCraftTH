@@ -2407,3 +2407,7 @@ animation effects	Off	关
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 个页面的文本无法读取。要识别该页面的文本吗？原有文本会保留，并可一步撤销。
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} 个页面的文本无法读取。只识别这些页面的文本吗？原有文本会保留，并可一步撤销。
 	Recognize these pages	识别这些页面
+	This page has unusable text	此页面包含无法使用的文本
+	It can't be searched or copied. Recognizing text on this page can fix that.	无法搜索或复制这些文本。识别此页面上的文本可以解决此问题。
+	Recognize text on this page…	识别此页面上的文本…
+	Also recognize pages whose text is unusable	同时识别文本无法使用的页面
