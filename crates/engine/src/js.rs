@@ -342,11 +342,16 @@ impl Session {
     /// seem to ask for, named from their labels, as (page, candidate). Scanned pages (a picture
     /// and no drawn shapes) are read from their pixels, see [`crate::scan_fields`].
     pub fn detect_fields(&self, id: DocId, pages: &[usize]) -> Vec<(usize, pdfcraft_forms::detect::Candidate)> {
-        self.detect_fields_turned(id, pages).into_iter().map(|(page, c, _)| (page, c)).collect()
+        self.detect_fields_with(id, pages, true)
+    }
+
+    /// [`Self::detect_fields`], where `leaders` false leaves rows of dots out.
+    pub fn detect_fields_with(&self, id: DocId, pages: &[usize], leaders: bool) -> Vec<(usize, pdfcraft_forms::detect::Candidate)> {
+        self.detect_fields_turned(id, pages, leaders).into_iter().map(|(page, c, _)| (page, c)).collect()
     }
 
     /// [`Self::detect_fields`], with how far each field turns (`/MK /R`) to read upright.
-    fn detect_fields_turned(&self, id: DocId, pages: &[usize]) -> Vec<(usize, pdfcraft_forms::detect::Candidate, i64)> {
+    fn detect_fields_turned(&self, id: DocId, pages: &[usize], leaders: bool) -> Vec<(usize, pdfcraft_forms::detect::Candidate, i64)> {
         let Some(doc) = self.get(id) else { return Vec::new() };
         let Some(cos) = doc.editor.as_ref().map(|e| &e.cos) else { return Vec::new() };
         let config = pdfcraft_render::RenderConfig { password: doc.password.as_deref().map(std::sync::Arc::from), ..Default::default() };
@@ -361,10 +366,10 @@ impl Session {
             let shapes = pdfcraft_forms::detect::page_shapes(cos, page);
             let existing: Vec<[f64; 4]> = doc.form.iter().flat_map(|f| f.widgets.iter()).filter(|w| w.page == Some(page)).map(|w| w.rect).collect();
             let (found, turn) = if shapes.boxes.is_empty() && shapes.rules.is_empty() && crate::scan_fields::is_scan(doc, page, info) {
-                self.detect_on_scan(id, &mut r, page, res.text.as_deref(), &existing, &taken)
+                self.detect_on_scan(id, &mut r, page, res.text.as_deref(), &existing, &taken, leaders)
             } else {
                 let words = res.text.map(|t| detection_words(&t, info)).unwrap_or_default();
-                (pdfcraft_forms::detect::detect(&words, &shapes, &existing, &taken), 0)
+                (pdfcraft_forms::detect::detect_with(&words, &shapes, &existing, &taken, leaders), 0)
             };
             for c in found {
                 taken.push(c.name.clone());
@@ -376,7 +381,12 @@ impl Session {
 
     /// Detect fields and add them, as one undoable step. Returns the new fields' names.
     pub fn auto_detect_fields(&mut self, id: DocId, pages: &[usize]) -> Result<Vec<String>, EditError> {
-        let found = self.detect_fields_turned(id, pages);
+        self.auto_detect_fields_with(id, pages, true)
+    }
+
+    /// [`Self::auto_detect_fields`], where `leaders` false leaves rows of dots out.
+    pub fn auto_detect_fields_with(&mut self, id: DocId, pages: &[usize], leaders: bool) -> Result<Vec<String>, EditError> {
+        let found = self.detect_fields_turned(id, pages, leaders);
         if found.is_empty() {
             return Ok(Vec::new());
         }

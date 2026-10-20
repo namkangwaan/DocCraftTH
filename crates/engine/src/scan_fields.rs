@@ -8,7 +8,7 @@
 //! stored sideways and turned upright by `/Rotate` reads like any other page. The fields are
 //! mapped back to user space and turned with the page (`/MK /R`), so typed text reads upright.
 
-use pdfcraft_forms::detect::{Candidate, Leader, Word, detect, raster};
+use pdfcraft_forms::detect::{Candidate, Leader, Word, detect_with, raster};
 use pdfcraft_render::{PageInfo, PageRenderer, PageText, RenderRequest};
 
 use crate::{DocId, Document, Session, ocr};
@@ -114,6 +114,7 @@ impl Session {
         text: Option<&PageText>,
         existing: &[[f64; 4]],
         taken: &[String],
+        leaders: bool,
     ) -> (Vec<Candidate>, i64) {
         let Some(info) = self.get(id).and_then(|d| d.info.pages.get(page)) else { return (Vec::new(), 0) };
         let frame = Frame(info);
@@ -124,7 +125,9 @@ impl Session {
         }
         let px_per_pt = f64::from(shot.width) / f64::from(info.width.max(1e-3));
         let mut shapes = raster::shapes(&shot.rgba, shot.width, shot.height, px_per_pt);
-        shapes.leaders = dot_leaders(&shot, px_per_pt);
+        if leaders {
+            shapes.leaders = dot_leaders(&shot, px_per_pt);
+        }
         if shapes.boxes.is_empty() && shapes.rules.is_empty() && shapes.leaders.is_empty() {
             return (Vec::new(), 0);
         }
@@ -138,7 +141,7 @@ impl Session {
             words = self.recognized_words(id, page, &frame);
         }
         let existing: Vec<[f64; 4]> = existing.iter().filter_map(|r| frame.user_box(corners(*r))).collect();
-        let found = detect(&words, &shapes, &existing, taken);
+        let found = detect_with(&words, &shapes, &existing, taken, leaders);
         let turn = i64::from(info.rotation % 360);
         (found.into_iter().map(|c| Candidate { rect: frame.user_rect(c.rect), ..c }).collect(), turn)
     }
