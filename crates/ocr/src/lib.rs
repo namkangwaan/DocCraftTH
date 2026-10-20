@@ -214,7 +214,9 @@ impl Ocr {
                     .collect())
             }
             Recognizer::Ctc { detector, model, dict } => {
-                let source = ocrs::ImageSource::from_bytes(&rgb, (width, height)).map_err(|e| err(&e))?;
+                let cleaned = erase_dot_leaders(&rgb, width, height);
+                let rgb: &[u8] = cleaned.as_deref().unwrap_or(&rgb);
+                let source = ocrs::ImageSource::from_bytes(rgb, (width, height)).map_err(|e| err(&e))?;
                 let input = detector.prepare_input(source).map_err(|e| err(&e))?;
                 let found = detector.detect_words(&input).map_err(|e| err(&e))?;
                 let merged_boxes = ctc_line_boxes(detector, &input, found, width);
@@ -232,7 +234,7 @@ impl Ocr {
                     if x1 <= x0 || y1 <= y0 {
                         continue;
                     }
-                    let Some(text) = recognize_ctc_crop(&rgb, width, height, [x0, y0, x1, y1], model, dict)? else {
+                    let Some(text) = recognize_ctc_crop(rgb, width, height, [x0, y0, x1, y1], model, dict)? else {
                         continue;
                     };
                     let trimmed = text.trim();
@@ -328,6 +330,137 @@ fn ctc_line_boxes(detector: &ocrs::OcrEngine, input: &ocrs::OcrInput, words: Vec
         }
     }
     merge_colinear_line_boxes(raw_boxes, width, median_h)
+}
+
+/// The page width, in pixels, at which the dot-leader sizes below were measured (an A4-ish form
+/// at 300 dpi); they scale with the image's width.
+const LEADER_REF_WIDTH: f32 = 2413.0;
+/// The fewest dots in a row that make a leader. Forms use runs this short too, and they hurt the
+/// recogniser as much as long ones; an ellipsis ("...") in prose is lost from the text with them.
+const MIN_LEADER_DOTS: usize = 3;
+/// The most pixels [`erase_dot_leaders`] labels (4 bytes each); larger images are read as they are.
+const MAX_LEADER_PIXELS: usize = 1 << 26;
+
+/// Fill-in dot leaders ("..........") on a form, whitened in a copy of `pixels` (`width` ×
+/// `height`, grey or RGB), or `None` when there are none or the image is too large to scan.
+///
+/// The Thai recogniser loses the words between leaders: a form line whose box and pixels are
+/// fine read as 5 of its 49 letters, and a real form page's CER fell from 0.26 to 0.08 once the
+/// dots were gone. Leaders carry no text worth keeping (the user fills them in), so they are
+/// removed before detection. A leader is a row of [`MIN_LEADER_DOTS`] or more dots (ink blobs at most
+/// ~0.8 mm across) with ~2 mm gaps at most and no ink straight above or below each dot: that
+/// last test keeps Thai marks, which sit on or under a letter. The sizes scale with the image
+/// width, so a page scanned at 96 dpi keeps its (small) letters.
+fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<Vec<u8>> {
+    let (w, h) = (width as usize, height as usize);
+    let n = w.checked_mul(h).filter(|&n| n > 0 && n <= MAX_LEADER_PIXELS)?;
+    let channels = match pixels.len() {
+        l if l == n => 1,
+        l if l == n * 3 => 3, // n ≤ 2^26
+        _ => return None,
+    };
+    let ink: Vec<bool> = pixels.chunks_exact(channels).map(|p| p.iter().map(|&v| u32::from(v)).sum::<u32>() < 128 * channels as u32).collect();
+
+    // 4-connected components, labelled with an explicit stack (no recursion).
+    struct Blob {
+        x0: usize,
+        y0: usize,
+        x1: usize,
+        y1: usize,
+        count: usize,
+    }
+    let mut label = vec![0u32; n];
+    let mut blobs: Vec<Blob> = Vec::new();
+    let mut stack = Vec::new();
+    for start in 0..n {
+        if !ink.get(start).copied().unwrap_or(false) || label.get(start).copied().unwrap_or(1) != 0 {
+            continue;
+        }
+        // At most n ≤ 2^26 blobs, so the id fits a u32.
+        let id = u32::try_from(blobs.len() + 1).ok()?;
+        let mut b = Blob { x0: usize::MAX, y0: usize::MAX, x1: 0, y1: 0, count: 0 };
+        if let Some(l) = label.get_mut(start) {
+            *l = id;
+        }
+        stack.push(start);
+        while let Some(i) = stack.pop() {
+            let (x, y) = (i % w, i / w);
+            b.x0 = b.x0.min(x);
+            b.y0 = b.y0.min(y);
+            b.x1 = b.x1.max(x + 1);
+            b.y1 = b.y1.max(y + 1);
+            b.count += 1;
+            let left = (x > 0).then(|| i - 1);
+            let right = (x + 1 < w).then_some(i + 1);
+            let up = (y > 0).then(|| i - w);
+            let down = (y + 1 < h).then_some(i + w);
+            for j in [left, right, up, down].into_iter().flatten() {
+                if let (Some(true), Some(l)) = (ink.get(j).copied(), label.get_mut(j))
+                    && *l == 0
+                {
+                    *l = id;
+                    stack.push(j);
+                }
+            }
+        }
+        blobs.push(b);
+    }
+
+    let k = w as f32 / LEADER_REF_WIDTH;
+    let dot = ((9.0 * k).round() as usize).max(2);
+    let gap = (25.0 * k).round().max(3.0);
+    let min_px = ((4.0 * k * k).round() as usize).max(1);
+    let band = (3.0 * k).max(1.0);
+    let reach = 3 * dot;
+    let margin = ((2.0 * k).round() as usize).max(1);
+    let other_ink = |id: u32, ys: std::ops::Range<usize>, xs: std::ops::Range<usize>| {
+        ys.flat_map(|y| xs.clone().map(move |x| y * w + x)).any(|i| label.get(i).is_some_and(|&l| l != 0 && l != id))
+    };
+    // Dots: (row band, centre x, blob index).
+    let mut dots: Vec<(i64, f32, usize)> = blobs
+        .iter()
+        .enumerate()
+        .filter(|(i, b)| {
+            let id = *i as u32 + 1;
+            b.x1 - b.x0 <= dot
+                && b.y1 - b.y0 <= dot
+                && b.count >= min_px
+                && !other_ink(id, b.y0.saturating_sub(reach)..b.y0, b.x0..b.x1)
+                && !other_ink(id, b.y1..(b.y1 + reach).min(h), b.x0..b.x1)
+        })
+        .map(|(i, b)| (((b.y0 + b.y1) as f32 * 0.5 / band).round() as i64, (b.x0 + b.x1) as f32 * 0.5, i))
+        .collect();
+    dots.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
+
+    let mut leader = Vec::new();
+    let mut run: Vec<usize> = Vec::new();
+    for (at, d) in dots.iter().enumerate() {
+        let joins = at > 0 && dots.get(at - 1).is_some_and(|p| p.0 == d.0 && d.1 - p.1 <= gap);
+        if !joins {
+            if run.len() >= MIN_LEADER_DOTS {
+                leader.append(&mut run);
+            }
+            run.clear();
+        }
+        run.push(d.2);
+    }
+    if run.len() >= MIN_LEADER_DOTS {
+        leader.append(&mut run);
+    }
+    if leader.is_empty() {
+        return None;
+    }
+    let mut out = pixels.to_vec();
+    for b in leader.iter().filter_map(|&i| blobs.get(i)) {
+        for y in b.y0.saturating_sub(margin)..(b.y1 + margin).min(h) {
+            let row = y * w;
+            let span = (row + b.x0.saturating_sub(margin)) * channels..(row + (b.x1 + margin).min(w)) * channels;
+            if let Some(px) = out.get_mut(span) {
+                px.fill(255);
+            }
+        }
+    }
+    Some(out)
 }
 
 /// The smallest short side, as a fraction of the page width, that a component needs before it
@@ -971,6 +1104,47 @@ mod tests {
         assert_eq!(merged[0][2], 900.0);
         // Line 3 right margin aligned to 900.0
         assert_eq!(merged[2][2], 900.0);
+    }
+
+    /// A form line at 300 dpi (2413 px wide, an A4-ish page): a word, a leader of dots after it,
+    /// three marks sitting on letters, and a lone pair of dots. Only the leader is whitened.
+    #[test]
+    fn dot_leaders_are_erased_and_marks_kept() {
+        let (w, h) = (2413usize, 200usize);
+        let mut img = vec![255u8; w * h];
+        let mut ink = |x0: usize, y0: usize, x1: usize, y1: usize| {
+            for y in y0..y1 {
+                img[y * w + x0..y * w + x1].fill(0);
+            }
+        };
+        ink(100, 100, 400, 160); // a word
+        for i in 0..20 {
+            ink(420 + i * 18, 150, 425 + i * 18, 155); // the leader, on the word's baseline
+        }
+        for i in 0..3 {
+            ink(900 + i * 20, 100, 915 + i * 20, 160); // three letters
+            ink(905 + i * 20, 90, 910 + i * 20, 95); // a tone mark over each
+        }
+        ink(1500, 150, 1505, 155); // two dots, not a leader
+        ink(1520, 150, 1525, 155);
+        let dark = |img: &[u8], x0: usize, y0: usize, x1: usize, y1: usize| (y0..y1).any(|y| img[y * w + x0..y * w + x1].iter().any(|&v| v < 128));
+
+        let out = erase_dot_leaders(&img, w as u32, h as u32).expect("a leader to erase");
+        assert!(!dark(&out, 418, 148, 785, 157), "the leader is gone");
+        assert!(dark(&out, 100, 100, 400, 160) && out[130 * w + 250] == 0, "the word stays");
+        assert!(dark(&out, 905, 90, 910, 95) && dark(&out, 945, 90, 950, 95), "marks on letters stay");
+        assert!(dark(&out, 1500, 150, 1525, 155), "a pair of dots stays");
+        // RGB reads the same.
+        let rgb: Vec<u8> = img.iter().flat_map(|&v| [v; 3]).collect();
+        let out = erase_dot_leaders(&rgb, w as u32, h as u32).expect("a leader to erase");
+        assert_eq!(out.len(), rgb.len());
+        assert_eq!(out[(152 * w + 422) * 3..(152 * w + 422) * 3 + 3], [255; 3]);
+        // Nothing to erase, or nothing usable, is None and never a panic.
+        assert!(erase_dot_leaders(&vec![255; w * h], w as u32, h as u32).is_none());
+        assert!(erase_dot_leaders(&[], 0, 0).is_none());
+        assert!(erase_dot_leaders(&[0; 7], 3, 3).is_none());
+        assert!(erase_dot_leaders(&[0], 1, 1).is_none());
+        assert!(erase_dot_leaders(&[0; 4], u32::MAX, u32::MAX).is_none());
     }
 
     fn rotated(w: f32, h: f32) -> rten_imageproc::RotatedRect {
