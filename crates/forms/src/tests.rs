@@ -599,6 +599,27 @@ fn a_pdfa_form_keeps_the_value_without_asking_viewers_to_redraw() {
     assert!(!need_appearances(&doc), "PDF/A forbids /NeedAppearances");
 }
 
+/// T0 of the dot-leader plan: a Thai value typed into a text field with the form's Helvetica is
+/// kept as typed, drawn as `?`, marked with its first Thai character and left to other viewers
+/// to redraw. The field cannot show Thai yet; this pins that down until it can.
+#[test]
+fn thai_values_are_kept_and_marked_while_helvetica_cannot_draw_them() {
+    let mut doc = fixture();
+    let value = "\u{0e0a}\u{0e37}\u{0e48}\u{0e2d}"; // base letters with a vowel and a tone mark
+    set_value(&mut doc, "name", &FieldValue::Text(value.into())).unwrap();
+    let name = field(&fields(&doc), "name").clone();
+    assert_eq!(name.value, [value]);
+    assert_eq!(undrawn_fields(&doc), [("name".to_string(), '\u{0e0a}')]);
+    assert!(need_appearances(&doc));
+    let drawn = ap(&doc, &name.widgets[0]);
+    assert!(drawn.contains("(????) Tj"), "{drawn}");
+    // Saved and reopened, the value and the mark survive.
+    let bytes = pdfcraft_cos::write_full(&doc, &SaveOptions::default()).unwrap();
+    let reopened = Document::open(Arc::new(bytes)).unwrap();
+    assert_eq!(field(&fields(&reopened), "name").value, [value]);
+    assert_eq!(undrawn_fields(&reopened), [("name".to_string(), '\u{0e0a}')]);
+}
+
 /// A button caption Helvetica can't draw is kept and marked like a value; redrawing a value another
 /// program stored (a dynamic form's layout, a property change) draws and marks it rather than
 /// failing, and an edit to an unrelated field never fails because of it.
