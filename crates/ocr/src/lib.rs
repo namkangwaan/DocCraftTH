@@ -345,7 +345,7 @@ const MAX_LEADER_PIXELS: usize = 1 << 26;
 /// `height`, grey or RGB), or `None` when there are none or the image is too large to scan.
 ///
 /// The Thai recogniser loses the words between leaders: a form line whose box and pixels are
-/// fine read as 5 of its 49 letters, and a real form page's CER fell from 0.26 to 0.08 once the
+/// fine read as 5 of its 49 letters, and a real form page's CER fell from 0.32 to 0.14 once the
 /// dots were gone. Leaders carry no text worth keeping (the user fills them in), so they are
 /// removed before detection. A leader is a row of [`MIN_LEADER_DOTS`] or more dots (ink blobs at most
 /// ~0.8 mm across) with ~2 mm gaps at most and no ink straight above or below each dot: that
