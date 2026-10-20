@@ -604,6 +604,10 @@ fn a_pdfa_form_keeps_the_value_without_asking_viewers_to_redraw() {
 /// to redraw. The field cannot show Thai yet; this pins that down until it can.
 #[test]
 fn thai_values_are_kept_and_marked_while_helvetica_cannot_draw_them() {
+    // With the craft-fonts Thai face the value is drawn instead, see the tests below.
+    if pdfcraft_fonts::thai_has('\u{0e0a}') {
+        return;
+    }
     let mut doc = fixture();
     let value = "\u{0e0a}\u{0e37}\u{0e48}\u{0e2d}"; // base letters with a vowel and a tone mark
     set_value(&mut doc, "name", &FieldValue::Text(value.into())).unwrap();
@@ -2297,4 +2301,139 @@ fn document_scripts_read_each_name_tree_node_once() {
         "<< /S /JavaScript /JS (var ready = true;) >>".into(),
     ]);
     assert_eq!(document_scripts_named(&doc), [("init".to_string(), "var ready = true;".to_string())]);
+}
+
+/// The craft-fonts Thai face is an optional build input (`CRAFT_FONTS_DIR`); CI sets
+/// `CRAFT_FONTS_REQUIRED`, where its absence fails the test instead of skipping it.
+fn thai_face() -> bool {
+    let has = pdfcraft_fonts::thai_has('\u{0e0a}');
+    assert!(has || std::env::var_os("CRAFT_FONTS_REQUIRED").is_none(), "this test needs the craft-fonts Thai face (CRAFT_FONTS_DIR)");
+    has
+}
+
+/// The coordinates of the path points (`m` and `l`) in an appearance stream.
+fn path_points(content: &str) -> Vec<[f64; 2]> {
+    content
+        .lines()
+        .filter(|l| l.ends_with(" m") || l.ends_with(" l"))
+        .filter_map(|l| {
+            let mut v = l.split_whitespace().filter_map(|x| x.parse::<f64>().ok());
+            Some([v.next()?, v.next()?])
+        })
+        .collect()
+}
+
+/// The typed text of each `/ActualText` span, line by line.
+fn actual_texts(content: &str) -> Vec<String> {
+    content
+        .lines()
+        .filter_map(|l| l.strip_prefix("/Span <</ActualText <FEFF")?.split_once(">>>").map(|(hex, _)| hex.to_string()))
+        .map(|hex| {
+            let units: Vec<u16> = (0..hex.len() / 4).filter_map(|i| u16::from_str_radix(hex.get(i * 4..i * 4 + 4)?, 16).ok()).collect();
+            String::from_utf16_lossy(&units)
+        })
+        .collect()
+}
+
+#[test]
+fn thai_values_are_drawn_with_the_thai_face_not_as_question_marks() {
+    if !thai_face() {
+        return;
+    }
+    let mut doc = fixture();
+    let value = "\u{0e0a}\u{0e37}\u{0e48}\u{0e2d} Ada";
+    set_value(&mut doc, "name", &FieldValue::Text(value.into())).unwrap();
+    let name = field(&fields(&doc), "name").clone();
+    assert_eq!(name.value, [value]);
+    assert!(undrawn_fields(&doc).is_empty(), "the Thai is drawn, so nothing is marked");
+    assert!(!need_appearances(&doc));
+    let drawn = ap(&doc, &name.widgets[0]);
+    assert!(!drawn.contains('?'), "{drawn}");
+    assert!(drawn.contains("Ada) Tj ET"), "the Latin part stays text: {drawn}");
+    assert!(path_points(&drawn).len() > 8, "the Thai part is outlines: {drawn}");
+    assert_eq!(actual_texts(&drawn), [value], "copying gives the typed text");
+    // Saved and reopened, the appearance and the value survive.
+    let bytes = pdfcraft_cos::write_full(&doc, &SaveOptions::default()).unwrap();
+    let reopened = Document::open(Arc::new(bytes)).unwrap();
+    let again = field(&fields(&reopened), "name").clone();
+    assert_eq!(again.value, [value]);
+    assert_eq!(ap(&reopened, &again.widgets[0]), drawn);
+    assert!(undrawn_fields(&reopened).is_empty());
+}
+
+#[test]
+fn stacked_thai_marks_stay_inside_a_short_field() {
+    if !thai_face() {
+        return;
+    }
+    // The `name` field is 200 x 20 pt with an auto-sized font.
+    for value in ["ปั้น", "ญู", "ที่นี่", "กำลัง"] {
+        let mut doc = fixture();
+        set_value(&mut doc, "name", &FieldValue::Text(value.into())).unwrap();
+        let name = field(&fields(&doc), "name").clone();
+        let points = path_points(&ap(&doc, &name.widgets[0]));
+        assert!(!points.is_empty(), "{value}");
+        for [x, y] in points {
+            assert!((0.0..=200.0).contains(&x) && (0.0..=20.0).contains(&y), "{value}: ({x}, {y}) is outside the field");
+        }
+    }
+}
+
+#[test]
+fn multiline_thai_wraps_between_words_and_never_apart_from_its_marks() {
+    if !thai_face() {
+        return;
+    }
+    let mut doc = fixture();
+    let text = "รายงานประจำปีของบริษัทเกี่ยวกับการดำเนินงานและผลประกอบการที่น่าพอใจ".repeat(3);
+    set_value(&mut doc, "notes", &FieldValue::Text(text.clone())).unwrap();
+    let notes = field(&fields(&doc), "notes").clone();
+    let lines = actual_texts(&ap(&doc, &notes.widgets[0]));
+    assert!(lines.len() >= 3, "{lines:?}");
+    assert_eq!(lines.concat(), text, "no text lost or repeated at the breaks");
+    for line in &lines {
+        assert!(line.chars().next().is_some_and(|c| !pdfcraft_fonts::thai::is_mark(c)), "{line:?} starts with a mark");
+    }
+    assert!(undrawn_fields(&doc).is_empty());
+}
+
+#[test]
+fn thai_in_comb_and_password_fields_is_not_drawn_as_outlines() {
+    let mut doc = fixture();
+    // A password field shows bullets, never its text; a comb field holds one character per cell.
+    set_value(&mut doc, "pin", &FieldValue::Text("ชื่อ".into())).unwrap();
+    let pin = field(&fields(&doc), "pin").clone();
+    assert!(path_points(&ap(&doc, &pin.widgets[0])).is_empty(), "password text is never outlines");
+    set_value(&mut doc, "zip", &FieldValue::Text("ชื่อ".into())).unwrap();
+    let zip = field(&fields(&doc), "zip").clone();
+    assert!(path_points(&ap(&doc, &zip.widgets[0])).is_empty(), "comb fields keep the one-character-per-cell path");
+}
+
+mod thai_never_panics {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(48))]
+        #[test]
+        fn any_thai_block_text_draws_inside_the_field(text in proptest::collection::vec(prop_oneof![6 => 0x0e01u32..0x0e3b, 3 => 0x0e3fu32..0x0e5c, 1 => 0x0e00u32..0x0e80, 1 => Just(0x20u32), 1 => Just(0x41u32), 1 => Just(0x0au32)], 0..120)) {
+            let value: String = text.into_iter().filter_map(char::from_u32).collect();
+            for name in ["name", "notes"] {
+                let mut doc = fixture();
+                if set_value(&mut doc, name, &FieldValue::Text(value.clone())).is_err() {
+                    continue;
+                }
+                let w = field(&fields(&doc), name).widgets[0].clone();
+                let rect = w.rect;
+                for [x, y] in path_points(&ap(&doc, &w)) {
+                    // A lone mark's outline starts left of its pen (up to ~0.3 em: a combining mark
+                    // has a negative bearing), and a single line longer than the box runs on to
+                    // the right, where the field's clip cuts it, as Latin text does. Wrapped
+                    // lines and every line's height stay inside.
+                    let right = if name == "name" { f64::INFINITY } else { rect[2] - rect[0] + 0.5 };
+                    prop_assert!(x >= -4.0 && x <= right && y >= -0.5 && y <= rect[3] - rect[1] + 0.5, "{name}: ({x}, {y}) in {value:?}");
+                }
+            }
+        }
+    }
 }
