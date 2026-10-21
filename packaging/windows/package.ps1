@@ -53,6 +53,20 @@ New-Item -ItemType Directory -Force -Path $Dist | Out-Null
 if (-not $env:PDFCRAFT_BUILD_SHA) { $env:PDFCRAFT_BUILD_SHA = (git -C $Root rev-parse HEAD 2>$null) }
 if (-not $env:PDFCRAFT_BUILD_DATE) { $env:PDFCRAFT_BUILD_DATE = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd') }
 
+# Auto-detect craft-fonts directory from sibling path or user environment if unset
+if (-not $env:CRAFT_FONTS_DIR) {
+  $userFonts = [Environment]::GetEnvironmentVariable('CRAFT_FONTS_DIR', 'User')
+  $siblingFonts = Join-Path (Split-Path $Root -Parent) 'craft-fonts'
+  if ($userFonts -and (Test-Path $userFonts)) {
+    $env:CRAFT_FONTS_DIR = $userFonts
+  } elseif (Test-Path $siblingFonts) {
+    $env:CRAFT_FONTS_DIR = (Resolve-Path $siblingFonts).Path
+  }
+}
+if ($env:CRAFT_FONTS_DIR) {
+  Write-Output "Craft fonts: $env:CRAFT_FONTS_DIR"
+}
+
 Write-Output "PdfCraft $Version for Windows $Arch ($Target)"
 
 if (-not $SkipBuild) {

@@ -35,7 +35,7 @@
   Build one small crate at the end to prove the toolchain links.
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File .\scripts\dev-env\windows\setup-dev-env.ps1 -ProjectPath K:\src\DocCraftTH -Verify
+  powershell -ExecutionPolicy Bypass -File .\scripts\dev-env\windows\setup-dev-env.ps1 -ProjectPath K:\src\DocCraftTH\pdfcraft -Verify
 #>
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
