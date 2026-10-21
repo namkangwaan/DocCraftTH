@@ -63,9 +63,11 @@ pub struct TextGlyph {
 /// Greek sigma's normal and word-final forms (`σ`/`ς`) both fold to `σ`, as does `Σ`.
 /// Thai digits (`๐`..`๙`) fold to `0`..`9`: Thai documents print either, and OCR reads one as the other, so
 /// `2569` finds `๒๕๖๙` and back. Only the comparison folds; the document keeps its digits.
+/// Legacy Thai PUA shifted marks (U+F700..=U+F71A) are mapped to standard Unicode (SRS FR-18).
 pub fn fold_case(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
+        let c = map_thai_pua(c);
         match c {
             'I' | 'i' | '\u{130}' | '\u{131}' => out.push('i'),
             'Σ' | 'σ' | 'ς' => out.push('σ'),
@@ -74,6 +76,31 @@ pub fn fold_case(s: &str) -> String {
         }
     }
     out
+}
+
+/// Maps legacy Thai PUA (Private Use Area) shifted vowels and tone marks
+/// (U+F700..=U+F71A) to standard Unicode Thai code points (SRS FR-18).
+pub fn map_thai_pua(c: char) -> char {
+    match c {
+        '\u{F700}' | '\u{F713}' => '\u{0E48}', // MAI EK
+        '\u{F701}' | '\u{F714}' => '\u{0E49}', // MAI THO
+        '\u{F702}' | '\u{F715}' => '\u{0E4A}', // MAI TRI
+        '\u{F703}' | '\u{F716}' => '\u{0E4B}', // MAI CHATTAWA
+        '\u{F704}' | '\u{F717}' | '\u{F71A}' => '\u{0E4C}', // THANTHAKHAT
+        '\u{F705}' => '\u{0E33}',             // SARA AM
+        '\u{F706}' => '\u{0E4D}',             // NIKKHAHIT
+        '\u{F70A}' => '\u{0E31}',             // MAI HAN-AKAT
+        '\u{F70B}' => '\u{0E34}',             // SARA I
+        '\u{F70C}' => '\u{0E35}',             // SARA II
+        '\u{F70D}' => '\u{0E36}',             // SARA UE
+        '\u{F70E}' => '\u{0E37}',             // SARA UEE
+        '\u{F710}' => '\u{0E38}',             // SARA U
+        '\u{F711}' => '\u{0E39}',             // SARA UU
+        '\u{F712}' => '\u{0E3A}',             // PHINTHU
+        '\u{F718}' => '\u{0E0D}',             // YO YING (cut)
+        '\u{F719}' => '\u{0E10}',             // THO THAN (cut)
+        _ => c,
+    }
 }
 
 /// A character extracted text can't stand for: a private-use code point (no standard meaning) or
@@ -110,7 +137,9 @@ impl PageText {
                     s.push(' ');
                 }
             }
-            s.push_str(&g.text);
+            for c in g.text.chars() {
+                s.push(map_thai_pua(c));
+            }
             prev_line = Some(self.line_of[i]);
         }
         s
@@ -320,7 +349,9 @@ impl PageText {
                 if prev.is_some() && gap {
                     s.push(' ');
                 }
-                s.push_str(&g.text);
+                for c in g.text.chars() {
+                s.push(map_thai_pua(c));
+            }
                 prev = Some(i);
             }
             s
@@ -2141,6 +2172,33 @@ mod tests {
         assert_eq!(decomposed.find("\u{0E33}"), vec![2..4]);
         assert_eq!(parts(&["น\u{0E49}\u{0E4D}\u{0E32}"]).find("น\u{0E49}\u{0E33}"), vec![0..1]);
         assert_eq!(decomposed.text_of(0..4), "น\u{0E49}\u{0E4D}\u{0E32}", "only the comparison changes");
+    }
+
+    #[test]
+    fn thai_pua_marks_map_for_search_and_copy() {
+        // Legacy Thai fonts placed shifted tone marks (such as MAI EK on SARA II in ที่)
+        // in PUA code points (e.g. U+F700, U+F713).
+        // Synthetic fixture: ที่ stored with PUA U+F700.
+        let pua_thi = parts(&["ท", "\u{0E35}", "\u{F700}"]);
+        let pua_combined = parts(&["ท\u{0E35}\u{F700}"]);
+
+        // SRS FR-18: search for standard ที่ finds the PUA text in both sensitive and insensitive modes.
+        for sensitive in [false, true] {
+            assert_eq!(pua_thi.find_opts("ที่", sensitive, false), vec![0..3], "sensitive={sensitive}");
+            assert_eq!(pua_combined.find_opts("ที่", sensitive, false), vec![0..1], "sensitive={sensitive}");
+        }
+
+        // Searching with PUA character directly also finds standard text.
+        let standard_thi = parts(&["ที่"]);
+        assert_eq!(standard_thi.find("ท\u{0E35}\u{F700}"), vec![0..1]);
+
+        // SRS FR-18: copy / text extraction maps PUA marks to standard Thai Unicode.
+        assert_eq!(pua_thi.plain_text(), "ที่");
+        assert_eq!(pua_combined.plain_text(), "ที่");
+
+        // Cut consonants (ญ / ฐ ตัดเชิง) in PUA map to standard characters.
+        assert_eq!(map_thai_pua('\u{F718}'), '\u{0E0D}');
+        assert_eq!(map_thai_pua('\u{F719}'), '\u{0E10}');
     }
 
     #[test]
