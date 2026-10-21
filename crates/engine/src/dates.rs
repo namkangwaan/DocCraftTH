@@ -496,12 +496,12 @@ pub fn format_day(fmt: &str, (y, m, d): (i64, u32, u32), lang: &DateLanguage) ->
     let with_day = runs.iter().any(|&(c, n, escaped)| !escaped && c == 'd' && n <= 2);
     let month = (m as usize).checked_sub(1);
     let weekday = weekday(y, m, d);
-    let year = era_year(lang.code, y);
+    let year = era_year(lang.code, y).clamp(0, 9999);
     let mut out = String::new();
     for (c, n, escaped) in runs {
         match (c, n) {
             _ if escaped => out.push(c),
-            ('y', 4..) => out.push_str(&format!("{:04}", year.clamp(0, 9999))),
+            ('y', 4..) => out.push_str(&format!("{year:04}")),
             ('y', _) => out.push_str(&format!("{:02}", year.rem_euclid(100))),
             ('m', 3..) => {
                 let names = if n >= 4 { lang.months_with_day.filter(|_| with_day).unwrap_or(lang.months) } else { lang.months_short };
@@ -816,5 +816,7 @@ mod tests {
         assert_eq!(s.today_text_for_pdf(Some("dd.mm.yyyy"), Some("th")).as_deref(), Ok("14.11.2566"));
         assert!(s.today_text_for_pdf(Some("d mmmm yyyy"), Some("th")).is_err());
         assert_eq!(format_day("yyyy", (9999, 1, 1), th), "9999", "the four-digit clamp still applies");
+        assert_eq!(format_day("yy", (9999, 1, 1), th), "99", "yy and yyyy agree at the clamp");
+        assert_eq!(format_day("yy", (9500, 1, 1), th), "99", "yy clamps with yyyy when BE exceeds 9999");
     }
 }
