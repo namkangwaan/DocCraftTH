@@ -82,23 +82,23 @@ pub fn fold_case(s: &str) -> String {
 /// (U+F700..=U+F71A) to standard Unicode Thai code points (SRS FR-18).
 pub fn map_thai_pua(c: char) -> char {
     match c {
-        '\u{F700}' | '\u{F713}' => '\u{0E48}', // MAI EK
-        '\u{F701}' | '\u{F714}' => '\u{0E49}', // MAI THO
-        '\u{F702}' | '\u{F715}' => '\u{0E4A}', // MAI TRI
-        '\u{F703}' | '\u{F716}' => '\u{0E4B}', // MAI CHATTAWA
+        '\u{F700}' | '\u{F713}' => '\u{0E48}',              // MAI EK
+        '\u{F701}' | '\u{F714}' => '\u{0E49}',              // MAI THO
+        '\u{F702}' | '\u{F715}' => '\u{0E4A}',              // MAI TRI
+        '\u{F703}' | '\u{F716}' => '\u{0E4B}',              // MAI CHATTAWA
         '\u{F704}' | '\u{F717}' | '\u{F71A}' => '\u{0E4C}', // THANTHAKHAT
-        '\u{F705}' => '\u{0E33}',             // SARA AM
-        '\u{F706}' => '\u{0E4D}',             // NIKKHAHIT
-        '\u{F70A}' => '\u{0E31}',             // MAI HAN-AKAT
-        '\u{F70B}' => '\u{0E34}',             // SARA I
-        '\u{F70C}' => '\u{0E35}',             // SARA II
-        '\u{F70D}' => '\u{0E36}',             // SARA UE
-        '\u{F70E}' => '\u{0E37}',             // SARA UEE
-        '\u{F710}' => '\u{0E38}',             // SARA U
-        '\u{F711}' => '\u{0E39}',             // SARA UU
-        '\u{F712}' => '\u{0E3A}',             // PHINTHU
-        '\u{F718}' => '\u{0E0D}',             // YO YING (cut)
-        '\u{F719}' => '\u{0E10}',             // THO THAN (cut)
+        '\u{F705}' => '\u{0E33}',                           // SARA AM
+        '\u{F706}' => '\u{0E4D}',                           // NIKKHAHIT
+        '\u{F70A}' => '\u{0E31}',                           // MAI HAN-AKAT
+        '\u{F70B}' => '\u{0E34}',                           // SARA I
+        '\u{F70C}' => '\u{0E35}',                           // SARA II
+        '\u{F70D}' => '\u{0E36}',                           // SARA UE
+        '\u{F70E}' => '\u{0E37}',                           // SARA UEE
+        '\u{F710}' => '\u{0E38}',                           // SARA U
+        '\u{F711}' => '\u{0E39}',                           // SARA UU
+        '\u{F712}' => '\u{0E3A}',                           // PHINTHU
+        '\u{F718}' => '\u{0E0D}',                           // YO YING (cut)
+        '\u{F719}' => '\u{0E10}',                           // THO THAN (cut)
         _ => c,
     }
 }
@@ -350,8 +350,8 @@ impl PageText {
                     s.push(' ');
                 }
                 for c in g.text.chars() {
-                s.push(map_thai_pua(c));
-            }
+                    s.push(map_thai_pua(c));
+                }
                 prev = Some(i);
             }
             s
