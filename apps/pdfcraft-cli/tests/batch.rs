@@ -44,3 +44,23 @@ fn cli_batch_rejects_bad_flags_before_creating_outputs() {
         assert!(output.stdout.is_empty());
     }
 }
+
+/// SRS FR-17: `--ocr-unusable-text` is documented and reaches `doc_batch` as
+/// `read_unusable_text`, which (like the other OCR settings) needs the ocr step.
+#[test]
+fn cli_batch_ocr_unusable_text_flag_maps_to_read_unusable_text() {
+    let help = Command::new(BIN).arg("--help").output().unwrap();
+    assert!(String::from_utf8_lossy(&help.stdout).contains("--ocr-unusable-text"));
+    let dir = std::env::temp_dir().join(format!("pdfcraft-cli-batch-unusable-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    let output = Command::new(BIN)
+        .current_dir(&dir)
+        .args(["batch", "in.pdf", "--steps", "optimize", "--out-dir", "out", "--ocr-unusable-text"])
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(!output.status.success() && stderr.contains("read_unusable_text") && stderr.contains("ocr step"), "{stderr}");
+    assert!(!dir.join("out").exists());
+    std::fs::remove_dir_all(dir).unwrap();
+}

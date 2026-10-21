@@ -6492,8 +6492,8 @@ milestone = "M10"
 status = "shipped"
 commands = ["ocr.recognize_batch"]
 tools = ["ocr_recognize_files"]
-evidence = ["crates/automation/tests/automation.rs::ocr_recognize_files_writes_searchable_copies", "crates/ui-egui/tests/ocr.rs::recognize_text_in_multiple_files_writes_searchable_copies"]
-notes = "Pick PDFs, then an output folder; copies are saved incrementally under the same names, in the background with progress."
+evidence = ["crates/automation/tests/automation.rs::ocr_recognize_files_writes_searchable_copies", "crates/automation/tests/automation.rs::batch_ocr_reads_unusable_text_pages_only_when_asked", "crates/ui-egui/tests/ocr.rs::recognize_text_in_multiple_files_writes_searchable_copies"]
+notes = "Pick PDFs, then an output folder; copies are saved incrementally under the same names, in the background with progress. Pages whose own text is unusable (private-use or unmapped characters) are skipped and listed as unusable_text_pages; read_unusable_text (ocr_recognize_files, doc_batch, `pdfcraft-cli batch --ocr-unusable-text`) reads only those. The desktop multiple-files dialog does not offer it yet."
 
 [[feature]]
 id = "ocr.ocr-languages"

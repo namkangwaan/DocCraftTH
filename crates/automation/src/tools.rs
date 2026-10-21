@@ -128,6 +128,7 @@ pub fn tools() -> Vec<ToolDef> {
                 "quality": {"type":"integer","minimum":1,"maximum":100},
                 "dpi": {"type":"number","minimum":72,"maximum":600},
                 "language": {"type":"string"}, "skip_text_pages": {"type":"boolean"},
+                "read_unusable_text": {"type":"boolean","description":"With the ocr step, also read pages whose own text is unusable (private-use or unmapped characters; listed in the step's unusable_text_pages) while pages with good text stay skipped (default false)."},
                 "digits": {"type":"string","enum":["as_read","thai","arabic"]}
             }), &["paths","out_dir","steps"])),
         t("doc_open", "Open a PDF", "Open a PDF file and return its document id, page count and whether it can be edited.")
@@ -1139,7 +1140,7 @@ pub fn tools() -> Vec<ToolDef> {
                 }),
                 &["doc"],
             )),
-        t("ocr_recognize_files", "Recognize text in multiple files", "Scan & OCR ▸ Recognize text ▸ In multiple files: read every page of each PDF in paths and write the searchable result into folder under the same name (pages that already have text are left alone unless skip_text_pages is false, as in ocr_recognize). Returns, per file, the output path, word count, skipped pages and pages whose own text was unusable, or the error.")
+        t("ocr_recognize_files", "Recognize text in multiple files", "Scan & OCR ▸ Recognize text ▸ In multiple files: read every page of each PDF in paths and write the searchable result into folder under the same name (pages that already have text are left alone unless skip_text_pages is false, as in ocr_recognize; pages whose own text is unusable are read too when read_unusable_text is true). Returns, per file, the output path, word count, skipped pages and pages whose own text was unusable, or the error.")
             .cmd("ocr.recognize_batch")
             .with(schema(
                 json!({
@@ -1148,6 +1149,7 @@ pub fn tools() -> Vec<ToolDef> {
                     "dpi": { "type": "number", "minimum": 72, "maximum": 600 },
                     "language": { "type": "string", "enum": ["en", "th"] },
                     "skip_text_pages": { "type": "boolean", "description": "Leave pages that already contain text alone (default true); see ocr_recognize." },
+                    "read_unusable_text": { "type": "boolean", "description": "Also read pages whose own text is unusable (listed in unusable_text_pages) while skip_text_pages still leaves pages with good text alone (default false); see ocr_recognize." },
                     "digits": { "type": "string", "enum": ["as_read", "thai", "arabic"], "description": "How recognised digits are written (default as_read); see ocr_recognize." },
                 }),
                 &["paths", "folder"],
