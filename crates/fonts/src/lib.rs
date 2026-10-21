@@ -20,14 +20,15 @@ mod std14_metrics;
 pub mod thai;
 pub use craft::{
     CRAFT_FONTS, CraftFont, SHIPPORI_MINCHO, document_arabic_font, document_hebrew_font, document_japanese_font, document_japanese_font_for_style,
-    document_japanese_fonts_for_style, document_thai_font, ui_arabic_fonts, ui_chinese_fonts, ui_cjk_fonts, ui_hebrew_fonts, ui_japanese_fonts,
-    ui_telugu_fonts, ui_thai_fonts,
+    document_japanese_fonts_for_style, document_thai_font, document_thai_font_named, document_thai_fonts, ui_arabic_fonts, ui_chinese_fonts,
+    ui_cjk_fonts, ui_hebrew_fonts, ui_japanese_fonts, ui_telugu_fonts, ui_thai_fonts,
 };
 pub use script::{
     GlyphError, GlyphOutline, INTER_REGULAR, MAX_SIGNATURE_CHARS, ScriptOutline, japanese_glyph, japanese_glyph_from, script_missing, script_outline,
 };
 pub use shaping::{
-    ShapedCluster, ShapedScript, arabic_glyph, arabic_has, hebrew_has, shape_arabic, shape_hebrew, shape_thai, shaped_glyph, thai_has,
+    ShapedCluster, ShapedScript, arabic_glyph, arabic_has, hebrew_has, shape_arabic, shape_hebrew, shape_thai, shape_thai_named, shape_thai_with,
+    shaped_glyph, thai_has, thai_has_in,
 };
 pub use std14::Std14;
 
