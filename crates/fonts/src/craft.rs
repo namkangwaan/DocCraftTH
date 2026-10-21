@@ -75,6 +75,16 @@ pub fn document_thai_font() -> Option<&'static CraftFont> {
     ui_thai_fonts().into_iter().next()
 }
 
+/// Find a Thai face by family name (case-insensitive, e.g. "Sarabun" or "Noto Sans Thai").
+pub fn document_thai_font_named(name: &str) -> Option<&'static CraftFont> {
+    ui_thai_fonts().into_iter().find(|f| f.family.eq_ignore_ascii_case(name))
+}
+
+/// All Thai faces for document text, in manifest order.
+pub fn document_thai_fonts() -> Vec<&'static CraftFont> {
+    ui_thai_fonts()
+}
+
 /// The `Hebr` craft-fonts faces for Hebrew interface text (file names, document titles, text
 /// being edited), in manifest order. Empty when built without craft-fonts or when it has no
 /// Hebrew face.
@@ -315,5 +325,21 @@ mod tests {
             assert_eq!(ui.first().map(|f| f.family), Some("BIZ UDPGothic"));
         }
         assert_eq!(document_japanese_font().map(|f| f.family), Some("Shippori Mincho"));
+    }
+
+    #[test]
+    fn thai_fonts_include_sarabun_when_craft_fonts_present() {
+        if CRAFT_FONTS.is_empty() {
+            return;
+        }
+        let thai = ui_thai_fonts();
+        if thai.is_empty() {
+            return;
+        }
+        assert!(document_thai_font().is_some());
+        if let Some(sarabun) = document_thai_font_named("Sarabun") {
+            assert_eq!(sarabun.family, "Sarabun");
+            assert!(sarabun.covers("Thai"));
+        }
     }
 }

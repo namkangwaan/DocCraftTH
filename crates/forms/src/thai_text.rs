@@ -35,10 +35,13 @@ struct Atom {
     end: usize,
 }
 
+type ShapedCache = HashMap<String, Option<Rc<Vec<ShapedCluster>>>>;
+type OutlineCache = HashMap<(ShapedScript, u32), Option<Rc<GlyphOutline>>>;
+
 /// A value that can be drawn with the Thai face, and the shaping it needs.
 pub(crate) struct Thai {
-    shaped: RefCell<HashMap<String, Option<Rc<Vec<ShapedCluster>>>>>,
-    outlines: RefCell<HashMap<u32, Option<Rc<GlyphOutline>>>>,
+    shaped: RefCell<ShapedCache>,
+    outlines: RefCell<OutlineCache>,
 }
 
 /// `text` cut into runs that are all Thai or all not.
@@ -90,12 +93,12 @@ impl Thai {
         shaped
     }
 
-    fn outline(&self, id: u32) -> Option<Rc<GlyphOutline>> {
-        if let Some(found) = self.outlines.borrow().get(&id) {
+    fn outline(&self, script: ShapedScript, id: u32) -> Option<Rc<GlyphOutline>> {
+        if let Some(found) = self.outlines.borrow().get(&(script, id)) {
             return found.clone();
         }
-        let outline = shaped_glyph(ShapedScript::Thai, id).ok().map(Rc::new);
-        self.outlines.borrow_mut().insert(id, outline.clone());
+        let outline = shaped_glyph(script, id).ok().map(Rc::new);
+        self.outlines.borrow_mut().insert((script, id), outline.clone());
         outline
     }
 
@@ -196,7 +199,7 @@ impl Thai {
         let mut drew = false;
         for cluster in clusters.iter() {
             for (id, [dx, dy]) in &cluster.glyphs {
-                let Some(glyph) = self.outline(*id) else { continue };
+                let Some(glyph) = self.outline(cluster.script, *id) else { continue };
                 for contour in glyph.contours.iter().filter(|c| c.len() >= 2) {
                     for (i, [px, py]) in contour.iter().enumerate() {
                         let (gx, gy) = (pen + (px + dx) * size, y + (py + dy) * size);
