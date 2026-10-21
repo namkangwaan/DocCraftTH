@@ -2352,3 +2352,7 @@ animation effects	Off	ఆఫ్
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 పేజీలోని టెక్స్ట్ చదవలేనిది. దానిపై టెక్స్ట్‌ను గుర్తించాలా? దాని టెక్స్ట్ అలాగే ఉంటుంది, దీన్ని ఒక్క దశలో రద్దు చేయవచ్చు.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} పేజీల్లోని టెక్స్ట్ చదవలేనిది. ఆ పేజీల్లో మాత్రమే టెక్స్ట్‌ను గుర్తించాలా? వాటి టెక్స్ట్ అలాగే ఉంటుంది, దీన్ని ఒక్క దశలో రద్దు చేయవచ్చు.
 	Recognize these pages	ఈ పేజీలను గుర్తించు
+	This page has unusable text	ఈ పేజీలో ఉపయోగించలేని టెక్స్ట్ ఉంది
+	It can't be searched or copied. Recognizing text on this page can fix that.	దానిని వెతకడం లేదా కాపీ చేయడం సాధ్యం కాదు. ఈ పేజీలో టెక్స్ట్‌ను గుర్తించడం దీన్ని సరిచేయగలదు.
+	Recognize text on this page…	ఈ పేజీలో టెక్స్ట్‌ను గుర్తించు…
+	Also recognize pages whose text is unusable	ఉపయోగించలేని టెక్స్ట్ ఉన్న పేజీలను కూడా గుర్తించు

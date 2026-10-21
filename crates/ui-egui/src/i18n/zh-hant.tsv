@@ -2393,3 +2393,7 @@ animation effects	Off	關
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 個頁面的文字無法讀取。要辨識該頁面的文字嗎？原有文字會保留，並可一步復原。
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} 個頁面的文字無法讀取。只辨識這些頁面的文字嗎？原有文字會保留，並可一步復原。
 	Recognize these pages	辨識這些頁面
+	This page has unusable text	此頁面包含無法使用的文字
+	It can't be searched or copied. Recognizing text on this page can fix that.	無法搜尋或複製這些文字。辨識此頁面上的文字可以解決此問題。
+	Recognize text on this page…	辨識此頁面上的文字…
+	Also recognize pages whose text is unusable	同時辨識文字無法使用的頁面

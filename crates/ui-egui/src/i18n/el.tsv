@@ -2449,3 +2449,7 @@ animation effects	Off	Ανενεργά
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 σελίδα έχει μη αναγνώσιμο κείμενο. Να γίνει αναγνώριση κειμένου σε αυτήν; Το κείμενό της παραμένει και μπορείτε να το αναιρέσετε σε ένα βήμα.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} σελίδες έχουν μη αναγνώσιμο κείμενο. Να γίνει αναγνώριση κειμένου μόνο σε αυτές; Το κείμενό τους παραμένει και μπορείτε να το αναιρέσετε σε ένα βήμα.
 	Recognize these pages	Αναγνώριση αυτών των σελίδων
+	This page has unusable text	Αυτή η σελίδα έχει μη αξιοποιήσιμο κείμενο
+	It can't be searched or copied. Recognizing text on this page can fix that.	Δεν μπορεί να αναζητηθεί ή να αντιγραφεί. Η αναγνώριση κειμένου σε αυτή τη σελίδα μπορεί να το διορθώσει.
+	Recognize text on this page…	Αναγνώριση κειμένου σε αυτή τη σελίδα…
+	Also recognize pages whose text is unusable	Αναγνώριση και σελίδων με μη αξιοποιήσιμο κείμενο
