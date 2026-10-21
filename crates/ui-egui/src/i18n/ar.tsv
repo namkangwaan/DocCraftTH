@@ -2720,3 +2720,7 @@ certificate	Version	الإصدار
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	صفحة واحدة فيها نص لا يمكن قراءته. هل تريد التعرف على النص فيها؟ يبقى نصها كما هو، ويمكنك التراجع عن ذلك بخطوة واحدة.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	عدد الصفحات التي فيها نص لا يمكن قراءته: {n}. هل تريد التعرف على النص في هذه الصفحات فقط؟ يبقى نصها كما هو، ويمكنك التراجع عن ذلك بخطوة واحدة.
 	Recognize these pages	التعرف على هذه الصفحات
+	This page has unusable text	تحتوي هذه الصفحة على نص غير قابل للاستخدام
+	It can't be searched or copied. Recognizing text on this page can fix that.	لا يمكن البحث فيه أو نسخه. يمكن للتعرف على النص في هذه الصفحة إصلاح ذلك.
+	Recognize text on this page…	التعرف على النص في هذه الصفحة…
+	Also recognize pages whose text is unusable	التعرف أيضًا على الصفحات ذات النص غير القابل للاستخدام

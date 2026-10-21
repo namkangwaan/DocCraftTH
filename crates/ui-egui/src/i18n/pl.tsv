@@ -2419,3 +2419,7 @@ animation effects	Off	Wyłączone
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 strona zawiera nieczytelny tekst. Rozpoznać na niej tekst? Jej tekst pozostanie, a zmianę można cofnąć jednym krokiem.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Liczba stron z nieczytelnym tekstem: {n}. Rozpoznać tekst tylko na nich? Ich tekst pozostanie, a zmianę można cofnąć jednym krokiem.
 	Recognize these pages	Rozpoznaj te strony
+	This page has unusable text	Ta strona zawiera bezużyteczny tekst
+	It can't be searched or copied. Recognizing text on this page can fix that.	Nie można go przeszukiwać ani kopiować. Rozpoznanie tekstu na tej stronie może to naprawić.
+	Recognize text on this page…	Rozpoznaj tekst na tej stronie…
+	Also recognize pages whose text is unusable	Rozpoznaj także strony z bezużytecznym tekstem

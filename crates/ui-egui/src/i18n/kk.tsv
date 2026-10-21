@@ -2441,3 +2441,7 @@ animation effects	Off	Өшірулі
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 беттегі мәтін оқылмайды. Ондағы мәтінді тану керек пе? Бар мәтін сақталады, ал мұны бір қадаммен болдырмауға болады.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Мәтіні оқылмайтын беттер: {n}. Тек солардағы мәтінді тану керек пе? Бар мәтін сақталады, ал мұны бір қадаммен болдырмауға болады.
 	Recognize these pages	Осы беттерді тану
+	This page has unusable text	Бұл бетте пайдалануға болмайтын мәтін бар
+	It can't be searched or copied. Recognizing text on this page can fix that.	Оны іздеу не көшіру мүмкін емес. Осы беттегі мәтінді тану мұны түзете алады.
+	Recognize text on this page…	Осы беттегі мәтінді тану…
+	Also recognize pages whose text is unusable	Пайдалануға болмайтын мәтіні бар беттерді де тану

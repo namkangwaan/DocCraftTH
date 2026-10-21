@@ -2439,3 +2439,7 @@ animation effects	Off	Kapalı
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 sayfada okunamayan metin var. Bu sayfadaki metin tanınsın mı? Mevcut metin kalır ve bunu tek adımda geri alabilirsiniz.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} sayfada okunamayan metin var. Yalnızca bu sayfalardaki metin tanınsın mı? Mevcut metin kalır ve bunu tek adımda geri alabilirsiniz.
 	Recognize these pages	Bu sayfaları tanı
+	This page has unusable text	Bu sayfada kullanılamayan metin var
+	It can't be searched or copied. Recognizing text on this page can fix that.	Metin aranamıyor veya kopyalanamıyor. Bu sayfadaki metni tanımak bunu düzeltebilir.
+	Recognize text on this page…	Bu sayfadaki metni tanı…
+	Also recognize pages whose text is unusable	Kullanılamayan metin içeren sayfaları da tanı

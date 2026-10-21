@@ -2712,3 +2712,7 @@ key	Space	Space
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 trang có văn bản không đọc được. Nhận dạng văn bản trên trang đó? Văn bản hiện có vẫn được giữ, và bạn có thể hoàn tác trong một bước.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} trang có văn bản không đọc được. Chỉ nhận dạng văn bản trên các trang đó? Văn bản hiện có vẫn được giữ, và bạn có thể hoàn tác trong một bước.
 	Recognize these pages	Nhận dạng các trang này
+	This page has unusable text	Trang này có văn bản không dùng được
+	It can't be searched or copied. Recognizing text on this page can fix that.	Không thể tìm kiếm hay sao chép văn bản đó. Nhận dạng văn bản trên trang này có thể khắc phục điều đó.
+	Recognize text on this page…	Nhận dạng văn bản trên trang này…
+	Also recognize pages whose text is unusable	Nhận dạng cả các trang có văn bản không dùng được

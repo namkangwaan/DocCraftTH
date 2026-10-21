@@ -2710,3 +2710,7 @@ theme	Appearance	Išvaizda
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 puslapyje tekstas neįskaitomas. Atpažinti jame tekstą? Jo tekstas liks, o atšaukti galėsite vienu žingsniu.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Puslapių su neįskaitomu tekstu: {n}. Atpažinti tekstą tik juose? Jų tekstas liks, o atšaukti galėsite vienu žingsniu.
 	Recognize these pages	Atpažinti šiuos puslapius
+	This page has unusable text	Šiame puslapyje yra netinkamo naudoti teksto
+	It can't be searched or copied. Recognizing text on this page can fix that.	Jo negalima ieškoti ar kopijuoti. Teksto atpažinimas šiame puslapyje gali tai ištaisyti.
+	Recognize text on this page…	Atpažinti tekstą šiame puslapyje…
+	Also recognize pages whose text is unusable	Taip pat atpažinti puslapius su netinkamu naudoti tekstu

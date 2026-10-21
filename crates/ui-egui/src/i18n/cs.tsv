@@ -2517,3 +2517,7 @@ animation effects	Off	Vypnuto
 	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 stránka obsahuje nečitelný text. Rozpoznat na ní text? Její text zůstane a změnu lze vrátit jedním krokem.
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Stránky s nečitelným textem: {n}. Rozpoznat text jen na nich? Jejich text zůstane a změnu lze vrátit jedním krokem.
 	Recognize these pages	Rozpoznat tyto stránky
+	This page has unusable text	Tato stránka obsahuje nepoužitelný text
+	It can't be searched or copied. Recognizing text on this page can fix that.	Nelze v něm vyhledávat ani ho kopírovat. Rozpoznání textu na této stránce to může napravit.
+	Recognize text on this page…	Rozpoznat text na této stránce…
+	Also recognize pages whose text is unusable	Rozpoznat i stránky s nepoužitelným textem
