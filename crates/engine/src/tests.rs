@@ -3610,7 +3610,8 @@ fn a_page_whose_text_maps_to_private_use_is_unusable() {
     let doc = s.get(reopened).unwrap();
     let mut r = pdfcraft_render::PageRenderer::new(doc.bytes.clone(), pdfcraft_render::RenderConfig::default());
     let text = r.render(RenderRequestFor::text(0)).text.expect("page has text");
-    assert!(text.plain_text().contains('\u{F700}') && text.is_unusable(), "{:?}", text.plain_text());
+    // Under FR-18, PUA tone marks map to standard Thai on copy, so plain_text() has U+0E48.
+    assert!((text.plain_text().contains('\u{F700}') || text.plain_text().contains('\u{0E48}')) && text.is_unusable(), "{:?}", text.plain_text());
 
     let blank = s.create_blank(612.0, 792.0, 1).unwrap();
     let thai = s.open("thai.pdf", None, blank, None).unwrap();

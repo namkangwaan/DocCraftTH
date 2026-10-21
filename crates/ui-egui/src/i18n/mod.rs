@@ -547,11 +547,27 @@ pub fn local_year(y: i64) -> i64 {
 pub fn local_pdf_date_in(lang: Lang, s: &str) -> String {
     let pretty = pdfcraft_render::pretty_date(s);
     let offset = pdfcraft_engine::dates::era_year(lang.code(), 0);
-    let year = pretty.get(..4).filter(|y| y.bytes().all(|b| b.is_ascii_digit())).and_then(|y| y.parse::<i64>().ok());
-    match (year, pretty.get(4..)) {
-        (Some(y), Some(rest)) if offset != 0 && rest.starts_with('-') => format!("{}{rest}", y.saturating_add(offset)),
-        _ => pretty,
+    if offset == 0 || !is_pretty_date(&pretty) {
+        return pretty;
     }
+    let Some(year) = pretty.get(..4).and_then(|y| y.parse::<i64>().ok()) else {
+        return pretty;
+    };
+    format!("{}{}", year.saturating_add(offset), &pretty[4..])
+}
+
+fn is_pretty_date(s: &str) -> bool {
+    let b = s.as_bytes();
+    b.len() == 16
+        && b[0..4].iter().all(u8::is_ascii_digit)
+        && b[4] == b'-'
+        && b[5..7].iter().all(u8::is_ascii_digit)
+        && b[7] == b'-'
+        && b[8..10].iter().all(u8::is_ascii_digit)
+        && b[10] == b' '
+        && b[11..13].iter().all(u8::is_ascii_digit)
+        && b[13] == b':'
+        && b[14..16].iter().all(u8::is_ascii_digit)
 }
 
 /// [`local_pdf_date_in`] for the current interface language.

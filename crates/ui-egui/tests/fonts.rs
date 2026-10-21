@@ -339,7 +339,7 @@ fn primary_ui_fonts_cover_latin_and_cyrillic_catalogs() {
 }
 
 /// Thai file names and titles with stacked marks, Thai digits and descenders (ฏ ฐ).
-const THAI: &str = "ไฟล์ภาษาไทย น้ำใจ ปฏิบัติ ฐาน ๒๕๖๙";
+const THAI: &str = "ไฟล์ภาษาไทย น้ำใจ ปฏิบัติ ฐาน ๒๕๖๙ ปั้น ฤๅษี";
 
 /// On a machine with an installed Thai font, the installed definitions include it and Thai text,
 /// such as a file name or a document title, has glyphs instead of boxes. Windows (Leelawadee UI,
@@ -360,8 +360,16 @@ fn system_fallback_covers_thai() {
         assert_eq!(stack.iter().filter(|n| *n == theme::SYSTEM_THAI_FALLBACK).count(), 1, "{family:?}: {stack:?}");
     }
     let mut fonts = Fonts::new(TextOptions::default(), defs);
-    for id in families() {
-        assert!(fonts.has_glyphs(&id, THAI), "{id:?} lacks {THAI} (embedded Thai face: {embedded})");
+    for (i, id) in families().iter().enumerate() {
+        assert!(fonts.has_glyphs(id, THAI), "{id:?} lacks {THAI} (embedded Thai face: {embedded})");
+        // Marks have no advance once shaped: stacked marks do not widen their base glyph (M4).
+        let w_thi = layout_widths(&mut fonts, "ที่")[i];
+        let w_th = layout_widths(&mut fonts, "ท")[i];
+        assert!((w_thi - w_th).abs() <= w_th * 0.25, "{id:?}: ที่ ({w_thi}) widens ท ({w_th})");
+
+        let w_nam = layout_widths(&mut fonts, "น้ำ")[i];
+        let w_num = layout_widths(&mut fonts, "นำ")[i];
+        assert!((w_nam - w_num).abs() <= w_num * 0.25, "{id:?}: น้ำ ({w_nam}) widens นำ ({w_num})");
     }
     assert!(layout_widths(&mut fonts, THAI).iter().all(|w| w.is_finite() && *w > 0.0));
 }
