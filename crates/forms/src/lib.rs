@@ -21,6 +21,7 @@ pub mod appearance;
 mod author;
 pub mod detect;
 mod scripting;
+mod thai_text;
 pub use actions::{FieldAction, Trigger, field_actions, set_field_actions};
 pub use author::{
     BorderStyle, CheckStyle, FieldFont, FieldProps, Look, LookPatch, NewField, add_field, check_style, delete_field, duplicate_field, look,

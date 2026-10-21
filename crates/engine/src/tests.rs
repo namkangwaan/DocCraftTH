@@ -1784,6 +1784,35 @@ fn a_value_its_font_cannot_draw_is_reported_by_the_edit_that_drew_it() {
     assert!(pdfcraft_forms::need_appearances(&saved));
 }
 
+/// Thai typed into a text field is drawn with the craft-fonts Thai face: nothing is reported or
+/// marked, other viewers are not asked to redraw it, and the rendered page shows ink in the field
+/// (the Helvetica `?` path would also show ink, so the stream is checked for the outlines).
+#[test]
+fn thai_in_a_text_field_is_drawn_on_the_page_and_not_reported() {
+    if !pdfcraft_fonts::thai_has('\u{0e0a}') {
+        assert!(std::env::var_os("CRAFT_FONTS_REQUIRED").is_none(), "this test needs the craft-fonts Thai face (CRAFT_FONTS_DIR)");
+        return;
+    }
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let id = s.open("form.pdf", None, Arc::new(form_fixture()), None).unwrap();
+    // The page is 200 x 300 pt at scale 1; the field is [20 250 180 270], so rows 30..50.
+    let ink = |s: &Session| {
+        let page = shown(s, id, 0);
+        let width = page.width as usize;
+        let px = page.rgba.as_chunks::<4>().0;
+        (34..46usize).flat_map(|y| (24..176usize).map(move |x| (x, y))).filter(|&(x, y)| px.get(y * width + x).is_some_and(|p| p[0] < 128)).count()
+    };
+    assert_eq!(ink(&s), 0, "an empty field has no ink inside its border");
+    s.apply(id, Edit::SetFieldValue { name: "name".into(), value: FieldValue::Text("ชื่อ นามสกุล".into()) }).unwrap();
+    let d = s.get(id).unwrap();
+    assert_eq!(d.form[0].value, ["ชื่อ นามสกุล"]);
+    assert!(d.edit_notices.is_empty(), "{:?}", d.edit_notices);
+    assert!(ink(&s) > 40, "the Thai text shows on the page: {} dark pixels", ink(&s));
+    let saved = pdfcraft_cos::Document::open(s.save_bytes(id).unwrap()).unwrap();
+    assert!(!pdfcraft_forms::need_appearances(&saved), "nothing asks other viewers to redraw");
+    assert!(pdfcraft_forms::undrawn_fields(&saved).is_empty());
+}
+
 #[test]
 fn filling_a_form_shows_saves_and_undoes() {
     let mut s = Session::new().with_clock(|| 1_700_000_000);

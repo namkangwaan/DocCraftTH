@@ -24,6 +24,7 @@ use pdfcraft_cos::{Dict, Document, Object, Stream};
 use pdfcraft_fonts::pdf::Metrics;
 use pdfcraft_fonts::{UnicodeCMap, cjk_width, helvetica_width, literal, win_ansi, wrap_with};
 
+use crate::thai_text::{self, Thai, without_thai};
 use crate::{Field, FieldKind, Widget, acroform, flags};
 
 /// Format a number for content streams.
@@ -445,13 +446,19 @@ pub fn field_appearance_drawn(doc: &Document, f: &Field, w: &Widget, values: &[S
         values.first().cloned().unwrap_or_default()
     };
     let text = if f.has(flags::PASSWORD) { "*".repeat(text.chars().count()) } else { text };
+    let comb = f.has(flags::COMB) && !f.has(flags::MULTILINE) && !f.has(flags::PASSWORD) && f.max_len.is_some_and(|m| m > 0);
+    // Thai is drawn as outlines from the craft-fonts face whatever the field's font is (a
+    // CID font addressed by Unicode would report it as encodable and draw nothing), so the
+    // font only has to hold the rest.
+    let thai = (matches!(f.kind, FieldKind::Text | FieldKind::Combo) && !comb).then(|| Thai::new(&text)).flatten();
+    let held = if thai.is_some() { without_thai(&text) } else { text.clone() };
     let can_show = |enc: &FontText| {
         if f.kind == FieldKind::List {
             f.options.iter().all(|(_, display)| enc.can_encode(display))
         } else if f.kind == FieldKind::Text && f.has(flags::MULTILINE) {
-            text.split(['\n', '\r']).all(|line| enc.can_encode(line))
+            held.split(['\n', '\r']).all(|line| enc.can_encode(line))
         } else {
-            enc.can_encode(&text)
+            enc.can_encode(&held)
         }
     };
     let (font_name, font_obj, enc) = match dr_font(doc, &da.font).filter(|(_, enc)| can_show(enc)) {
@@ -505,8 +512,53 @@ pub fn field_appearance_drawn(doc: &Document, f: &Field, w: &Widget, values: &[S
             }
         }
         _ => {
-            let comb = f.has(flags::COMB) && !f.has(flags::MULTILINE) && !f.has(flags::PASSWORD) && f.max_len.is_some_and(|m| m > 0);
-            if f.kind == FieldKind::Text && f.has(flags::MULTILINE) {
+            let multiline = f.kind == FieldKind::Text && f.has(flags::MULTILINE);
+            if let Some(th) = &thai {
+                // Outlines cannot sit inside a text object, so this body is page-level: each
+                // line is a marked-content span of text runs (`BT .. ET`) and filled paths.
+                let latin = |s: &str, sz: f64| width_of(s, sz);
+                let one_line: String = text.chars().map(|c| if matches!(c, '\n' | '\r') { ' ' } else { c }).collect();
+                if size == 0.0 {
+                    let h = height - 2.0 * pad;
+                    size = if multiline {
+                        let wrapped = |sz: f64| th.wrap(&text, sz, inner_w, &latin).len() as f64 * sz * thai_text::LINE_STEP;
+                        auto_text_size_by(inner_w, h, true, |sz| th.width(&one_line, sz, &latin), wrapped)
+                    } else {
+                        auto_text_size_by(inner_w, h, false, |sz| th.width(&one_line, sz, &latin), |_| 0.0)
+                    };
+                }
+                let mut draw = |body: &mut Vec<u8>, line: &str, y: f64| {
+                    let tw = th.width(line, size, &latin);
+                    let x = match q {
+                        1 => pad + (inner_w - tw) / 2.0,
+                        2 => width - pad - tw,
+                        _ => pad,
+                    };
+                    th.draw_line(body, line, x, y, size, &mut |out, px, run| {
+                        if unencodable.is_none() {
+                            unencodable = enc.first_unencodable(run);
+                        }
+                        out.extend(format!("BT 1 0 0 1 {} {} Tm ", n(px), n(y)).bytes());
+                        out.extend(literal(&enc.encode(run)));
+                        out.extend_from_slice(b" Tj ET\n");
+                        width_of(run, size)
+                    });
+                };
+                if multiline {
+                    let mut y = height - pad - size;
+                    for (i, line) in th.wrap(&text, size, inner_w, &latin).iter().enumerate() {
+                        // The next line's descenders would leave the box.
+                        if i > 0 && y < 0.25 * size {
+                            break;
+                        }
+                        draw(&mut body, line, y);
+                        y -= size * thai_text::LINE_STEP;
+                    }
+                } else {
+                    // Centre the Thai ink: about 1 em above the baseline and 0.25 em below.
+                    draw(&mut body, &one_line, (height - 1.25 * size) / 2.0 + 0.25 * size);
+                }
+            } else if multiline {
                 if size == 0.0 {
                     size = auto_text_size(&text, inner_w, height - 2.0 * pad, true, width_of);
                 }
@@ -543,13 +595,16 @@ pub fn field_appearance_drawn(doc: &Document, f: &Field, w: &Widget, values: &[S
         }
     }
     let mut content = c.into_bytes();
+    // Thai bodies are page-level (see above): the font and colour are set outside `BT`.
+    let text_object = if thai.is_some() { "" } else { "BT\n" };
     content.extend(
         format!(
-            "/Tx BMC\nq\n{} {} {} {} re W n\nBT\n/{} {} Tf\n{}\n",
+            "/Tx BMC\nq\n{} {} {} {} re W n\n{}/{} {} Tf\n{}\n",
             n(bw),
             n(bw),
             n(width - 2.0 * bw),
             n(height - 2.0 * bw),
+            text_object,
             font_name,
             n(size),
             da.color
@@ -557,7 +612,7 @@ pub fn field_appearance_drawn(doc: &Document, f: &Field, w: &Widget, values: &[S
         .bytes(),
     );
     content.extend(body);
-    content.extend_from_slice(b"ET\nQ\nEMC\n");
+    content.extend_from_slice(if thai.is_some() { b"Q\nEMC\n" } else { b"ET\nQ\nEMC\n" });
     let mut fonts = Dict::new();
     fonts.set(font_name.into_bytes(), font_obj);
     let mut res = Dict::new();
