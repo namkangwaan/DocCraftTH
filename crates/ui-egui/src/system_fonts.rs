@@ -34,6 +34,8 @@ const SINHALA_PROBE: char = '\u{0D9A}';
 const TAMIL_PROBE: char = '\u{0B95}';
 /// Thai letter ko kai (ก): the face must have it to cover Thai.
 const THAI_PROBE: char = '\u{0E01}';
+/// CJK ideograph '日' (U+65E5): the face must have it to cover CJK text in non-CJK interfaces.
+const CJK_PROBE: char = '\u{65E5}';
 /// 欢 (U+6B22): Simplified only, absent from the Japanese craft-fonts faces.
 const HANS_PROBE: char = '\u{6B22}';
 /// 說 (U+8AAA): Traditional only, absent from the Japanese craft-fonts faces.
@@ -110,6 +112,21 @@ pub fn tamil_fallback() -> Option<Arc<FontData>> {
 pub fn thai_fallback() -> Option<Arc<FontData>> {
     static CACHE: OnceLock<Option<Arc<FontData>>> = OnceLock::new();
     CACHE.get_or_init(|| script_fallback(&thai_candidates(), THAI_PROBE)).clone()
+}
+
+/// The installed fallback face for CJK (Chinese and Japanese text in non-CJK interfaces), read once.
+/// `None` when it is turned off or no candidate is installed; the interface then draws what
+/// the embedded faces can.
+pub fn cjk_fallback() -> Option<Arc<FontData>> {
+    static CACHE: OnceLock<Option<Arc<FontData>>> = OnceLock::new();
+    CACHE
+        .get_or_init(|| {
+            if std::env::var_os("PDFCRAFT_SYSTEM_FONTS").is_some_and(|v| v == "0") {
+                return None;
+            }
+            cjk_candidates().iter().find_map(|path| read(path, CJK_PROBE, MAX_HAN_BYTES))
+        })
+        .clone()
 }
 
 fn script_fallback(candidates: &[PathBuf], probe: char) -> Option<Arc<FontData>> {
@@ -264,6 +281,44 @@ fn thai_candidates() -> Vec<PathBuf> {
             "truetype/tlwg/Garuda.ttf",
             "tlwg/Loma.ttf",
             "thai-scalable/Loma.ttf",
+        ])
+    }
+}
+
+/// Well-known locations of CJK (Chinese and Japanese) faces, best first.
+fn cjk_candidates() -> Vec<PathBuf> {
+    if cfg!(windows) {
+        // Microsoft YaHei (covers Simplified & Traditional Chinese + Japanese Kana/Kanji),
+        // Meiryo / MS Gothic (Japanese), Microsoft JhengHei (Traditional), SimSun.
+        ["msyh.ttc", "meiryo.ttc", "msgothic.ttc", "msjh.ttc", "yugoth.ttc", "simsun.ttc", "mingliu.ttc"]
+            .iter()
+            .map(|f| windows_fonts().join(f))
+            .collect()
+    } else if cfg!(target_os = "macos") {
+        [
+            "/System/Library/Fonts/PingFang.ttc",
+            "/System/Library/Fonts/Hiragino Sans GB.ttc",
+            "/System/Library/Fonts/Supplemental/Songti.ttc",
+            "/System/Library/Fonts/STHeiti Light.ttc",
+            "/System/Library/Fonts/STHeiti Medium.ttc",
+        ]
+        .iter()
+        .map(PathBuf::from)
+        .collect()
+    } else {
+        unix_fonts(&[
+            "truetype/wqy/wqy-microhei.ttc",
+            "wenquanyi/wqy-microhei/wqy-microhei.ttc",
+            "wqy-microhei/wqy-microhei.ttc",
+            "truetype/wqy/wqy-zenhei.ttc",
+            "wenquanyi/wqy-zenhei/wqy-zenhei.ttc",
+            "wqy-zenhei/wqy-zenhei.ttc",
+            "truetype/vlgothic/VL-PGothic-Regular.ttf",
+            "truetype/droid/DroidSansFallbackFull.ttf",
+            "google-droid-sans-fonts/DroidSansFallbackFull.ttf",
+            "droid/DroidSansFallbackFull.ttf",
+            "truetype/arphic/uming.ttc",
+            "arphic-uming/uming.ttc",
         ])
     }
 }
@@ -472,7 +527,7 @@ mod tests {
 
     #[test]
     fn script_candidates_are_absolute_font_files() {
-        for list in [devanagari_candidates(), telugu_candidates(), sinhala_candidates(), tamil_candidates(), thai_candidates()] {
+        for list in [devanagari_candidates(), telugu_candidates(), sinhala_candidates(), tamil_candidates(), thai_candidates(), cjk_candidates()] {
             assert!(!list.is_empty());
             assert!(list.iter().all(|p| p.is_absolute() || cfg!(windows)), "{list:?}");
             assert!(list.iter().all(|p| p.extension().is_some_and(|e| e == "ttf" || e == "ttc")), "{list:?}");
@@ -486,6 +541,10 @@ mod tests {
                 let name = path.to_string_lossy().to_lowercase();
                 assert!(!["notosanscjk", "notoserifcjk", "sourcehan", "source-han"].iter().any(|b| name.contains(b)), "{name}");
             }
+        }
+        for path in cjk_candidates() {
+            let name = path.to_string_lossy().to_lowercase();
+            assert!(!["notosanscjk", "notoserifcjk", "sourcehan", "source-han"].iter().any(|b| name.contains(b)), "{name}");
         }
     }
 }
