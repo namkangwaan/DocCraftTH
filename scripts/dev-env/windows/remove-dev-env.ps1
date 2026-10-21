@@ -42,7 +42,7 @@
 .EXAMPLE
   .\remove-dev-env.ps1 -WhatIf
 .EXAMPLE
-  .\remove-dev-env.ps1 -Components BuildTools,Rustup -Since 2026-10-16 -ProjectPath K:\src\pdfcraft -CleanBuild
+  .\remove-dev-env.ps1 -Components BuildTools,Rustup -Since 2026-10-16 -ProjectPath K:\src\DocCraftTH\pdfcraft -CleanBuild
 #>
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
