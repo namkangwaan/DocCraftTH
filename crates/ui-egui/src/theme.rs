@@ -231,6 +231,8 @@ pub const SYSTEM_SINHALA_FALLBACK: &str = "system-sinhala-fallback";
 pub const SYSTEM_TAMIL_FALLBACK: &str = "system-tamil-fallback";
 /// The name of the installed Thai face [`installed_font_definitions`] may add.
 pub const SYSTEM_THAI_FALLBACK: &str = "system-thai-fallback";
+/// The name of the installed CJK face [`installed_font_definitions`] may add in non-CJK interfaces.
+pub const SYSTEM_CJK_FALLBACK: &str = "system-cjk-fallback";
 
 /// What [`install_fonts_for`] installs: [`font_definitions_for`], then, on desktop, one face
 /// already installed on this machine. It only draws characters no embedded face has.
@@ -260,12 +262,14 @@ pub fn installed_font_definitions_with(cjk: CjkPreference, thai_family: &str) ->
     {
         use crate::system_fonts::{Need, fallback};
         // Before the general installed face, which stays the last fallback outside Chinese.
+        let cjk_fb = if cjk == CjkPreference::Default { crate::system_fonts::cjk_fallback() } else { None };
         for (name, data) in [
             (SYSTEM_DEVANAGARI_FALLBACK, crate::system_fonts::devanagari_fallback()),
             (SYSTEM_TELUGU_FALLBACK, crate::system_fonts::telugu_fallback()),
             (SYSTEM_SINHALA_FALLBACK, crate::system_fonts::sinhala_fallback()),
             (SYSTEM_TAMIL_FALLBACK, crate::system_fonts::tamil_fallback()),
             (SYSTEM_THAI_FALLBACK, crate::system_fonts::thai_fallback()),
+            (SYSTEM_CJK_FALLBACK, cjk_fb),
         ] {
             let Some(data) = data else { continue };
             fonts.font_data.insert(name.to_owned(), data);

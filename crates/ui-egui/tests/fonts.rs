@@ -373,3 +373,28 @@ fn system_fallback_covers_thai() {
     }
     assert!(layout_widths(&mut fonts, THAI).iter().all(|w| w.is_finite() && *w > 0.0));
 }
+
+/// On a machine with an installed CJK font, the installed definitions include it and CJK
+/// language names (日本語, 简体中文, 繁體中文 in Preferences) have glyphs instead of boxes.
+#[test]
+fn system_fallback_covers_cjk() {
+    assert!(!theme::font_definitions().font_data.contains_key(theme::SYSTEM_CJK_FALLBACK));
+    let defs = theme::installed_font_definitions(theme::CjkPreference::Default);
+    let off = std::env::var_os("PDFCRAFT_SYSTEM_FONTS").is_some_and(|v| v == "0");
+    let always = cfg!(windows) || cfg!(target_os = "macos");
+    if !defs.font_data.contains_key(theme::SYSTEM_CJK_FALLBACK) && (off || !always) {
+        eprintln!("skipping system_fallback_covers_cjk: no installed CJK fallback font (or PDFCRAFT_SYSTEM_FONTS=0)");
+        assert!(defs.families.values().all(|stack| !stack.iter().any(|n| n == theme::SYSTEM_CJK_FALLBACK)));
+        return;
+    }
+    for (family, stack) in &defs.families {
+        assert_eq!(stack.iter().filter(|n| *n == theme::SYSTEM_CJK_FALLBACK).count(), 1, "{family:?}: {stack:?}");
+    }
+    let mut fonts = Fonts::new(TextOptions::default(), defs);
+    for name in ["日本語", "简体中文", "繁體中文"] {
+        for id in families() {
+            assert!(fonts.has_glyphs(&id, name), "{id:?} lacks {name}");
+        }
+        assert!(layout_widths(&mut fonts, name).iter().all(|w| w.is_finite() && *w > 0.0));
+    }
+}
