@@ -272,7 +272,8 @@ fn tabbing_back_to_the_same_field_then_saving_keeps_the_committed_value() {
         ("shared-backward", true, true, false),
         ("same-frame", false, false, true),
     ] {
-        let dir = scratch(case);
+        // Prefixed so these folders never collide with another test's scratch name running in parallel.
+        let dir = scratch(&format!("tab-{case}"));
         let out = dir.join("saved.pdf");
         let bytes = if shared_widgets {
             pdf_from_objects(&[
