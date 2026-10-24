@@ -1,0 +1,45 @@
+# Fork guard manifest. One line per item that must survive every upstream merge.
+#   path           -> the file must exist
+#   path::needle   -> the file (or any file under the directory) must contain needle
+# Fork-only files
+crates/ui-egui/src/thai_fonts.rs
+crates/fonts/src/thai.rs
+crates/fonts/src/shaping.rs
+crates/forms/src/thai_text.rs
+crates/edit/src/invisible_font.rs
+vendor/epaint/src/text/font.rs
+vendor/epaint/src/text/fonts.rs
+crates/ui-egui/src/i18n/th.tsv
+crates/ui-egui/src/i18n/th_tests.rs
+crates/ui-egui/tests/fonts.rs
+crates/ui-egui/tests/thai_wrap.rs
+crates/engine/tests/thai_ocr.rs
+crates/engine/tests/doc_title_names.rs
+docs/thai-ocr-model.md
+docs/thai-word-breaking.md
+# Fork additions inside shared files
+crates/fonts/src/thai.rs::pub fn may_break
+crates/fonts/src/thai.rs::pub fn break_offsets
+crates/fonts/src/shaping.rs::pub fn shape_thai
+crates/fonts/src/shaping.rs::pub fn shape_thai_named
+crates/ui-egui/src/thai_fonts.rs::pub const DEFAULT_THAI_FONT
+crates/ui-egui/src/thai_fonts.rs::pub fn install
+crates/ui-egui/src/thai_fonts.rs::pub fn preferences_section
+crates/fonts/src/craft.rs::fn document_thai_font
+crates/fonts/src/craft.rs::fn ui_thai_fonts
+crates/ui-egui/src/theme.rs::SYSTEM_THAI_FALLBACK
+crates/ui-egui/src/theme.rs::SYSTEM_CJK_FALLBACK
+crates/ui-egui/src/theme.rs::enum CjkPreference
+crates/ui-egui/src/system_fonts.rs::pub fn thai_fallback
+crates/ui-egui/src/system_fonts.rs::pub fn cjk_fallback
+crates/ui-egui/src/i18n/mod.rs::code: "th"
+crates/engine/src/dates.rs::pub fn era_year
+crates/engine/src/lib.rs::pub fn display_name
+crates/render/src/text.rs::fn map_thai_pua
+crates/render/src/text.rs::fn is_combining_mark
+crates/render/src/text.rs::pub fn fold_case
+crates/engine/src/ocr.rs::Thai recognizer
+# Fork font code must be reached, not just defined
+crates/ui-egui/src::thai_fonts::DEFAULT_THAI_FONT
+crates/ui-egui/src::thai_fonts::preferences_section
+crates/ui-egui/src::thai_fonts::known_choice
