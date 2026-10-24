@@ -21,7 +21,7 @@ The published files are Paddle inference weights. The card has no `.onnx` file a
 | `inference.yml` | `f6ba7fefc38ca1ff398ddafa75d67d16e0b3757c4e6c833adffee98a981766c9` |
 | `ppocrv5_th_dict.txt` | `57f5406f94bb6688fb7077f7be65f08bbd71cecf48c01ea26c522cb5c4836b7a` |
 
-Hashes were computed on the files downloaded to `K:\tmp\thai-ocr-model`. Those files are not in this repository.
+Hashes were computed on the files downloaded to `K:\src\DocCraftTH\models\thai-ocr-model` (moved from `K:\tmp\thai-ocr-model`). Those files are outside this repository, in the DocCraftTH workspace root.
 
 ## Geometry
 
@@ -43,7 +43,7 @@ The model card publishes only the Paddle weights, so the converted `.rten` is ho
 
 ## Load check and class map
 
-A scratch program outside the repository, `K:\tmp\thai-ocr-probe`, loads `th_PP-OCRv5_mobile_rec.rten` with `rten` 0.26.0, feature `rten_format` only.
+A scratch program outside the repository, `K:\src\DocCraftTH\tools\thai-ocr-probe` (moved from `K:\tmp\thai-ocr-probe`), loads `th_PP-OCRv5_mobile_rec.rten` with `rten` 0.26.0, feature `rten_format` only.
 
 - Input `x` shape is `["DynamicDimension.0", 3, 48, "DynamicDimension.1"]` (BGR channels normalized with `(pixel / 255.0 - 0.5) / 0.5`, height 48 px, minimum padded width 160 px).
 - Output `fetch_name_0` shape is `["DynamicDimension.0", "unknown_2", 526]`.
@@ -64,6 +64,18 @@ Measured at 300 dpi with `CRAFT_FONTS_DIR=K:\src\craft-fonts` (Noto Sans Thai):
 | `กรุณาลงนามและส่งคืนภายในวันที่ 30 กันยายน` | `0.0000` |
 | `ข้อมูลส่วนบุคคลได้รับการคุ้มครองตามกฎหมาย` | `0.0244` |
 | **Mean** | **`0.0136`** (gate ≤ `0.05`) |
+
+### Benchmark on Thai Government Documents (2026-10-24)
+
+Evaluated with `crates/engine/tests/thai_real_docs.rs` across 16 held-out government native-text PDFs (84 unique documents split: 16 test [12 TH Sarabun + 4 other fonts], 66 train candidates, 2 excluded):
+
+| Benchmark Set | Baseline (`8b70e6d1…`) | Colab Fine-tuned (`d0329f75…`) | Outcome |
+| --- | --- | --- | --- |
+| 5 Synthetic Sentences | **`0.0136`** | `0.0853` | Baseline better (forgetting in candidate) |
+| Set A Recognizer-Only (787 lines) | `0.2260` | **`0.1932`** | Candidate better (-3.28 % CER on real lines) |
+| Set A End-to-End (27 pages) | **`0.3358`** | `0.3788` | Baseline better (more robust under detector noise) |
+| Set B Real-Scan Lines (32 verified) | **`0.1431`** | `0.2086` | Baseline better (-6.55 % CER on real scans) |
+| **Decision Gate Ruling** | **Retained in `assets/models/`** | Rejected for promotion | **Keep Baseline** |
 
 ## Installing the model
 

@@ -25,7 +25,7 @@
 
 ## 🔬 สรุปผลการวิจัยและพัฒนาเฉพาะภาษาไทย (Thai Engineering Enhancements)
 
-โครงการนี้ได้ทำการปรับปรุงและพัฒนาเพิ่มเติมใน 8 มิติหลัก:
+โครงการนี้ได้ทำการปรับปรุงและพัฒนาเพิ่มเติมใน 9 มิติหลัก:
 
 ### 1. การปรับจูน Bias โมเดลรู้จำอักขระไทย (CTC Classifier Tuning)
 - ปรับแต่งค่าน้ำหนักเวกเตอร์ `linear_8.b_0` ในโมเดล RTen (`text-recognition-th.rten`)
@@ -78,6 +78,22 @@
 - **Windows installer v0.9.0:** WiX v5 (`packaging/windows/package.ps1`) ได้ `.msi`, `.zip` แบบพกพา และ `Install-DocCraftTH.bat` ฝังโมเดล OCR ไทยและอังกฤษ ผูกนามสกุล PDF และเมนูคลิกขวา "Edit with PdfCraft"
 - `packaging` ค้นหา `craft-fonts` อัตโนมัติตามโครงสร้างโฟลเดอร์ DocCraftTH
 - CI ตรวจ Ubuntu, Windows, ARM64, Wasm, FreeBSD และ Cargo Deny (ดูปัญหา FreeBSD x86_64 ที่ยังค้างใน `CHANGELOG.md`)
+
+### 9. ชุดทดสอบ CER บนเอกสารราชการจริง และไปป์ไลน์ชุดข้อมูล Diverse Dataset v2
+- **การประเมินผล CER เปรียบเทียบ 4 มิติอย่างเป็นรูปธรรม (Empirical Benchmark & Decision Gate):**
+  - **Synthetic Base (5 ประโยค):** Baseline CER `0.0136` vs Candidate `0.0853` (Baseline เหนือกว่า)
+  - **Set A Recognizer-only (787 บรรทัดจาก 27 หน้า):** Baseline `0.2260` vs Candidate `0.1932`
+  - **Set A End-to-End (27 หน้าสแกนสังเคราะห์):** Baseline `0.3358` vs Candidate `0.3788` (Baseline ทนทานต่อ Detector Noise มากกว่า)
+  - **Set B Real-Scan Lines (สแกนจริง 150 บรรทัด):** ผ่านกระบวนการ **Human Audit Gate รับรองเฉลย 32 บรรทัด (21.3%)** ได้ผลลัพธ์ Baseline CER `0.1431` vs Candidate `0.2086` (Candidate มีข้อผิดพลาดเพิ่มขึ้น +6.55% บนสแกนจริง)
+  - **Decision Ruling:** ผลการทดสอบยืนยันว่าโมเดล Candidate มีปัญหา Catastrophic Forgetting จึงคงโมเดล Baseline คุณภาพสูงไว้ใน `assets/models/text-recognition-th.rten` เพื่อความเสถียรของระบบ
+- **Test Harness ใน Rust (`crates/engine/tests/thai_real_docs.rs`):**
+  - รองรับการสลับโมเดลผ่าน Environment Variable `PDFCRAFT_MODELS` เพื่อทดสอบโมเดลผู้สมัครโดยไม่เขียนทับ assets เดิม
+- **ไปป์ไลน์ชุดข้อมูลฝึกฝนรอบใหม่ (Diverse Training Dataset v2 — 24,786 ภาพ):**
+  - สกัดข้อความจากเอกสารราชการ 66 ฉบับ ผสมประโยค Replay ทั่วไป ป้องกันการลืมความรู้เดิม
+  - **Multi-Font Rendering (5 ตระกูล):** TH Sarabun New (40%), Angsana New (15%), Cordia New (15%), Noto Sans Thai (20%), MiSans Thai (10%)
+  - **Robust Augmentation:** Bounding Box Jittering (±4-10%), Skew (±1.2°), Noise, Blur, JPEG Artifacts ป้องกันปัญหาความคลาดเคลื่อนจาก Text Detector
+  - **พจนานุกรมอักขระไทย 524 ตัว (`dict-th.txt`):** รองรับภาษาไทย บาลี/สันสกฤต เลขไทย/อารบิก และสัญลักษณ์ทางราชการ
+  - **Colab Training Pipeline:** สมุดบันทึก `Thai_OCR_FineTune_DocCraftTH (1).ipynb` ปรับแต่งสำหรับ PP-OCRv5 Mobile Recognizer ด้วย Cosine Decay Learning Rate `1e-4` (รองรับการเทรนบน GPU A100 / T4)
 
 ---
 
