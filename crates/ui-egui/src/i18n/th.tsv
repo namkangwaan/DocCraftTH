@@ -2707,3 +2707,91 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 	It can't be searched or copied. Recognizing text on this page can fix that.	ข้อความในหน้านี้ค้นหาหรือคัดลอกไม่ได้ การรู้จำข้อความในหน้านี้ช่วยแก้ปัญหานี้ได้
 	Recognize text on this page…	รู้จำข้อความในหน้านี้…
 	Also recognize pages whose text is unusable	รู้จำหน้าที่มีข้อความใช้ไม่ได้ด้วย
+	Show gaps between pages	แสดงช่องว่างระหว่างหน้า
+	Hide gaps to join page edges. Margins inside the PDF remain unchanged.	ซ่อนช่องว่างเพื่อให้ขอบหน้าต่อกัน ระยะขอบภายใน PDF ยังคงเหมือนเดิม
+
+# New upstream features (Calc order, Text field table, Rich text)
+	Add fields	เพิ่มฟิลด์
+	Add text field table	เพิ่มตารางฟิลด์ข้อความ
+	Alignment	การจัดแนว
+	Always use my default zoom and page layout	ใช้ระดับการซูมและเค้าโครงหน้าเริ่มต้นของฉันเสมอ
+	Back to Prepare a form	กลับไปที่เตรียมฟอร์ม
+	Bulleted list	รายการสัญลักษณ์แสดงหัวข้อย่อย
+	Calculation order	ลำดับการคำนวณ
+	Column spacing	ระยะห่างระหว่างคอลัมน์
+	Column widths	ความกว้างของคอลัมน์
+	Column {n}	คอลัมน์ {n}
+	Columns	คอลัมน์
+	Distribute evenly	กระจายเท่าๆ กัน
+	Drag a field to move it, or select it and press {up} or {down}.	ลากฟิลด์เพื่อย้าย หรือเลือกฟิลด์แล้วกด {up} หรือ {down}
+	Earlier in calculation order	ก่อนหน้าตามลำดับการคำนวณ
+	Edit {field}'s formula	แก้ไขสูตรของ {field}
+	Every field calculates after the fields it reads.	ทุกฟิลด์จะคำนวณหลังจากฟิลด์ที่อ่านค่า
+	Every field outside a loop calculates after the fields it reads.	ทุกฟิลด์ที่อยู่นอกลูปจะคำนวณหลังจากฟิลด์ที่อ่านค่า
+	Field names	ชื่อฟิลด์
+	First row number	หมายเลขแถวแรก
+	Fix order	แก้ไขลำดับ
+	Larger thumbnails	ภาพขนาดย่อขนาดใหญ่ขึ้น
+	Later in calculation order	ภายหลังตามลำดับการคำนวณ
+	Layer options	ตัวเลือกเลเยอร์
+	Less	ย่อลง
+	Links on page	ลิงก์บนหน้า
+	Loop	ลูป
+	Missing from the calculation order saved in the PDF: other PDF viewers may not calculate it.	ไม่มีในลำดับการคำนวณที่บันทึกไว้ใน PDF: โปรแกรมดู PDF อื่นอาจไม่คำนวณฟิลด์นี้
+	Move only what must move, so every field calculates after the fields it reads.	ย้ายเฉพาะฟิลด์ที่จำเป็นต้องย้าย เพื่อให้ทุกฟิลด์คำนวณหลังจากฟิลด์ที่อ่านค่า
+	Moves only what must move	ย้ายเฉพาะฟิลด์ที่จำเป็นต้องย้าย
+	N or {row} is the row number, {col} the column number, {seq} the cell number. With none of them, the row number goes last.	N หรือ {row} คือหมายเลขแถว, {col} คือหมายเลขคอลัมน์, {seq} คือหมายเลขเซลล์ หากไม่ระบุ หมายเลขแถวจะอยู่ท้ายสุด
+	No field in this form calculates its value yet. Give a field a calculation on the Calculate tab of its properties, and it shows here.	ยังไม่มีฟิลด์ใดในฟอร์มนี้ที่คำนวณค่า กำหนดการคำนวณให้ฟิลด์ในแท็บคำนวณของคุณสมบัติฟิลด์ แล้วจะแสดงที่นี่
+	No field reads it	ไม่มีฟิลด์ใดอ่านค่านั้น
+	No order can fix a loop. Change one of the formulas.	ไม่มีลำดับใดที่สามารถแก้ไขลูปได้ โปรดเปลี่ยนสูตรใดสูตรหนึ่ง
+	Not in order	ไม่อยู่ในลำดับ
+	Numbered list	รายการลำดับเลข
+	Order · top calculates first	ลำดับ · ด้านบนคำนวณก่อน
+	Other options	ตัวเลือกอื่นๆ
+	Paragraph spacing	ระยะห่างย่อหน้า
+	Printer default	ค่าเริ่มต้นของเครื่องพิมพ์
+	Reading the printer's settings…	กำลังอ่านการตั้งค่าของเครื่องพิมพ์…
+	Reads {names}, which read it back. No order can fix a loop: change one of the formulas.	อ่าน {names} ซึ่งอ่านค่ากลับมา ไม่มีลำดับใดแก้ลูปได้: โปรดเปลี่ยนสูตรใดสูตรหนึ่ง
+	Reads {name}, which calculates later, so it shows an old value.	อ่าน {name} ซึ่งคำนวณทีหลัง จึงแสดงค่าเดิม
+	Remove {standard} identification	ลบการระบุ {standard}
+	Reset to Initial Visibility	รีเซ็ตเป็นการมองเห็นเริ่มต้น
+	Reshape comment	เปลี่ยนรูปร่างความคิดเห็น
+	Row spacing	ระยะห่างระหว่างแถว
+	Script	สคริปต์
+	Set calculation order	ตั้งค่าลำดับการคำนวณ
+	Show on the page which fields each field reads	แสดงบนหน้าเอกสารว่าแต่ละฟิลด์อ่านค่าจากฟิลด์ใดบ้าง
+	Shrink the page content to make room for the header and footer	ย่อเนื้อหาหน้าเพื่อเว้นที่สำหรับส่วนหัวและส่วนท้ายกระดาษ
+	Smaller thumbnails	ภาพขนาดย่อขนาดเล็กลง
+	Subscript	ตัวห้อย
+	Superscript	ตัวยก
+	Text Field Table	ตารางฟิลด์ข้อความ
+	Text field table	ตารางฟิลด์ข้อความ
+	The document's security settings don't allow printing	การตั้งค่าความปลอดภัยของเอกสารไม่อนุญาตให้พิมพ์
+	The order saved in the PDF needs tidying	ลำดับที่บันทึกไว้ใน PDF จำเป็นต้องจัดระเบียบใหม่
+	The signature's signed attributes have no content type, which CMS requires; it was read anyway.	แอตทริบิวต์ที่ลงนามแล้วของลายเซ็นไม่มี content type ซึ่ง CMS กำหนด แต่ยังคงอ่านค่าได้
+	The signature's signed attributes have no message digest, so the signature does not cover the document.	แอตทริบิวต์ที่ลงนามแล้วของลายเซ็นไม่มี message digest ลายเซ็นจึงไม่ครอบคลุมเอกสาร
+	The signature's signed attributes name a content type other than data, so it is not a signature of the document.	แอตทริบิวต์ที่ลงนามแล้วของลายเซ็นระบุ content type อื่นที่ไม่ใช่ data จึงไม่ใช่ลายเซ็นของเอกสารนี้
+	This signature uses an RSA key shorter than 2048 bits, which is no longer considered strong enough for signatures. It still validates, but it should not be relied on.	ลายเซ็นนี้ใช้คีย์ RSA สั้นกว่า 2048 บิต ซึ่งไม่ถือว่าปลอดภัยเพียงพอสำหรับลายเซ็นอีกต่อไป แม้ยังตรวจสอบความถูกต้องได้แต่ไม่ควรเชื่อถือ
+	Thumbnail size	ขนาดภาพขนาดย่อ
+	Too early	เร็วเกินไป
+	a column is too narrow: make the area wider, give the column more of it, or use fewer columns or less column spacing	คอลัมน์แคบเกินไป: ขยายพื้นที่ให้กว้างขึ้น เพิ่มความกว้างให้คอลัมน์ หรือลดจำนวนคอลัมน์หรือระยะห่างคอลัมน์
+	a field named {name} already exists	มีฟิลด์ชื่อ {name} อยู่แล้ว
+	a table has 1 to {max} columns	ตารางมีได้ 1 ถึง {max} คอลัมน์
+	a table has 1 to {max} rows	ตารางมีได้ 1 ถึง {max} แถว
+	field names can't contain a period: {name}	ชื่อฟิลด์ต้องไม่มีจุด: {name}
+	the area, the spacing and the column widths must be numbers, the spacing 0 or more and each width more than 0	พื้นที่ ระยะห่าง และความกว้างคอลัมน์ต้องเป็นตัวเลข โดยระยะห่างต้องมากกว่าหรือเท่ากับ 0 และความกว้างต้องมากกว่า 0
+	the first row number can be at most {max}	หมายเลขแถวแรกต้องไม่เกิน {max}
+	the rows are too short: make the area taller, or use fewer rows or less row spacing	แถวเตี้ยเกินไป: ขยายพื้นที่ให้สูงขึ้น หรือลดจำนวนแถวหรือระยะห่างแถว
+	two cells would both be named {name}	มีสองเซลล์ที่ใช้ชื่อ {name} ซ้ำกัน
+	{fields} read each other	{fields} อ่านค่าซึ่งกันและกัน
+	{field} reads its own value	{field} อ่านค่าของตัวเอง
+	{field} reads no other field	{field} ไม่อ่านค่าจากฟิลด์อื่น
+	{field} reads {fields}	{field} อ่านค่า {fields}
+	{names} and {last}	{names} และ {last}
+@plural	The calculation order has {n} entry that calculates nothing. Fix order removes it.|The calculation order has {n} entries that calculate nothing. Fix order removes them.	ลำดับการคำนวณมี {n} รายการที่ไม่ได้คำนวณอะไร การแก้ไขลำดับจะลบรายการเหล่านี้ออก
+@plural	{fields} is missing from the order saved in the PDF, so other PDF viewers may not calculate it.|{fields} are missing from the order saved in the PDF, so other PDF viewers may not calculate them.	{fields} ไม่มีในลำดับที่บันทึกไว้ใน PDF โปรแกรมดู PDF อื่นจึงอาจไม่คำนวณค่า
+@plural	{fields} reads it|{fields} read it	{fields} อ่านค่านั้น
+@plural	{field} calculates before {fields}, which it reads.|{field} calculates before {fields}, which it reads.	{field} คำนวณก่อน {fields} ซึ่งเป็นฟิลด์ที่อ่านค่า
+@plural	{n} calculation now uses the new name.|{n} calculations now use the new name.	การคำนวณ {n} รายการเปลี่ยนไปใช้ชื่อใหม่แล้ว
+@plural	{n} field shows an old value|{n} fields show old values	ฟิลด์ {n} รายการแสดงค่าเดิม
+@plural	{n} more field calculates too early.|{n} more fields calculate too early.	มีอีก {n} ฟิลด์ที่คำนวณเร็วเกินไป
