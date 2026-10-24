@@ -2461,7 +2461,12 @@ fn unused_descriptions_in_shared_or_inherited_resources_are_retired() {
     }
 }
 
+mod descriptions;
+mod inline_images;
+mod limits;
 mod property_retirement;
+mod surviving_references;
+mod text_state;
 
 /// `[(FIRSTARR)] [(LASTARR)] TJ` is malformed (a surplus array operand), but the operator still
 /// draws only the one immediately before it (LASTARR, 7 glyphs, 35 pt wide from x = 10) -- not
@@ -2670,4 +2675,24 @@ fn owners_nested_too_deeply_are_refused() {
     doc.update_dict(ObjRef::new(3, 0), |d| d.set(b"PieceInfo".to_vec(), Object::Ref(ObjRef::new(7, 0)))).unwrap();
     let out = remove_hidden(&mut doc, &[Hidden::LinksActionsScripts]);
     assert!(matches!(out, Err(RedactError::TooDeep)), "{out:?}");
+}
+
+/// A name tree node that lists the same kid more times than the node budget: each repeat costs a
+/// step, so the walk stops at the budget instead of scanning every repeat, and the distinct kid
+/// listed after them is never reached.
+#[test]
+fn repeated_name_tree_kids_count_towards_the_node_budget() {
+    use crate::sanitize::{Hidden, scan};
+    let repeats = "6 0 R ".repeat(100_010);
+    let doc = pdf(vec![
+        b"<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles 5 0 R >> >>".to_vec(),
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 300] /Contents 4 0 R >>".to_vec(),
+        stream("", b"BT ET"),
+        format!("<< /Kids [{repeats}7 0 R] >>").into_bytes(),
+        b"<< /Names [(a.txt) << /Type /Filespec /F (a.txt) >>] >>".to_vec(),
+        b"<< /Names [(b.txt) << /Type /Filespec /F (b.txt) >>] >>".to_vec(),
+    ]);
+    let counts: std::collections::HashMap<Hidden, usize> = scan(&doc).into_iter().collect();
+    assert_eq!(counts[&Hidden::Attachments], 1, "the walk went past its node budget to the last kid");
 }
