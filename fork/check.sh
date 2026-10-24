@@ -40,7 +40,8 @@ run_tests() {
   t -p pdfcraft-engine --lib thai_dates_use_buddhist_era || fail=1
   t -p pdfcraft-render --lib thai || fail=1
   t -p pdfcraft-render --lib combining_mark || fail=1
-  t -p pdfcraft-ui-egui --test fonts --test thai_wrap || fail=1
+  t -p pdfcraft-ui-egui --test it fonts || fail=1
+  t -p pdfcraft-ui-egui --test thai_wrap || fail=1
   t -p pdfcraft-ui-egui --lib th_tests || fail=1
 }
 
