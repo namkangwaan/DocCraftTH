@@ -2795,3 +2795,5 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 @plural	{n} calculation now uses the new name.|{n} calculations now use the new name.	การคำนวณ {n} รายการเปลี่ยนไปใช้ชื่อใหม่แล้ว
 @plural	{n} field shows an old value|{n} fields show old values	ฟิลด์ {n} รายการแสดงค่าเดิม
 @plural	{n} more field calculates too early.|{n} more fields calculate too early.	มีอีก {n} ฟิลด์ที่คำนวณเร็วเกินไป
+	The certificate of {} has critical extensions PdfCraft does not recognize, so it is not used to vouch for {}.	ใบรับรองของ {} มีส่วนขยายสำคัญที่ PdfCraft ไม่รู้จัก จึงไม่ถูกนำมาใช้รับรองให้กับ {}
+	The timestamp authority's certificate is not issued for time stamping.	ใบรับรองของผู้ให้บริการประทับตรารับรองเวลาไม่ได้ออกให้สำหรับการประทับตรารับรองเวลา
