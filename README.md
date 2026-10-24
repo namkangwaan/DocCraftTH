@@ -25,7 +25,7 @@
 
 ## 🔬 สรุปผลการวิจัยและพัฒนาเฉพาะภาษาไทย (Thai Engineering Enhancements)
 
-โครงการนี้ได้ทำการปรับปรุงและพัฒนาเพิ่มเติมใน 5 มิติหลัก:
+โครงการนี้ได้ทำการปรับปรุงและพัฒนาเพิ่มเติมใน 9 มิติหลัก:
 
 ### 1. การปรับจูน Bias โมเดลรู้จำอักขระไทย (CTC Classifier Tuning)
 - ปรับแต่งค่าน้ำหนักเวกเตอร์ `linear_8.b_0` ในโมเดล RTen (`text-recognition-th.rten`)
@@ -61,6 +61,39 @@
 ### 5. การพัฒนาชุดเครื่องมือติดตั้งสำหรับ Windows
 - จัดทำสคริปต์ Release Build (`build_release.ps1`) รองรับคำสั่ง CPU SIMD AVX2
 - จัดทำสคริปต์ Windows System Installer (`install_system.ps1`) สำหรับติดตั้งลงสู่ `C:\Program Files\PdfCraft` พร้อมกำหนดค่า System Environment (`PATH`, `PDFCRAFT_MODELS`) โดยอิสระ
+
+### 6. การแสดงผลและค้นหาข้อความไทย
+- **ฟอนต์ Sarabun (OFL-1.1)** ควบคู่ Noto Sans Thai: ตัวอักษรที่ Noto Sans Thai ไม่มีจะ fallback ไป Sarabun อัตโนมัติ (`crates/fonts`)
+- **ช่องกรอกแบบฟอร์ม (AcroForm)** แสดงตัวอักษรไทยได้ถูกต้อง ไม่เป็น `????` และมี `/ActualText` สำหรับค้นหา
+- **FR-18 PUA Mapping:** แปลงรหัสวรรณยุกต์และสระของฟอนต์ไทยยุคเก่าใน Private Use Area (U+F700..=U+F71A) เป็น Unicode มาตรฐานตอนค้นหาและคัดลอกข้อความ
+- **ฟอนต์สำรอง CJK:** ชื่อภาษาญี่ปุ่นและจีนในเมนูภาษาไม่แสดงเป็นกล่อง
+- ปี **พ.ศ.** ในส่วนติดต่อผู้ใช้ภาษาไทย (ภาษาอื่นใช้ ค.ศ.)
+
+### 7. OCR สำหรับหน้าที่อ่านข้อความไม่ได้และสแกนความละเอียดต่ำ
+- **FR-17:** ตรวจหน้าที่ข้อความใช้ไม่ได้ (PUA หรือ U+FFFD เกิน 50%) แสดงแถบเตือนพร้อมปุ่มลัดไป Recognize Text และการ์ดยืนยันก่อน OCR
+- **Batch OCR:** `pdfcraft-cli batch --ocr-unusable-text` (พารามิเตอร์ `read_unusable_text` ของ `ocr_recognize_files`) OCR เฉพาะหน้าที่ข้อความใช้ไม่ได้ ข้ามหน้าที่ปกติ
+- **Auto-upscale:** OCR ภาษาไทยจะ render สแกนที่ต่ำกว่า 200 dpi ขึ้นเป็น 200 dpi และเพิ่ม padding แนวตั้ง (บน 30%, ล่าง 18%) กันวรรณยุกต์ถูกตัด (อยู่บน branch `feat/thai-ocr-auto-upscale` รอ merge)
+
+### 8. ตัวติดตั้งและการตรวจคุณภาพ
+- **Windows installer v0.9.0:** WiX v5 (`packaging/windows/package.ps1`) ได้ `.msi`, `.zip` แบบพกพา และ `Install-DocCraftTH.bat` ฝังโมเดล OCR ไทยและอังกฤษ ผูกนามสกุล PDF และเมนูคลิกขวา "Edit with PdfCraft"
+- `packaging` ค้นหา `craft-fonts` อัตโนมัติตามโครงสร้างโฟลเดอร์ DocCraftTH
+- CI ตรวจ Ubuntu, Windows, ARM64, Wasm, FreeBSD และ Cargo Deny (ดูปัญหา FreeBSD x86_64 ที่ยังค้างใน `CHANGELOG.md`)
+
+### 9. ชุดทดสอบ CER บนเอกสารราชการจริง และไปป์ไลน์ชุดข้อมูล Diverse Dataset v2
+- **การประเมินผล CER เปรียบเทียบ 4 มิติอย่างเป็นรูปธรรม (Empirical Benchmark & Decision Gate):**
+  - **Synthetic Base (5 ประโยค):** Baseline CER `0.0136` vs Candidate `0.0853` (Baseline เหนือกว่า)
+  - **Set A Recognizer-only (787 บรรทัดจาก 27 หน้า):** Baseline `0.2260` vs Candidate `0.1932`
+  - **Set A End-to-End (27 หน้าสแกนสังเคราะห์):** Baseline `0.3358` vs Candidate `0.3788` (Baseline ทนทานต่อ Detector Noise มากกว่า)
+  - **Set B Real-Scan Lines (สแกนจริง 150 บรรทัด):** ผ่านกระบวนการ **Human Audit Gate รับรองเฉลย 32 บรรทัด (21.3%)** ได้ผลลัพธ์ Baseline CER `0.1431` vs Candidate `0.2086` (Candidate มีข้อผิดพลาดเพิ่มขึ้น +6.55% บนสแกนจริง)
+  - **Decision Ruling:** ผลการทดสอบยืนยันว่าโมเดล Candidate มีปัญหา Catastrophic Forgetting จึงคงโมเดล Baseline คุณภาพสูงไว้ใน `assets/models/text-recognition-th.rten` เพื่อความเสถียรของระบบ
+- **Test Harness ใน Rust (`crates/engine/tests/thai_real_docs.rs`):**
+  - รองรับการสลับโมเดลผ่าน Environment Variable `PDFCRAFT_MODELS` เพื่อทดสอบโมเดลผู้สมัครโดยไม่เขียนทับ assets เดิม
+- **ไปป์ไลน์ชุดข้อมูลฝึกฝนรอบใหม่ (Diverse Training Dataset v2 — 24,786 ภาพ):**
+  - สกัดข้อความจากเอกสารราชการ 66 ฉบับ ผสมประโยค Replay ทั่วไป ป้องกันการลืมความรู้เดิม
+  - **Multi-Font Rendering (5 ตระกูล):** TH Sarabun New (40%), Angsana New (15%), Cordia New (15%), Noto Sans Thai (20%), MiSans Thai (10%)
+  - **Robust Augmentation:** Bounding Box Jittering (±4-10%), Skew (±1.2°), Noise, Blur, JPEG Artifacts ป้องกันปัญหาความคลาดเคลื่อนจาก Text Detector
+  - **พจนานุกรมอักขระไทย 524 ตัว (`dict-th.txt`):** รองรับภาษาไทย บาลี/สันสกฤต เลขไทย/อารบิก และสัญลักษณ์ทางราชการ
+  - **Colab Training Pipeline:** สมุดบันทึก `Thai_OCR_FineTune_DocCraftTH (1).ipynb` ปรับแต่งสำหรับ PP-OCRv5 Mobile Recognizer ด้วย Cosine Decay Learning Rate `1e-4` (รองรับการเทรนบน GPU A100 / T4)
 
 ---
 

@@ -416,6 +416,9 @@ struct TextDevice {
     excluded_depth: Option<usize>,
     actual_filtered: bool,
     partial_replacement: bool,
+    /// Work the last redraw dedupe used, so a test can check the bound without timing it.
+    #[cfg(test)]
+    redraw_work: usize,
 }
 
 /// An `/ActualText` replacement: the glyph standing for it in `TextDevice::glyphs` (none for an
@@ -489,6 +492,8 @@ impl TextDevice {
             excluded_depth: None,
             actual_filtered: false,
             partial_replacement: false,
+            #[cfg(test)]
+            redraw_work: 0,
         }
     }
 
@@ -576,6 +581,10 @@ impl TextDevice {
                     }
                 }
             }
+        }
+        #[cfg(test)]
+        {
+            self.redraw_work = MAX_REDRAW_WORK - budget;
         }
         if redraws.is_empty() {
             return;
@@ -1920,7 +1929,12 @@ mod tests {
         }
         let started = std::time::Instant::now();
         dev.finish();
-        assert!(started.elapsed() < std::time::Duration::from_secs(30), "took {:?}", started.elapsed());
+        // The bound is the work counted, not the clock (a loaded CI runner can take several times
+        // longer): the page needs ~10^10 comparisons, so the budget must have been spent, and no more.
+        assert!(dev.redraw_work <= 1 << 22, "work {} is over the budget", dev.redraw_work);
+        assert!(dev.redraw_work + 8 > 1 << 22, "work {} left the budget unspent: the page was not hostile", dev.redraw_work);
+        // A loose backstop for a loop that never ends.
+        assert!(started.elapsed() < std::time::Duration::from_secs(120), "took {:?}", started.elapsed());
         assert_eq!(dev.glyphs.len(), 2 * N + 2, "unmatched glyphs are kept");
         assert_eq!(dev.glyphs[1].2.text, "fi", "the redraw found within the budget takes the replacement");
     }
