@@ -2774,3 +2774,31 @@ theme	Appearance	Aspect
 	field names can't contain a period: {name}	numele câmpurilor nu pot conține punct: {name}
 	two cells would both be named {name}	două celule s-ar numi amândouă {name}
 	a field named {name} already exists	există deja un câmp numit {name}
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 pagină are text ilizibil. Recunoașteți textul de pe ea? Textul se păstrează și puteți anula într-un singur pas.
+	; some pages have unreadable text (turn on “{option}” to read them)	; unele pagini au text ilizibil (activați „{option}” pentru a le citi)
+	Also recognize pages whose text is unusable	Recunoaște și paginile al căror text este inutilizabil
+	Arabic digits	Cifre arabe
+	As recognized	Așa cum a fost recunoscut
+	Continue from previous section	Continuă din secțiunea anterioară
+	Digits	Cifre
+	Interface font	Font interfață
+	It can't be searched or copied. Recognizing text on this page can fix that.	Nu poate fi căutat sau copiat. Recunoașterea textului de pe această pagină poate rezolva problema.
+	Not installed	Neinstalat
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped afișează doar thailandeza. Textul în engleză al interfeței rămâne în fontul interfeței.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium afișează interfața în engleză și thailandeză.
+	Operating system	Sistem de operare
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	Fonturile sistemului de operare sunt afișate doar pe ecran. Nu sunt scrise într-un PDF.
+	Optional font	Font opțional
+	Primary	Principal
+	Recognize text on this page…	Recunoaște textul de pe această pagină…
+	Recognize these pages	Recunoaște aceste pagini
+	Show optional fonts	Afișează fonturile opționale
+	Thai digits	Cifre thailandeze
+	Thai text	Text thailandez
+	Thai text font	Font text thailandez
+	This application	Această aplicație
+	This page has unusable text	Această pagină are text inutilizabil
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	modelul de recunoaștere a textului pentru {language} nu este instalat (reinstalați PdfCraft sau setați PDFCRAFT_MODELS la folderul care îl conține)
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} pagini au text ilizibil. Recunoașteți textul doar pe acele pagini? Textul se păstrează și puteți anula într-un singur pas.

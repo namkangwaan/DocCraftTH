@@ -2550,3 +2550,18 @@ animation effects	Off	Вимкнено
 	It can't be searched or copied. Recognizing text on this page can fix that.	Його не можна знайти пошуком чи скопіювати. Розпізнавання тексту на цій сторінці може це виправити.
 	Recognize text on this page…	Розпізнати текст на цій сторінці…
 	Also recognize pages whose text is unusable	Розпізнавати й сторінки з непридатним текстом
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	Interface font	Шрифт інтерфейсу
+	Not installed	Не встановлено
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped відображає лише тайський текст. Текст інтерфейсу англійською залишається шрифтом інтерфейсу.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium відображає англійський та тайський інтерфейс.
+	Operating system	Операційна система
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	Шрифти операційної системи відображаються лише на екрані. Вони не записуються в PDF.
+	Optional font	Додатковий шрифт
+	Primary	Основний
+	Show optional fonts	Показати додаткові шрифти
+	Thai text	Тайський текст
+	Thai text font	Шрифт для тайського тексту
+	This application	Ця програма
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	модель розпізнавання тексту для {language} не встановлена (перевстановіть PdfCraft або вкажіть папку з нею у PDFCRAFT_MODELS)

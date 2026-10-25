@@ -2750,3 +2750,31 @@ theme	Appearance	모양
 	field names can't contain a period: {name}	필드 이름에는 마침표를 쓸 수 없습니다: {name}
 	two cells would both be named {name}	두 셀의 이름이 모두 {name}이(가) 됩니다
 	a field named {name} already exists	{name}(이)라는 필드가 이미 있습니다
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.
+	; some pages have unreadable text (turn on “{option}” to read them)	; some pages have unreadable text (turn on “{option}” to read them)
+	Also recognize pages whose text is unusable	Also recognize pages whose text is unusable
+	Arabic digits	Arabic digits
+	As recognized	As recognized
+	Continue from previous section	Continue from previous section
+	Digits	Digits
+	Interface font	Interface font
+	It can't be searched or copied. Recognizing text on this page can fix that.	It can't be searched or copied. Recognizing text on this page can fix that.
+	Not installed	Not installed
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium draws the English and Thai interface.
+	Operating system	Operating system
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	Operating system fonts are drawn on screen only. They are not written into a PDF.
+	Optional font	Optional font
+	Primary	Primary
+	Recognize text on this page…	Recognize text on this page…
+	Recognize these pages	Recognize these pages
+	Show optional fonts	Show optional fonts
+	Thai digits	Thai digits
+	Thai text	Thai text
+	Thai text font	Thai text font
+	This application	This application
+	This page has unusable text	This page has unusable text
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.

@@ -2774,3 +2774,31 @@ theme	Appearance	Aspecte
 	field names can't contain a period: {name}	els noms dels camps no poden contenir cap punt: {name}
 	two cells would both be named {name}	dues cel·les es dirien {name}
 	a field named {name} already exists	ja existeix un camp anomenat {name}
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 pàgina té text il·legible. Voleu reconèixer-ne el text? El text es manté i podeu desfer-ho en un sol pas.
+	; some pages have unreadable text (turn on “{option}” to read them)	; algunes pàgines tenen text il·legible (activeu «{option}» per llegir-les)
+	Also recognize pages whose text is unusable	Reconeix també pàgines amb text inutilitzable
+	Arabic digits	Xifres aràbigues
+	As recognized	Com s'ha reconegut
+	Continue from previous section	Continua des de la secció anterior
+	Digits	Xifres
+	Interface font	Tipus de lletra de la interfície
+	It can't be searched or copied. Recognizing text on this page can fix that.	No es pot cercar ni copiar. Reconèixer el text d'aquesta pàgina ho pot solucionar.
+	Not installed	No instal·lat
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped només dibuixa tailandès. El text de la interfície en anglès es manté amb el tipus de lletra de la interfície.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium dibuixa la interfície en anglès i tailandès.
+	Operating system	Sistema operatiu
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	Els tipus de lletra del sistema operatiu només es dibuixen a la pantalla. No s'escriuen en un PDF.
+	Optional font	Tipus de lletra opcional
+	Primary	Principal
+	Recognize text on this page…	Reconeix el text d'aquesta pàgina…
+	Recognize these pages	Reconeix aquestes pàgines
+	Show optional fonts	Mostra els tipus de lletra opcionals
+	Thai digits	Xifres tailandeses
+	Thai text	Text tailandès
+	Thai text font	Tipus de lletra del text tailandès
+	This application	Aquesta aplicació
+	This page has unusable text	Aquesta pàgina té text inutilitzable
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	el model de reconeixement de text en {language} no està instal·lat (reinstal·leu el PdfCraft o establiu PDFCRAFT_MODELS a la carpeta que el conté)
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} pàgines tenen text il·legible. Voleu reconèixer el text només en aquestes pàgines? El text es manté i podeu desfer-ho en un sol pas.

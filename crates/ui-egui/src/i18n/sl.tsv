@@ -2533,3 +2533,18 @@ animation effects	Off	Izklopljeni
 	It can't be searched or copied. Recognizing text on this page can fix that.	Ni ga mogoče iskati ali kopirati. Prepoznavanje besedila na tej strani lahko to odpravi.
 	Recognize text on this page…	Prepoznaj besedilo na tej strani…
 	Also recognize pages whose text is unusable	Prepoznaj tudi strani z neuporabnim besedilom
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	Interface font	Interface font
+	Not installed	Not installed
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium draws the English and Thai interface.
+	Operating system	Operating system
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	Operating system fonts are drawn on screen only. They are not written into a PDF.
+	Optional font	Optional font
+	Primary	Primary
+	Show optional fonts	Show optional fonts
+	Thai text	Thai text
+	Thai text font	Thai text font
+	This application	This application
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)

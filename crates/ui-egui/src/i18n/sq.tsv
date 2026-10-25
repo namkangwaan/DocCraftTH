@@ -2500,3 +2500,31 @@ animation effects	Off	Joaktiv
 	field names can't contain a period: {name}	emrat e fushave nuk mund të përmbajnë pikë: {name}
 	two cells would both be named {name}	dy qeliza do të kishin të dyja emrin {name}
 	a field named {name} already exists	ekziston tashmë një fushë me emrin {name}
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 faqe ka tekst të palexueshëm. Të njihet teksti në të? Teksti mbetet dhe mund ta zhbëni me një hap.
+	; some pages have unreadable text (turn on “{option}” to read them)	; disa faqe kanë tekst të palexueshëm (aktivizoni “{option}” për t'i lexuar)
+	Also recognize pages whose text is unusable	Gjithashtu njih faqet teksti i të cilave është i papërdorshëm
+	Arabic digits	Shifra arabe
+	As recognized	Siç është njohur
+	Continue from previous section	Vazhdo nga seksioni i mëparshëm
+	Digits	Shifra
+	Interface font	Fonti i ndërfaqes
+	It can't be searched or copied. Recognizing text on this page can fix that.	Nuk mund të kërkohet ose të kopjohet. Njohja e tekstit në këtë faqe mund ta rregullojë këtë.
+	Not installed	I painstaluar
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped vizaton vetëm tajlandisht. Teksti i ndërfaqes në anglisht qëndron në fontin e ndërfaqes.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium vizaton ndërfaqen në anglisht dhe tajlandisht.
+	Operating system	Sistemi operativ
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	Fontet e sistemit operativ vizatohen vetëm në ekran. Ato nuk shkruhen në një PDF.
+	Optional font	Font opsional
+	Primary	Kryesor
+	Recognize text on this page…	Njih tekstin në këtë faqe…
+	Recognize these pages	Njih këto faqe
+	Show optional fonts	Shfaq fontet opsionale
+	Thai digits	Shifra tajlandeze
+	Thai text	Tekst tajlandez
+	Thai text font	Fonti i tekstit tajlandez
+	This application	Ky aplikacion
+	This page has unusable text	Kjo faqe ka tekst të papërdorshëm
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	modeli i njohjes së tekstit për {language} nuk është instaluar (riinstaloni PdfCraft ose caktoni PDFCRAFT_MODELS te dosja që e mban atë)
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} faqe kanë tekst të palexueshëm. Të njihet teksti vetëm në ato faqe? Teksti mbetet dhe mund ta zhbëni me një hap.

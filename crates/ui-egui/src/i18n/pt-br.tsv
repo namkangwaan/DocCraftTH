@@ -2812,3 +2812,18 @@ theme	Appearance	Aparência
 	It can't be searched or copied. Recognizing text on this page can fix that.	Ele não pode ser pesquisado nem copiado. Reconhecer o texto desta página pode resolver isso.
 	Recognize text on this page…	Reconhecer texto nesta página…
 	Also recognize pages whose text is unusable	Reconhecer também as páginas com texto inutilizável
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	Interface font	Fonte da interface
+	Not installed	Não instalado
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped exibe apenas tailandês. O texto em inglês permanece na fonte da interface.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium exibe a interface em inglês e tailandês.
+	Operating system	Sistema operacional
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	As fontes do sistema operacional são exibidas apenas na tela. Elas não são gravadas em um PDF.
+	Optional font	Fonte opcional
+	Primary	Principal
+	Show optional fonts	Mostrar fontes opcionais
+	Thai text	Texto em tailandês
+	Thai text font	Fonte do texto em tailandês
+	This application	Este aplicativo
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	o modelo de reconhecimento de texto em {language} não está instalado (reinstale o PdfCraft ou defina PDFCRAFT_MODELS para a pasta correspondente)

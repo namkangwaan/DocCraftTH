@@ -2783,3 +2783,31 @@ theme	Appearance	Teema
 	field names can't contain a period: {name}	kenttien nimissä ei voi olla pistettä: {name}
 	two cells would both be named {name}	kahdella solulla olisi sama nimi {name}
 	a field named {name} already exists	kenttä nimeltä {name} on jo olemassa
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	Yhdellä sivulla on lukukelvotonta tekstiä. Tunnistetaanko sen teksti? Nykyinen teksti säilyy, ja toiminnon voi kumota yhdellä vaiheella.
+	; some pages have unreadable text (turn on “{option}” to read them)	; joillakin sivuilla on lukukelvotonta tekstiä (ota käyttöön ”{option}” niiden lukemiseksi)
+	Also recognize pages whose text is unusable	Tunnista myös sivut, joiden teksti ei ole käytettävissä
+	Arabic digits	Arabialaiset numerot
+	As recognized	Tunnistetun mukaisesti
+	Continue from previous section	Jatka edellisestä osiosta
+	Digits	Numerot
+	Interface font	Käyttöliittymän kirjasin
+	It can't be searched or copied. Recognizing text on this page can fix that.	Sitä ei voi hakea tai kopioida. Tekstin tunnistaminen tällä sivulla voi korjata tämän.
+	Not installed	Ei asennettu
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped piirtää vain thaita. Englanninkielinen käyttöliittymäteksti käyttää käyttöliittymän kirjasinta.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium piirtää englannin- ja thainkielisen käyttöliittymän.
+	Operating system	Käyttöjärjestelmä
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	Käyttöjärjestelmän kirjasimet piirretään vain näytölle. Niitä ei kirjoiteta PDF-tiedostoon.
+	Optional font	Valinnainen kirjasin
+	Primary	Ensisijainen
+	Recognize text on this page…	Tunnista teksti tällä sivulla…
+	Recognize these pages	Tunnista nämä sivut
+	Show optional fonts	Näytä valinnaiset kirjasimet
+	Thai digits	Thainumerot
+	Thai text	Thainkielinen teksti
+	Thai text font	Thainkielisen tekstin kirjasin
+	This application	Tämä sovellus
+	This page has unusable text	Tällä sivulla on tekstiä, jota ei voi käyttää
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	{language}-tekstintunnistusmallia ei ole asennettu (asenna PdfCraft uudelleen tai aseta PDFCRAFT_MODELS-muuttuja sen kansioon)
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} sivulla on lukukelvotonta tekstiä. Tunnistetaanko teksti vain kyseisiltä sivuilta? Nykyinen teksti säilyy, ja toiminnon voi kumota yhdellä vaiheella.

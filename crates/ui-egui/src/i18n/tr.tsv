@@ -2524,3 +2524,18 @@ animation effects	Off	Kapalı
 	It can't be searched or copied. Recognizing text on this page can fix that.	Metin aranamıyor veya kopyalanamıyor. Bu sayfadaki metni tanımak bunu düzeltebilir.
 	Recognize text on this page…	Bu sayfadaki metni tanı…
 	Also recognize pages whose text is unusable	Kullanılamayan metin içeren sayfaları da tanı
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	Interface font	Arayüz yazı tipi
+	Not installed	Yüklü değil
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped yalnızca Tayca çizer. İngilizce arayüz metni arayüz yazı tipinde kalır.
+	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium İngilizce ve Tayca arayüzü çizer.
+	Operating system	İşletim sistemi
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	İşletim sistemi yazı tipleri yalnızca ekranda çizilir. PDF içine yazılmazlar.
+	Optional font	İsteğe bağlı yazı tipi
+	Primary	Birincil
+	Show optional fonts	İsteğe bağlı yazı tiplerini göster
+	Thai text	Tayca metin
+	Thai text font	Tayca metin yazı tipi
+	This application	Bu uygulama
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	{language} metin tanıma modeli yüklü değil (PdfCraft'ı yeniden yükleyin veya PDFCRAFT_MODELS değişkenini modeli içeren klasöre ayarlayın)
