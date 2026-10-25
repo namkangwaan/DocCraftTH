@@ -83,15 +83,16 @@
 - **CI ครบทุกแพลตฟอร์ม:** ตรวจ Ubuntu, Windows, ARM64, Wasm, FreeBSD และ Cargo Deny (แก้ไขเทสต์ `redraw_dedupe_work_is_bounded_on_hostile_pages` ให้วัดด้วยปริมาณงานแทนเวลาจริง เพื่อไม่ให้ล้มบนเครื่องรัน FreeBSD x86_64 ที่โหลดสูง)
 
 ### 9. ชุดทดสอบ CER บนเอกสารราชการจริง และการประเมินเปรียบเทียบโมเดล (Empirical Testset & Decision Gate)
-จัดทำชุดทดสอบมาตรฐานนอกคลังโค้ด (`data/testset/`) จากเอกสารราชการจริง 84 ฉบับที่ไม่ซ้ำกัน (แบ่งเป็น `test` 16 ฉบับ, `train_candidate` 66 ฉบับ, `excluded` 2 ฉบับ) และพัฒนาชุดทดสอบ Rust [`crates/engine/tests/thai_real_docs.rs`](crates/engine/tests/thai_real_docs.rs) ที่สลับโมเดลด้วย `THAI_CANDIDATE_MODELS_DIR` / `PDFCRAFT_MODELS` โดยไม่เขียนทับ `assets/models/`:
+จัดทำชุดทดสอบมาตรฐานนอกคลังโค้ด (`data/testset/`) จากเอกสารราชการจริง 84 ฉบับที่ไม่ซ้ำกัน (แบ่งเป็น `test` 16 ฉบับ, `train_candidate` 66 ฉบับ, `excluded` 2 ฉบับ) และพัฒนาชุดทดสอบ Rust [`crates/engine/tests/thai_real_docs.rs`](crates/engine/tests/thai_real_docs.rs) ที่สลับโมเดลด้วย `THAI_CANDIDATE_MODELS_DIR` / `PDFCRAFT_MODELS` พร้อมรองรับการอ่านความกว้าง Input (`image_shape: [3, 48, W]`) จาก `model_meta.json` โดยไม่เขียนทับ `assets/models/`:
 
-| ชุดทดสอบ (Benchmark Set) | โมเดลเดิมในระบบ (Baseline `8b70e6d1…`) | Candidate v1 (`d0329f75…`) | **Candidate v2 (`07626524…`)** | การเปลี่ยนแปลง (v2 เทียบ v1) | สรุปผลทางเทคนิค |
+| ชุดทดสอบ (Benchmark Set) | โมเดลเดิมในระบบ (Baseline `8b70e6d1…`) | Candidate v1 (`d0329f75…`) | **Candidate v2 (`07626524…`)** | Candidate R4 (`fed74cec…`, W=800) | สรุปผลทางเทคนิค |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **1. Synthetic 5 Sentences** (ประโยคมาตรฐาน) | **`0.0136`** | `0.0853` | **`0.0174`** | 🟢 **ลดลง -6.79%** | แก้ปัญหา Catastrophic Forgetting สำเร็จ |
-| **2. Set A Recognizer-Only** (787 บรรทัดราชการ) | `0.2260` | `0.1932` | **`0.1915`** | 🟢 **ลดลง -0.17%** | 🏆 **Candidate v2 ชนะเลิศ** (ดีกว่า Baseline -3.45%) |
-| **3. Set A End-to-End** (สแกนสังเคราะห์ 27 หน้า) | **`0.3358`** | `0.3788` | **`0.3619`** | 🟢 **ดีขึ้น +1.69%** | Baseline ทนทานต่อ Detector Noise มากกว่า |
-| **4. Set B Real-Scan Lines** (สแกนจริง 32 บรรทัดตรวจรับรอง) | **`0.1431`** | `0.2086` | **`0.1952`** | 🟢 **ดีขึ้น +1.34%** | ผ่าน Human Audit Gate 21.3%; Baseline แม่นยำกว่าบนสแกนจริง |
-| **คำตัดสิน (Decision Gate Ruling)** | **คงไว้ใน `assets/models/`** | ปฏิเสธ (Rejected) | **ปฏิเสธการสลับ** | ดีขึ้นทุกมิติชัดเจน | **คง Baseline เป็นโมเดลหลักใน Production** |
+| **จำนวน Output Classes** | 526 (`dict` 524) | 526 (`dict` 524) | **526 (`dict` 524)** | 241 (`dict` 239) | v2 โหลด Pretrained ครบ 100%; R4 ถูกรีเซ็ต SVTR+Head |
+| **1. Synthetic 5 Sentences** (ประโยคมาตรฐาน) | **`0.0136`** | `0.0853` | **`0.0174`** | `0.4027` | v2 แก้ปัญหา Catastrophic Forgetting สำเร็จ (-6.79% จาก v1) |
+| **2. Set A Recognizer-Only** (787 บรรทัดราชการ) | `0.2260` | `0.1932` | **`0.1915`** | `0.5423` | 🏆 **Candidate v2 ชนะเลิศ** (ดีกว่า Baseline -3.45%) |
+| **3. Set A End-to-End** (สแกนสังเคราะห์ 27 หน้า) | **`0.3358`** | `0.3788` | **`0.3619`** | `0.6732` | Baseline ทนทานต่อ Detector Noise มากกว่า |
+| **4. Set B Real-Scan Lines** (สแกนจริง 32 บรรทัดตรวจรับรอง) | **`0.1431`** | `0.2086` | **`0.1952`** | `0.6544` | ผ่าน Human Audit Gate 21.3%; Baseline แม่นยำกว่าบนสแกนจริง |
+| **คำตัดสิน (Decision Gate Ruling)** | **คงไว้ใน `assets/models/`** | ปฏิเสธ (Rejected) | **ดีที่สุดในกลุ่ม Fine-tune** | ปฏิเสธ (Rejected) | **คง Baseline เป็นโมเดลหลักใน Production** |
 
 ### 10. ไปป์ไลน์ชุดข้อมูลฝึกฝนรอบใหม่ (Diverse Training Dataset v2 — 24,786 ภาพ)
 พัฒนาไปป์ไลน์สร้างชุดข้อมูลฝึกฝน (`tools/dataset_builder/`) เพื่อแก้ปัญหา Catastrophic Forgetting และเพิ่มความหลากหลายของฟอนต์:

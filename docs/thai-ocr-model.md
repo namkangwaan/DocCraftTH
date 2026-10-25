@@ -69,13 +69,14 @@ Measured at 300 dpi with `CRAFT_FONTS_DIR=K:\src\craft-fonts` (Noto Sans Thai):
 
 Evaluated with `crates/engine/tests/thai_real_docs.rs` across 16 held-out government native-text PDFs (84 unique documents split: 16 test [12 TH Sarabun + 4 other fonts], 66 train candidates, 2 excluded):
 
-| Benchmark Set | Baseline (`8b70e6d1…`) | Candidate v1 (`d0329f75…`) | Candidate v2 (`07626524…`) | Outcome |
-| --- | --- | --- | --- | --- |
-| 5 Synthetic Sentences | **`0.0136`** | `0.0853` | `0.0174` | Forgetting resolved in v2; Baseline slightly cleaner |
-| Set A Recognizer-Only (787 lines) | `0.2260` | `0.1932` | **`0.1915`** | **Candidate v2 wins** (-3.45 % CER on real lines) |
-| Set A End-to-End (27 pages) | **`0.3358`** | `0.3788` | `0.3619` | v2 improved +1.69 % over v1; Baseline more robust |
-| Set B Real-Scan Lines (32 verified) | **`0.1431`** | `0.2086` | `0.1952` | v2 improved +1.34 % over v1; Baseline better on scans |
-| **Decision Gate Ruling** | **Retained in `assets/models/`** | Rejected | **Rejected for Promotion** | **Keep Baseline** in production assets |
+| Benchmark Set | Baseline (`8b70e6d1…`) | Candidate v1 (`d0329f75…`) | Candidate v2 (`07626524…`) | Candidate R4 (`fed74cec…`, W=800) | Outcome |
+| --- | --- | --- | --- | --- | --- |
+| Output Classes | 526 (`dict` 524) | 526 (`dict` 524) | 526 (`dict` 524) | 241 (`dict` 239) | v2 kept pretrained SVTR+Head; R4 reset SVTR+Head |
+| 5 Synthetic Sentences | **`0.0136`** | `0.0853` | `0.0174` | `0.4027` | Forgetting resolved in v2; Baseline slightly cleaner |
+| Set A Recognizer-Only (787 lines) | `0.2260` | `0.1932` | **`0.1915`** | `0.5423` | **Candidate v2 wins** (-3.45 % CER on real lines) |
+| Set A End-to-End (27 pages) | **`0.3358`** | `0.3788` | `0.3619` | `0.6732` | v2 improved +1.69 % over v1; Baseline more robust |
+| Set B Real-Scan Lines (32 verified) | **`0.1431`** | `0.2086` | `0.1952` | `0.6544` | v2 improved +1.34 % over v1; Baseline better on scans |
+| **Decision Gate Ruling** | **Retained in `assets/models/`** | Rejected | **Best Finetuned (v2)** | Rejected | **Keep Baseline** in production assets |
 
 ## Installing the model
 
