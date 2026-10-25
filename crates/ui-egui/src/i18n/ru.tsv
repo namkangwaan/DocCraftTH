@@ -604,6 +604,7 @@
 	Discard private data of other applications	Удалить личные данные других приложений
 	Discard hidden text	Удалить скрытый текст
 	Use Flate to encode streams that are not encoded	Использовать Flate для кодирования некодированных потоков
+	In streams that use LZW encoding, use Flate instead	Использовать Flate вместо LZW в потоках с кодированием LZW
 	Remove invalid links and bookmarks	Удалить недействительные ссылки и закладки
 	Remove unreferenced named destinations	Удалить неиспользуемые именованные места назначения
 	Compress document structure (object streams)	Сжать структуру документа (потоки объектов)
@@ -1638,7 +1639,6 @@
 	Recognized {n} words	Распознано {n} слов
 	{words} on {pages}	{words} на {pages}
 	; 1 page already had text	; 1 страница уже имела текст
-	; some pages have unreadable text (turn on “{option}” to read them)	; на некоторых страницах текст нечитаем (включите «{option}», чтобы распознать их)
 	; {n} pages already had text	; {n} страниц уже имели текст
 	Recognized {w} words in 1 file	Распознано {w} слов в 1 файле
 	Recognized {w} words in {n} files	Распознано {w} слов в {n} файлах
@@ -2042,6 +2042,10 @@
 	Perimeter	Периметр
 	Area	Площадь
 	Drawing scale	Масштаб чертежа
+	Scale	Масштаб
+	Common scales	Распространённые масштабы
+	Enter a scale such as 1:50.	Введите масштаб, например 1:50.
+	Applying a scale switches units to m / mm.	При применении масштаба единицы переключаются на м / мм.
 	Snapping	Привязка
 	Export measurements	Экспортировать измерения
 	Open a PDF to measure it.	Откройте PDF для измерения.
@@ -2109,7 +2113,10 @@
 	Default zoom	Масштаб по умолчанию
 	Used when a PDF doesn't ask for a layout or zoom. Continuous scrolling never snaps between pages.	Используется, когда PDF не запрашивает макет или масштаб. Непрерывная прокрутка никогда не привязывается между страницами.
 	Reopen the files that were open when PdfCraft last closed	Повторно открывать файлы, которые были открыты при последнем закрытии PdfCraft
+	Restore the last view (page, zoom and page display) when a document is opened again	Восстанавливать последний вид (страницу, масштаб и показ страниц) при повторном открытии документа
 	Reload documents when their files change on disk	Перезагружать документы при изменении их файлов на диске
+	Don't show again	Больше не показывать
+	Show a notice when a document is secured	Показывать уведомление, когда документ защищён
 	Always use my default zoom and page layout	Всегда использовать мой масштаб и макет страницы по умолчанию
 	This file changed on disk. Reload shows the new version and drops your unsaved changes; Save replaces it with this version.	Этот файл был изменён на диске. «Перезагрузить» покажет новую версию и отбросит несохранённые изменения; «Сохранить» заменит её этой версией.
 	Reload	Перезагрузить
@@ -2395,6 +2402,19 @@ animation effects	Off	Выкл
 	Make properties default	Сделать свойства стандартными
 	Pages selected	Выделенные страницы
 	Page properties	Свойства страницы
+	Create & Edit	Создание и редактирование
+	Review & Compare	Рецензирование и сравнение
+	Forms & Signatures	Формы и подписи
+	Protect & Standardize	Защита и стандартизация
+	Customize & Automate	Настройка и автоматизация
+	No tools match your search.	Нет инструментов, соответствующих запросу.
+	Expand all tools	Развернуть все инструменты
+	Collapse all tools	Свернуть все инструменты
+	Attach a file…	Прикрепить файл…
+	Delete attachment	Удалить вложение
+	Attaching files is not available on the web yet	Прикрепление файлов в веб-версии пока недоступно
+	Attach {name}	Прикрепить {name}
+	Delete attachment {key}	Удалить вложение {key}
 	Font	Шрифт
 	Bulleted list	Маркированный список
 	Numbered list	Нумерованный список
@@ -2429,6 +2449,13 @@ animation effects	Off	Выкл
 	field names can't contain a period: {name}	имена полей не могут содержать точку: {name}
 	two cells would both be named {name}	две ячейки получили бы одно имя {name}
 	a field named {name} already exists	поле с именем {name} уже существует
+
+# Date picker: Today button (#4274) (AI-assisted, not separately native-reviewed)
+	Today	Сегодня
+@plural	{n} reply|{n} replies	{n} ответ|{n} ответа|{n} ответов
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	; some pages have unreadable text (turn on “{option}” to read them)	; на некоторых страницах текст нечитаем (включите «{option}», чтобы распознать их)
 	Continue from previous section	Continue from previous section
 	Digits	Цифры
 	As recognized	Как распознано
@@ -2441,8 +2468,6 @@ animation effects	Off	Выкл
 	It can't be searched or copied. Recognizing text on this page can fix that.	Его нельзя найти поиском или скопировать. Распознавание текста на этой странице может это исправить.
 	Recognize text on this page…	Распознать текст на этой странице…
 	Also recognize pages whose text is unusable	Распознавать и страницы с непригодным текстом
-# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
-# These additions have not had separate native-speaker review.
 	Interface font	Interface font
 	Not installed	Not installed
 	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.

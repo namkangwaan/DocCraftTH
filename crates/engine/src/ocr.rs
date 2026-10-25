@@ -74,6 +74,11 @@ pub struct OcrSettings {
     pub read_unusable_text: bool,
     /// How recognised digits are written into the text layer.
     pub digits: Digits,
+    /// What counts as the page's text when `skip_text_pages` is on: only its own (page content
+    /// and form fields). Comments and text boxes are left out, and are not drawn into the picture
+    /// that is read, so a scan with a few comments on it is still a scan. `false`: everything
+    /// the page shows.
+    pub native_text_only: bool,
 }
 
 /// A recognised word whose box is at least this much covered by the page's own text is that
@@ -105,7 +110,14 @@ fn covered(word: [f32; 4], text: &[[f32; 4]]) -> f32 {
 
 impl Default for OcrSettings {
     fn default() -> Self {
-        OcrSettings { dpi: 300.0, language: "en".into(), skip_text_pages: true, read_unusable_text: false, digits: Digits::AsRead }
+        OcrSettings {
+            dpi: 300.0,
+            language: "en".into(),
+            skip_text_pages: true,
+            read_unusable_text: false,
+            digits: Digits::AsRead,
+            native_text_only: false,
+        }
     }
 }
 
@@ -177,7 +189,8 @@ impl OcrJob {
     /// Read the pages. `progress(done, total)` is called before each page; returning `false`
     /// stops (the pages read so far are returned).
     pub fn run(self, ocr: &Ocr, mut progress: impl FnMut(usize, usize) -> bool) -> Vec<OcrPage> {
-        let config = RenderConfig { password: self.password.as_deref().map(Arc::from), ..Default::default() };
+        let config =
+            RenderConfig { password: self.password.as_deref().map(Arc::from), hide_comments: self.settings.native_text_only, ..Default::default() };
         let mut r = PageRenderer::new(self.bytes.clone(), config);
         let mut out = Vec::new();
         let total = self.pages.len();

@@ -288,6 +288,7 @@
 	Discard private data of other applications	丢弃其他应用程序的私有数据
 	Discard hidden text	丢弃隐藏文本
 	Use Flate to encode streams that are not encoded	使用 Flate 编码未编码的流
+	In streams that use LZW encoding, use Flate instead	在使用 LZW 编码的流中改用 Flate
 	Remove invalid links and bookmarks	删除无效链接和书签
 	Remove unreferenced named destinations	删除未引用的命名目标
 	Compress document structure (object streams)	压缩文档结构（对象流）
@@ -1605,7 +1606,6 @@
 	Recognized {n} words	识别了{n}个单词
 	{words} on {pages}	在{pages}{words}
 	; 1 page already had text	；1 页已有文本
-	; some pages have unreadable text (turn on “{option}” to read them)	；部分页面的文本无法读取（要识别这些页面，请打开“{option}”）
 	; {n} pages already had text	；{n} 页已有文本
 	Recognized {w} words in 1 file	在 1 个文件中识别了{w}个单词
 	Recognized {w} words in {n} files	在{n}个文件中识别了{w}个单词
@@ -1911,6 +1911,10 @@
 	Perimeter	周长
 	Area	面积
 	Drawing scale	图面比例
+	Scale	比例
+	Common scales	常用比例
+	Enter a scale such as 1:50.	请输入比例，例如 1:50。
+	Applying a scale switches units to m / mm.	应用比例会将单位切换为 m / mm。
 	Snapping	吸附
 	Export measurements	导出测量结果
 	Open a PDF to measure it.	打开 PDF 以进行测量。
@@ -2143,7 +2147,10 @@
 	Used when opening PDFs. An explicit launch or control mode takes precedence for the session.	用于打开 PDF 时。如果启动参数或控制通道明确指定了模式，则本次会话优先使用该模式。
 	Used when a PDF doesn't ask for a layout or zoom. Continuous scrolling never snaps between pages.	PDF 未指定布局或缩放时使用。连续滚动时页面不会逐页吸附。
 	Reopen the files that were open when PdfCraft last closed	重新打开上次关闭 PdfCraft 时打开的文件
+	Restore the last view (page, zoom and page display) when a document is opened again	再次打开文档时恢复上次的视图（页面、缩放和页面显示）
 	Reload documents when their files change on disk	文件在磁盘上更改时重新加载对应的文档
+	Don't show again	不再显示
+	Show a notice when a document is secured	文档已加密时显示通知
 	Always use my default zoom and page layout	始终使用我的默认缩放和页面布局
 	This file changed on disk. Reload shows the new version and drops your unsaved changes; Save replaces it with this version.	此文件已在磁盘上更改。“重新加载”显示新版本并放弃未保存的更改；“保存”则用此版本替换它。
 	Reload	重新加载
@@ -2446,6 +2453,19 @@ animation effects	Off	关
 	Make properties default	将属性设为默认
 	Pages selected	选定的页面
 	Page properties	页面属性
+	Create & Edit	创建和编辑
+	Review & Compare	审阅和比较
+	Forms & Signatures	表单和签名
+	Protect & Standardize	保护和标准化
+	Customize & Automate	自定义和自动化
+	No tools match your search.	没有与搜索匹配的工具。
+	Expand all tools	展开所有工具
+	Collapse all tools	折叠所有工具
+	Attach a file…	附加文件…
+	Delete attachment	删除附件
+	Attaching files is not available on the web yet	网页版尚不支持附加文件
+	Attach {name}	附加 {name}
+	Delete attachment {key}	删除附件 {key}
 	Font	字体
 	Bulleted list	项目符号列表
 	Numbered list	编号列表
@@ -2480,6 +2500,13 @@ animation effects	Off	关
 	field names can't contain a period: {name}	字段名称不能包含句点：{name}
 	two cells would both be named {name}	两个单元格的名称都会是 {name}
 	a field named {name} already exists	已存在名为 {name} 的字段
+
+# Date picker: Today button (#4274) (AI-assisted, not separately native-reviewed)
+	Today	今天
+@plural	{n} reply|{n} replies	{n} 条回复
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	; some pages have unreadable text (turn on “{option}” to read them)	；部分页面的文本无法读取（要识别这些页面，请打开“{option}”）
 	Continue from previous section	Continue from previous section
 	Digits	数字
 	As recognized	按识别结果
@@ -2492,8 +2519,6 @@ animation effects	Off	关
 	It can't be searched or copied. Recognizing text on this page can fix that.	无法搜索或复制这些文本。识别此页面上的文本可以解决此问题。
 	Recognize text on this page…	识别此页面上的文本…
 	Also recognize pages whose text is unusable	同时识别文本无法使用的页面
-# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
-# These additions have not had separate native-speaker review.
 	Interface font	Interface font
 	Not installed	Not installed
 	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.

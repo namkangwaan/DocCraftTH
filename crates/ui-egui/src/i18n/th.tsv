@@ -2797,3 +2797,27 @@ certificate	SHA-256 digest	ไดเจสต์ SHA-256
 @plural	{n} more field calculates too early.|{n} more fields calculate too early.	มีอีก {n} ฟิลด์ที่คำนวณเร็วเกินไป
 	The certificate of {} has critical extensions PdfCraft does not recognize, so it is not used to vouch for {}.	ใบรับรองของ {} มีส่วนขยายสำคัญที่ PdfCraft ไม่รู้จัก จึงไม่ถูกนำมาใช้รับรองให้กับ {}
 	The timestamp authority's certificate is not issued for time stamping.	ใบรับรองของผู้ให้บริการประทับตรารับรองเวลาไม่ได้ออกให้สำหรับการประทับตรารับรองเวลา
+# New additions from upstream main
+	In streams that use LZW encoding, use Flate instead	ใช้ Flate แทนในสตรีมที่เข้ารหัสแบบ LZW
+	Scale	มาตราส่วน
+	Common scales	มาตราส่วนที่ใช้บ่อย
+	Enter a scale such as 1:50.	ป้อนมาตราส่วน เช่น 1:50
+	Applying a scale switches units to m / mm.	การใช้มาตราส่วนจะเปลี่ยนหน่วยเป็น m / mm
+	Don't show again	ไม่ต้องแสดงอีก
+	Show a notice when a document is secured	แสดงการแจ้งเตือนเมื่อเอกสารมีการรักษาความปลอดภัย
+	Create & Edit	สร้างและแก้ไข
+	Review & Compare	ตรวจทานและเปรียบเทียบ
+	Forms & Signatures	แบบฟอร์มและลายเซ็น
+	Protect & Standardize	ป้องกันและกำหนดมาตรฐาน
+	Customize & Automate	ปรับแต่งและทำงานอัตโนมัติ
+	No tools match your search.	ไม่มีเครื่องมือที่ตรงกับการค้นหาของคุณ
+	Expand all tools	ขยายเครื่องมือทั้งหมด
+	Collapse all tools	ยุบเครื่องมือทั้งหมด
+	Attach a file…	แนบไฟล์…
+	Delete attachment	ลบไฟล์แนบ
+	Attaching files is not available on the web yet	การแนบไฟล์ยังไม่พร้อมใช้งานบนเว็บในขณะนี้
+	Attach {name}	แนบ {name}
+	Delete attachment {key}	ลบไฟล์แนบ {key}
+	Today	วันนี้
+	Restore the last view (page, zoom and page display) when a document is opened again	คืนค่ามุมมองล่าสุด (หน้า การซูม และการแสดงหน้า) เมื่อเปิดเอกสารอีกครั้ง
+@plural	{n} reply|{n} replies	การตอบกลับ {n} รายการ

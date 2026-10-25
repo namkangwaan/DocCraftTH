@@ -569,6 +569,7 @@
 	Discard private data of other applications	Diğer uygulamaların özel verilerini at
 	Discard hidden text	Gizli metni at
 	Use Flate to encode streams that are not encoded	Kodlanmamış akışları kodlamak için Flate kullan
+	In streams that use LZW encoding, use Flate instead	LZW kodlamalı akışlarda bunun yerine Flate kullan
 	Remove invalid links and bookmarks	Geçersiz bağlantıları ve yer işaretlerini kaldır
 	Remove unreferenced named destinations	Referans verilmeyen adlandırılmış hedefleri kaldır
 	Compress document structure (object streams)	Belge yapısını sıkıştır (nesne akışları)
@@ -1601,7 +1602,6 @@
 	Recognized {n} words	{n} sözcük tanındı
 	{words} on {pages}	{pages} üzerinde {words}
 	; 1 page already had text	; 1 sayfada zaten metin vardı
-	; some pages have unreadable text (turn on “{option}” to read them)	; bazı sayfalarda okunamayan metin var (tanımak için “{option}” seçeneğini açın)
 	; {n} pages already had text	; {n} sayfada zaten metin vardı
 	Recognized {w} words in 1 file	1 dosyada {w} sözcük tanındı
 	Recognized {w} words in {n} files	{n} dosyada {w} sözcük tanındı
@@ -1935,6 +1935,10 @@
 	Perimeter	Çevre
 	Area	Alan
 	Drawing scale	Çizim ölçeği
+	Scale	Ölçek
+	Common scales	Yaygın ölçekler
+	Enter a scale such as 1:50.	1:50 gibi bir ölçek girin.
+	Applying a scale switches units to m / mm.	Ölçek uygulamak birimleri m / mm olarak değiştirir.
 	Snapping	Yakalama
 	Export measurements	Ölçümleri dışa aktar
 	Open a PDF to measure it.	Ölçmek için bir PDF açın.
@@ -2140,6 +2144,7 @@ signature pad	Type	Yaz
 certificate	Subject	Konu
 action wizard	Start	Başlat
 	Reopen the files that were open when PdfCraft last closed	PdfCraft en son kapatıldığında açık olan dosyaları yeniden aç
+	Restore the last view (page, zoom and page display) when a document is opened again	Bir belge yeniden açıldığında son görünümü (sayfa, yakınlaştırma ve sayfa görünümü) geri yükle
 	Add {what}	{what} ekle
 	Use {what}	{what} kullan
 	Place saved {what}	Kayıtlı {what} yerleştir
@@ -2317,6 +2322,8 @@ key	Space	Boşluk
 	Printer paper and scaling may differ. Check driver settings.	Yazıcı kâğıdı ve ölçekleme farklı olabilir. Sürücü ayarlarını kontrol edin.
 	Drawing scale changes. Use Actual size for full-scale plans.	Çizim ölçeği değişir. Tam ölçekli planlar için Gerçek boyutu kullanın.
 	Reload documents when their files change on disk	Diskteki dosyaları değiştiğinde belgeleri yeniden yükle
+	Don't show again	Bir daha gösterme
+	Show a notice when a document is secured	Bir belge güvenli olduğunda bildirim göster
 	Always use my default zoom and page layout	Her zaman varsayılan yakınlaştırmamı ve sayfa düzenimi kullan
 	This file changed on disk. Reload shows the new version and drops your unsaved changes; Save replaces it with this version.	Bu dosya diskte değişti. Yeniden yükle yeni sürümü gösterir ve kaydedilmemiş değişikliklerinizi atar; Kaydet onu bu sürümle değiştirir.
 	Reload	Yeniden yükle
@@ -2478,6 +2485,19 @@ animation effects	Off	Kapalı
 	Make properties default	Özellikleri varsayılan yap
 	Pages selected	Seçilen sayfalar
 	Page properties	Sayfa özellikleri
+	Create & Edit	Oluştur ve Düzenle
+	Review & Compare	İncele ve Karşılaştır
+	Forms & Signatures	Formlar ve İmzalar
+	Protect & Standardize	Koru ve Standartlaştır
+	Customize & Automate	Özelleştir ve Otomatikleştir
+	No tools match your search.	Aramanızla eşleşen araç yok.
+	Expand all tools	Tüm araçları genişlet
+	Collapse all tools	Tüm araçları daralt
+	Attach a file…	Dosya ekle…
+	Delete attachment	Eki sil
+	Attaching files is not available on the web yet	Dosya eklemek web'de henüz kullanılamıyor
+	Attach {name}	{name} ekle
+	Delete attachment {key}	{key} ekini sil
 	Font	Yazı tipi
 	Bulleted list	Madde işaretli liste
 	Numbered list	Numaralı liste
@@ -2512,6 +2532,13 @@ animation effects	Off	Kapalı
 	field names can't contain a period: {name}	alan adları nokta içeremez: {name}
 	two cells would both be named {name}	iki hücrenin de adı {name} olurdu
 	a field named {name} already exists	{name} adlı bir alan zaten var
+
+# Date picker: Today button (#4274) (AI-assisted, not separately native-reviewed)
+	Today	Bugün
+@plural	{n} reply|{n} replies	{n} yanıt
+# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
+# These additions have not had separate native-speaker review.
+	; some pages have unreadable text (turn on “{option}” to read them)	; bazı sayfalarda okunamayan metin var (tanımak için “{option}” seçeneğini açın)
 	Continue from previous section	Continue from previous section
 	Digits	Rakamlar
 	As recognized	Tanındığı gibi
@@ -2524,8 +2551,6 @@ animation effects	Off	Kapalı
 	It can't be searched or copied. Recognizing text on this page can fix that.	Metin aranamıyor veya kopyalanamıyor. Bu sayfadaki metni tanımak bunu düzeltebilir.
 	Recognize text on this page…	Bu sayfadaki metni tanı…
 	Also recognize pages whose text is unusable	Kullanılamayan metin içeren sayfaları da tanı
-# AI-assisted additions: Thai page numbers and the Thai text font (DocCraftTH).
-# These additions have not had separate native-speaker review.
 	Interface font	Arayüz yazı tipi
 	Not installed	Yüklü değil
 	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped yalnızca Tayca çizer. İngilizce arayüz metni arayüz yazı tipinde kalır.

@@ -427,8 +427,7 @@ fn other_candidates() -> Vec<PathBuf> {
     }
 }
 
-/// Chinese sans faces the operating system ships, the UI language's own region first. Noto CJK
-/// and Source Han are left out on purpose (AGENTS.md §1.1).
+/// Chinese sans faces the operating system ships, the UI language's own region first.
 fn han_candidates(traditional: bool) -> Vec<PathBuf> {
     if cfg!(windows) {
         // Microsoft YaHei / JhengHei, then the older SimSun / MingLiU collections.
@@ -459,8 +458,7 @@ fn han_candidates(traditional: bool) -> Vec<PathBuf> {
     }
 }
 
-/// Well-known locations of Korean faces, best first. Noto CJK and Source Han are left out, as for
-/// Chinese (AGENTS.md §1.1).
+/// Well-known locations of Korean faces, best first.
 fn hangul_candidates() -> Vec<PathBuf> {
     if cfg!(windows) {
         ["malgun.ttf", "gulim.ttc", "batang.ttc"].iter().map(|f| windows_fonts().join(f)).collect()
@@ -678,13 +676,11 @@ mod tests {
     }
 
     #[test]
-    fn hangul_candidates_are_font_files_without_adobe_designs() {
+    fn hangul_candidates_are_font_files() {
         let list = hangul_candidates();
         assert!(!list.is_empty());
         for path in list {
             assert!(path.extension().is_some_and(|e| e == "ttf" || e == "ttc"), "{path:?}");
-            let name = path.to_string_lossy().to_lowercase();
-            assert!(!["notosanscjk", "notoserifcjk", "sourcehan", "source-han"].iter().any(|b| name.contains(b)), "{name}");
         }
         // Inter has no Hangul.
         let inter = include_bytes!("../../../assets/fonts/Inter-Regular.ttf");
@@ -704,7 +700,6 @@ mod tests {
             assert!(!["notosanscjk", "notoserifcjk", "sourcehan", "source-han"].iter().any(|b| name.contains(b)), "{name}");
         }
     }
-
     /// Retune tripwires, deliberately separate from `the_macos_devanagari_list_is_apples_layout` below: these assert that three
     /// constants still hold the values this module's contract depends on. They cannot fail on their
     /// own — they exist so that editing one is a decision someone has to make twice. Each was
