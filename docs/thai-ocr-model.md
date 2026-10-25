@@ -65,17 +65,17 @@ Measured at 300 dpi with `CRAFT_FONTS_DIR=K:\src\craft-fonts` (Noto Sans Thai):
 | `ข้อมูลส่วนบุคคลได้รับการคุ้มครองตามกฎหมาย` | `0.0244` |
 | **Mean** | **`0.0136`** (gate ≤ `0.05`) |
 
-### Benchmark on Thai Government Documents (2026-10-24)
+### Benchmark on Thai Government Documents (2026-10-24 & 2026-10-25)
 
 Evaluated with `crates/engine/tests/thai_real_docs.rs` across 16 held-out government native-text PDFs (84 unique documents split: 16 test [12 TH Sarabun + 4 other fonts], 66 train candidates, 2 excluded):
 
-| Benchmark Set | Baseline (`8b70e6d1…`) | Colab Fine-tuned (`d0329f75…`) | Outcome |
-| --- | --- | --- | --- |
-| 5 Synthetic Sentences | **`0.0136`** | `0.0853` | Baseline better (forgetting in candidate) |
-| Set A Recognizer-Only (787 lines) | `0.2260` | **`0.1932`** | Candidate better (-3.28 % CER on real lines) |
-| Set A End-to-End (27 pages) | **`0.3358`** | `0.3788` | Baseline better (more robust under detector noise) |
-| Set B Real-Scan Lines (32 verified) | **`0.1431`** | `0.2086` | Baseline better (-6.55 % CER on real scans) |
-| **Decision Gate Ruling** | **Retained in `assets/models/`** | Rejected for promotion | **Keep Baseline** |
+| Benchmark Set | Baseline (`8b70e6d1…`) | Candidate v1 (`d0329f75…`) | Candidate v2 (`07626524…`) | Outcome |
+| --- | --- | --- | --- | --- |
+| 5 Synthetic Sentences | **`0.0136`** | `0.0853` | `0.0174` | Forgetting resolved in v2; Baseline slightly cleaner |
+| Set A Recognizer-Only (787 lines) | `0.2260` | `0.1932` | **`0.1915`** | **Candidate v2 wins** (-3.45 % CER on real lines) |
+| Set A End-to-End (27 pages) | **`0.3358`** | `0.3788` | `0.3619` | v2 improved +1.69 % over v1; Baseline more robust |
+| Set B Real-Scan Lines (32 verified) | **`0.1431`** | `0.2086` | `0.1952` | v2 improved +1.34 % over v1; Baseline better on scans |
+| **Decision Gate Ruling** | **Retained in `assets/models/`** | Rejected | **Rejected for Promotion** | **Keep Baseline** in production assets |
 
 ## Installing the model
 

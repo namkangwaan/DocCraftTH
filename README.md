@@ -81,11 +81,11 @@
 
 ### 9. ชุดทดสอบ CER บนเอกสารราชการจริง และไปป์ไลน์ชุดข้อมูล Diverse Dataset v2
 - **การประเมินผล CER เปรียบเทียบ 4 มิติอย่างเป็นรูปธรรม (Empirical Benchmark & Decision Gate):**
-  - **Synthetic Base (5 ประโยค):** Baseline CER `0.0136` vs Candidate `0.0853` (Baseline เหนือกว่า)
-  - **Set A Recognizer-only (787 บรรทัดจาก 27 หน้า):** Baseline `0.2260` vs Candidate `0.1932`
-  - **Set A End-to-End (27 หน้าสแกนสังเคราะห์):** Baseline `0.3358` vs Candidate `0.3788` (Baseline ทนทานต่อ Detector Noise มากกว่า)
-  - **Set B Real-Scan Lines (สแกนจริง 150 บรรทัด):** ผ่านกระบวนการ **Human Audit Gate รับรองเฉลย 32 บรรทัด (21.3%)** ได้ผลลัพธ์ Baseline CER `0.1431` vs Candidate `0.2086` (Candidate มีข้อผิดพลาดเพิ่มขึ้น +6.55% บนสแกนจริง)
-  - **Decision Ruling:** ผลการทดสอบยืนยันว่าโมเดล Candidate มีปัญหา Catastrophic Forgetting จึงคงโมเดล Baseline คุณภาพสูงไว้ใน `assets/models/text-recognition-th.rten` เพื่อความเสถียรของระบบ
+  - **Synthetic Base (5 ประโยค):** Baseline `0.0136` vs Candidate v1 `0.0853` vs **Candidate v2 `0.0174`** (แก้ปัญหา Catastrophic Forgetting สำเร็จ ความรู้ทั่วไปไม่หาย)
+  - **Set A Recognizer-only (787 บรรทัดจาก 27 หน้า):** Baseline `0.2260` vs Candidate v1 `0.1932` vs **Candidate v2 `0.1915`** (🏆 **Candidate v2 ชนะเลิศ** ลด CER ลงได้ 3.45% เทียบกับ Baseline)
+  - **Set A End-to-End (27 หน้าสแกนสังเคราะห์):** Baseline `0.3358` vs Candidate v1 `0.3788` vs **Candidate v2 `0.3619`** (v2 ดีขึ้นกว่า v1 +1.69% แต่ Baseline ทนทานต่อ Detector Noise มากกว่า)
+  - **Set B Real-Scan Lines (สแกนจริง 150 บรรทัด):** ผ่านกระบวนการ **Human Audit Gate รับรองเฉลย 32 บรรทัด (21.3%)** ได้ผลลัพธ์ Baseline `0.1431` vs Candidate v1 `0.2086` vs **Candidate v2 `0.1952`** (v2 พัฒนาดีขึ้นกว่า v1 +1.34%)
+  - **Decision Ruling:** แม้โมเดล Candidate v2 จะพัฒนาดีขึ้นอย่างชัดเจนในทุกมิติและชนะเลิศบน Recognizer บรรทัดราชการ แต่ในภาพรวมระบบและสแกนจริง Baseline จากทีม PaddleOCR ยังคงมีความทนทานสูงสุด จึงคงโมเดล Baseline ไว้ใน `assets/models/text-recognition-th.rten` ตามเกณฑ์ที่ตั้งไว้อย่างเคร่งครัด
 - **Test Harness ใน Rust (`crates/engine/tests/thai_real_docs.rs`):**
   - รองรับการสลับโมเดลผ่าน Environment Variable `PDFCRAFT_MODELS` เพื่อทดสอบโมเดลผู้สมัครโดยไม่เขียนทับ assets เดิม
 - **ไปป์ไลน์ชุดข้อมูลฝึกฝนรอบใหม่ (Diverse Training Dataset v2 — 24,786 ภาพ):**
