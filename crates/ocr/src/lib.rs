@@ -1677,4 +1677,65 @@ mod tests {
             (w, h, px)
         }
     }
+
+    /// Writes `meta` as `model_meta.json` in a fresh per-test directory (unique per name and
+    /// process, so parallel tests never share one) and returns the path of a model beside it.
+    fn model_with_meta(name: &str, meta: Option<&str>) -> (std::path::PathBuf, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("pdfcraft-ocr-meta-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        if let Some(meta) = meta {
+            std::fs::write(dir.join("model_meta.json"), meta).expect("write meta");
+        }
+        (dir.join("rec.onnx"), dir)
+    }
+
+    #[test]
+    fn model_meta_width_is_read_from_image_shape() {
+        let (model, dir) = model_with_meta("ok", Some(r#"{"name": "th", "image_shape": [3, 48, 800]}"#));
+        assert_eq!(parse_model_meta_width(&model), Some(800));
+        let _ = std::fs::remove_dir_all(dir);
+
+        let (model, dir) = model_with_meta("multiline", Some("{\n \"image_shape\": [\n  3,\n  48,\n  320\n ]\n}"));
+        assert_eq!(parse_model_meta_width(&model), Some(320));
+        let _ = std::fs::remove_dir_all(dir);
+
+        // The bounds themselves are accepted.
+        let (model, dir) = model_with_meta("bounds-lo", Some(r#"{"image_shape": [3, 48, 16]}"#));
+        assert_eq!(parse_model_meta_width(&model), Some(16));
+        let _ = std::fs::remove_dir_all(dir);
+        let (model, dir) = model_with_meta("bounds-hi", Some(&format!(r#"{{"image_shape": [3, 48, {MAX_CTC_WIDTH}]}}"#)));
+        assert_eq!(parse_model_meta_width(&model), Some(MAX_CTC_WIDTH));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn model_meta_width_is_none_without_a_meta_file() {
+        let (model, dir) = model_with_meta("missing", None);
+        assert_eq!(parse_model_meta_width(&model), None);
+        let _ = std::fs::remove_dir_all(dir);
+        // A model path with no parent directory has nowhere to look either.
+        assert_eq!(parse_model_meta_width(Path::new("")), None);
+    }
+
+    #[test]
+    fn model_meta_width_rejects_out_of_range_and_malformed_values() {
+        let too_wide = format!(r#"{{"image_shape": [3, 48, {}]}}"#, MAX_CTC_WIDTH + 1);
+        let cases: [(&str, &str); 9] = [
+            ("narrow", r#"{"image_shape": [3, 48, 8]}"#),
+            ("just-narrow", r#"{"image_shape": [3, 48, 15]}"#),
+            ("huge", r#"{"image_shape": [3, 48, 100000]}"#),
+            ("just-wide", &too_wide),
+            ("no-bracket-close", r#"{"image_shape": [3, 48, 800"#),
+            ("no-bracket-open", r#"{"image_shape": 3, 48, 800}"#),
+            ("two-numbers", r#"{"image_shape": [3, 48]}"#),
+            ("no-key", r#"{"shape": [3, 48, 800]}"#),
+            ("not-numbers", r#"{"image_shape": [3, 48, "wide"]}"#),
+        ];
+        for (name, meta) in cases {
+            let (model, dir) = model_with_meta(name, Some(meta));
+            assert_eq!(parse_model_meta_width(&model), None, "{name}: {meta}");
+            let _ = std::fs::remove_dir_all(dir);
+        }
+    }
 }
