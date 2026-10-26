@@ -133,7 +133,19 @@ impl Line {
 
 enum Recognizer {
     Ocrs(ocrs::OcrEngine),
-    Ctc { detector: ocrs::OcrEngine, model: Box<rten::Model>, dict: Vec<char> },
+    Ctc { detector: ocrs::OcrEngine, model: Box<rten::Model>, dict: Vec<char>, fixed_width: Option<usize> },
+}
+
+/// Parse `"image_shape": [3, 48, W]` from `model_meta.json` beside the recognition model, if present.
+fn parse_model_meta_width(recognition_path: &Path) -> Option<usize> {
+    let meta_path = recognition_path.parent()?.join("model_meta.json");
+    let text = std::fs::read_to_string(meta_path).ok()?;
+    let idx = text.find("\"image_shape\"")?;
+    let after = &text[idx..];
+    let open = after.find('[')?;
+    let close = after[open..].find(']')?;
+    let nums: Vec<usize> = after[open + 1..open + close].split(',').filter_map(|s| s.trim().parse::<usize>().ok()).collect();
+    nums.get(2).copied().filter(|&w| (16..=MAX_CTC_WIDTH).contains(&w))
 }
 
 /// A loaded recogniser. Loading takes a moment; keep one and reuse it.
@@ -158,7 +170,8 @@ impl Ocr {
             let mut dict: Vec<char> = raw.lines().filter_map(|line| line.chars().next()).collect();
             // PaddleOCR's `use_space_char: true` appends the space class after the dictionary entries.
             dict.push(' ');
-            Ok(Ocr { recognizer: Recognizer::Ctc { detector, model, dict } })
+            let fixed_width = parse_model_meta_width(&models.recognition);
+            Ok(Ocr { recognizer: Recognizer::Ctc { detector, model, dict, fixed_width } })
         } else {
             let params = ocrs::OcrEngineParams {
                 detection_model: Some(load(&models.detection)?),
@@ -213,7 +226,7 @@ impl Ocr {
                     .filter(|l| !l.words.is_empty())
                     .collect())
             }
-            Recognizer::Ctc { detector, model, dict } => {
+            Recognizer::Ctc { detector, model, dict, fixed_width } => {
                 let (cleaned, leaders) = erase_dot_leaders(&rgb, width, height).unzip();
                 let rgb: &[u8] = cleaned.as_deref().unwrap_or(&rgb);
                 let source = ocrs::ImageSource::from_bytes(rgb, (width, height)).map_err(|e| err(&e))?;
@@ -234,7 +247,7 @@ impl Ocr {
                     if x1 <= x0 || y1 <= y0 {
                         continue;
                     }
-                    let Some(text) = recognize_ctc_crop(rgb, width, height, [x0, y0, x1, y1], model, dict)? else {
+                    let Some(text) = recognize_ctc_crop(rgb, width, height, [x0, y0, x1, y1], model, dict, *fixed_width)? else {
                         continue;
                     };
                     let trimmed = text.trim();
@@ -272,7 +285,7 @@ impl Ocr {
         };
         match &self.recognizer {
             Recognizer::Ocrs(_) => Ok(None),
-            Recognizer::Ctc { model, dict, .. } => recognize_ctc_crop(&rgb, width, height, rect, model, dict),
+            Recognizer::Ctc { model, dict, fixed_width, .. } => recognize_ctc_crop(&rgb, width, height, rect, model, dict, *fixed_width),
         }
     }
 }
@@ -617,19 +630,21 @@ fn recognize_ctc_crop(
     [x0, y0, x1, y1]: [u32; 4],
     model: &rten::Model,
     dict: &[char],
+    fixed_width: Option<usize>,
 ) -> Result<Option<String>, OcrError> {
     let crop_w = x1.saturating_sub(x0) as usize;
     let crop_h = y1.saturating_sub(y0) as usize;
     if crop_w == 0 || crop_h == 0 {
         return Ok(None);
     }
-    let dst_w = (crop_w.saturating_mul(CTC_HEIGHT) / crop_h).max(16);
-    if dst_w > MAX_CTC_WIDTH {
-        return Ok(None);
-    }
-    // PaddleOCR RecResizeImg pads to at least 320 wide when narrower, or runs dynamic width.
-    let padded_w = dst_w.max(160);
-    if padded_w > MAX_CTC_WIDTH {
+    let (dst_w, padded_w) = if let Some(target_w) = fixed_width {
+        let w = (crop_w.saturating_mul(CTC_HEIGHT).div_ceil(crop_h)).clamp(1, target_w);
+        (w, target_w)
+    } else {
+        let w = (crop_w.saturating_mul(CTC_HEIGHT) / crop_h).max(16);
+        (w, w.max(160))
+    };
+    if dst_w > MAX_CTC_WIDTH || padded_w > MAX_CTC_WIDTH {
         return Ok(None);
     }
     let plane = CTC_HEIGHT * padded_w;
@@ -1660,6 +1675,67 @@ mod tests {
                 }
             }
             (w, h, px)
+        }
+    }
+
+    /// Writes `meta` as `model_meta.json` in a fresh per-test directory (unique per name and
+    /// process, so parallel tests never share one) and returns the path of a model beside it.
+    fn model_with_meta(name: &str, meta: Option<&str>) -> (std::path::PathBuf, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!("pdfcraft-ocr-meta-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        if let Some(meta) = meta {
+            std::fs::write(dir.join("model_meta.json"), meta).expect("write meta");
+        }
+        (dir.join("rec.onnx"), dir)
+    }
+
+    #[test]
+    fn model_meta_width_is_read_from_image_shape() {
+        let (model, dir) = model_with_meta("ok", Some(r#"{"name": "th", "image_shape": [3, 48, 800]}"#));
+        assert_eq!(parse_model_meta_width(&model), Some(800));
+        let _ = std::fs::remove_dir_all(dir);
+
+        let (model, dir) = model_with_meta("multiline", Some("{\n \"image_shape\": [\n  3,\n  48,\n  320\n ]\n}"));
+        assert_eq!(parse_model_meta_width(&model), Some(320));
+        let _ = std::fs::remove_dir_all(dir);
+
+        // The bounds themselves are accepted.
+        let (model, dir) = model_with_meta("bounds-lo", Some(r#"{"image_shape": [3, 48, 16]}"#));
+        assert_eq!(parse_model_meta_width(&model), Some(16));
+        let _ = std::fs::remove_dir_all(dir);
+        let (model, dir) = model_with_meta("bounds-hi", Some(&format!(r#"{{"image_shape": [3, 48, {MAX_CTC_WIDTH}]}}"#)));
+        assert_eq!(parse_model_meta_width(&model), Some(MAX_CTC_WIDTH));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn model_meta_width_is_none_without_a_meta_file() {
+        let (model, dir) = model_with_meta("missing", None);
+        assert_eq!(parse_model_meta_width(&model), None);
+        let _ = std::fs::remove_dir_all(dir);
+        // A model path with no parent directory has nowhere to look either.
+        assert_eq!(parse_model_meta_width(Path::new("")), None);
+    }
+
+    #[test]
+    fn model_meta_width_rejects_out_of_range_and_malformed_values() {
+        let too_wide = format!(r#"{{"image_shape": [3, 48, {}]}}"#, MAX_CTC_WIDTH + 1);
+        let cases: [(&str, &str); 9] = [
+            ("narrow", r#"{"image_shape": [3, 48, 8]}"#),
+            ("just-narrow", r#"{"image_shape": [3, 48, 15]}"#),
+            ("huge", r#"{"image_shape": [3, 48, 100000]}"#),
+            ("just-wide", &too_wide),
+            ("no-bracket-close", r#"{"image_shape": [3, 48, 800"#),
+            ("no-bracket-open", r#"{"image_shape": 3, 48, 800}"#),
+            ("two-numbers", r#"{"image_shape": [3, 48]}"#),
+            ("no-key", r#"{"shape": [3, 48, 800]}"#),
+            ("not-numbers", r#"{"image_shape": [3, 48, "wide"]}"#),
+        ];
+        for (name, meta) in cases {
+            let (model, dir) = model_with_meta(name, Some(meta));
+            assert_eq!(parse_model_meta_width(&model), None, "{name}: {meta}");
+            let _ = std::fs::remove_dir_all(dir);
         }
     }
 }

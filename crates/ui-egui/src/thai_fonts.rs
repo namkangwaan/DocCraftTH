@@ -136,9 +136,9 @@ pub fn preferences_section(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
         RichText::new(say("Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.")).small().color(t.text_muted),
     );
     ui.horizontal(|ui| {
-        ui.label(say("Thai text font"));
+        let name = ui.label(say("Thai text font"));
         let selected = choice_label(&app.thai_font);
-        egui::ComboBox::from_id_salt("thai-text-font").selected_text(selected).show_ui(ui, |ui| {
+        let combo = egui::ComboBox::from_id_salt("thai-text-font").selected_text(selected).show_ui(ui, |ui| {
             for face in choices(app.thai_optional_fonts, &app.thai_font) {
                 let label = choice_label(face.family);
                 if ui.selectable_value(&mut app.thai_font, face.family.to_owned(), label).clicked() {
@@ -146,6 +146,7 @@ pub fn preferences_section(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
                 }
             }
         });
+        combo.response.labelled_by(name.id);
     });
     ui.add(widgets::checkbox(&mut app.thai_optional_fonts, say("Show optional fonts")));
     ui.label(RichText::new("English และภาษาไทย").font(theme::regular(16.0)));
@@ -222,7 +223,7 @@ fn source_of(face: Option<&Face>) -> Source {
 fn load_ui() -> Option<Arc<FontData>> {
     let face = face_named("Noto Sans Thai")?;
     let data = load_face(face, 'A')?;
-    covers(&data.font, data.index, '\u{0E01}').then_some(data)
+    covers((*data.font).as_ref(), data.index, '\u{0E01}').then_some(data)
 }
 
 fn load_text(family: &str) -> Option<Arc<FontData>> {

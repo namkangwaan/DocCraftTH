@@ -79,7 +79,7 @@ fn thai_covers_commands_and_tools() {
 #[test]
 fn thai_covers_ui_literals() {
     let th = Lang::from_code("th").expect("th registered");
-    let literals = super::tests::scan_ui_literals(true);
+    let literals = super::tests::ui_literals();
     let missing: Vec<_> = literals.iter().filter(|label| !has(th, label)).collect();
     assert!(missing.is_empty(), "Untranslated Thai UI labels: {missing:#?}");
 }
