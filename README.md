@@ -64,7 +64,7 @@
 
 ### 6. การแสดงผล การตัดคำ และค้นหาข้อความไทย
 - **ฟอนต์ Sarabun (OFL-1.1)** ควบคู่ Noto Sans Thai: ตัวอักษรที่ Noto Sans Thai ไม่มีจะ fallback ไป Sarabun อัตโนมัติ (`crates/fonts`)
-- **การตัดคำและตัดบรรทัดภาษาไทย (Thai Word & Line Breaking):** รองรับการตัดบรรทัดภาษาไทยด้วยโมเดล LSTM ควบคู่พจนานุกรม (`thai_wrap.rs` และแพตช์ `vendor/epaint`)
+- **การตัดคำและตัดบรรทัดภาษาไทย (Thai Word & Line Breaking):** รองรับการตัดบรรทัดภาษาไทยด้วยโมเดล LSTM ควบคู่พจนานุกรม (`thai_wrap.rs` และ `ThaiLineBreaker` ที่เสียบเข้ากับ `LineBreaker` ของ egui)
 - **ช่องกรอกแบบฟอร์ม (AcroForm)** แสดงตัวอักษรไทยได้ถูกต้อง ไม่เป็น `????` และมี `/ActualText` สำหรับค้นหา พร้อมรองรับเส้นประช่องกรอกข้อมูล (Form Leader Fields)
 - **FR-18 PUA Mapping:** แปลงรหัสวรรณยุกต์และสระของฟอนต์ไทยยุคเก่าใน Private Use Area (U+F700..=U+F71A) เป็น Unicode มาตรฐานตอนค้นหาและคัดลอกข้อความ
 - **ฟอนต์สำรอง CJK และชื่อเอกสารหลายภาษา:** ชื่อภาษาญี่ปุ่นและจีนในเมนูภาษาไม่แสดงเป็นกล่อง และรองรับการบันทึก/เปิดชื่อเอกสาร (Document Title) ภาษาไทย จีน ญี่ปุ่น อย่างสมบูรณ์ (`doc_title_names.rs`)
@@ -79,7 +79,7 @@
 ### 8. ตัวติดตั้ง ระบบ Fork Guard และการตรวจคุณภาพ
 - **Windows installer v0.9.0:** WiX v5 (`packaging/windows/package.ps1`) ได้ `.msi`, `.zip` แบบพกพา และ `Install-DocCraftTH.bat` ฝังโมเดล OCR ไทยและอังกฤษ ผูกนามสกุล PDF และเมนูคลิกขวา "Edit with PdfCraft"
 - `packaging` ค้นหา `craft-fonts` อัตโนมัติตามโครงสร้างโฟลเดอร์ DocCraftTH
-- **ระบบกันฟีเจอร์หาย (Fork Guard — `fork/manifest.txt`, `fork/check.sh`):** ตรวจสอบไฟล์และสัญลักษณ์สำคัญของภาษาไทย (`thai_fonts.rs`, `shaping.rs`, `thai_text.rs`, `map_thai_pua`, `era_year`, `th.tsv`, `vendor/epaint`) อัตโนมัติเมื่อซิงก์โค้ดจาก upstream
+- **ระบบกันฟีเจอร์หาย (Fork Guard — `fork/manifest.txt`, `fork/check.sh`):** ตรวจสอบไฟล์และสัญลักษณ์สำคัญของภาษาไทย (`thai_fonts.rs`, `shaping.rs`, `thai_text.rs`, `map_thai_pua`, `era_year`, `th.tsv`, `ThaiLineBreaker`) อัตโนมัติเมื่อซิงก์โค้ดจาก upstream
 - **CI ครบทุกแพลตฟอร์ม:** ตรวจ Ubuntu, Windows, ARM64, Wasm, FreeBSD และ Cargo Deny (แก้ไขเทสต์ `redraw_dedupe_work_is_bounded_on_hostile_pages` ให้วัดด้วยปริมาณงานแทนเวลาจริง เพื่อไม่ให้ล้มบนเครื่องรัน FreeBSD x86_64 ที่โหลดสูง)
 
 ### 9. ชุดทดสอบ CER บนเอกสารราชการจริง และการประเมินเปรียบเทียบโมเดล (Empirical Testset & Decision Gate)
