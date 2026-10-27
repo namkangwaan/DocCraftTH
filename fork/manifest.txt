@@ -12,7 +12,6 @@ vendor/epaint/src/text/fonts.rs
 crates/ui-egui/src/i18n/th.tsv
 crates/ui-egui/src/i18n/th_tests.rs
 crates/ui-egui/tests/it/fonts.rs
-crates/ui-egui/tests/thai_wrap.rs
 crates/engine/tests/thai_ocr.rs
 crates/engine/tests/doc_title_names.rs
 docs/thai-ocr-model.md
