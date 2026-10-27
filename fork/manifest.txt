@@ -7,11 +7,11 @@ crates/fonts/src/thai.rs
 crates/fonts/src/shaping.rs
 crates/forms/src/thai_text.rs
 crates/edit/src/invisible_font.rs
-vendor/epaint/src/text/font.rs
-vendor/epaint/src/text/fonts.rs
+crates/ui-egui/src/i18n/th_breaks.rs
 crates/ui-egui/src/i18n/th.tsv
 crates/ui-egui/src/i18n/th_tests.rs
 crates/ui-egui/tests/it/fonts.rs
+crates/ui-egui/tests/it/thai_wrap.rs
 crates/engine/tests/thai_ocr.rs
 crates/engine/tests/doc_title_names.rs
 docs/thai-ocr-model.md
@@ -19,6 +19,8 @@ docs/thai-word-breaking.md
 # Fork additions inside shared files
 crates/fonts/src/thai.rs::pub fn may_break
 crates/fonts/src/thai.rs::pub fn break_offsets
+crates/ui-egui/src/i18n/th_breaks.rs::pub struct ThaiLineBreaker
+crates/ui-egui/src::set_line_breaker(std::sync::Arc::new(ThaiLineBreaker))
 crates/fonts/src/shaping.rs::pub fn shape_thai
 crates/fonts/src/shaping.rs::pub fn shape_thai_named
 crates/ui-egui/src/thai_fonts.rs::pub const DEFAULT_THAI_FONT
