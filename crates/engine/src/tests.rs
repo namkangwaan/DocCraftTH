@@ -5058,7 +5058,6 @@ fn detected_fields_have_no_border_or_fill() {
     let look = s.get(id).unwrap().field_look("drawn").unwrap();
     assert!(look.border.is_some() && look.fill.is_some(), "{look:?}");
 }
-}
 
 /// A printed form, 420 × 300 pt: a title, a label with a rule to write on, a box with a small
 /// label in its corner, an empty box with its label above, and two check boxes.

@@ -2465,7 +2465,7 @@ fn page_shapes_reads_boxes_and_rules() {
 
 #[test]
 fn page_shapes_preserves_content_piece_boundaries() {
-    use crate::detect::{Candidate, Kind, Shapes, detect, page_shapes};
+    use crate::detect::{Candidate, Kind, Shapes, Source, detect, page_shapes};
     let read = |pieces: &[&[u8]]| {
         let mut doc = one_page();
         let page = pdfcraft_model::pages(&doc)[0].obj;
@@ -2480,16 +2480,16 @@ fn page_shapes_preserves_content_piece_boundaries() {
         assert_eq!(shapes, empty, "an unterminated comment hides the next piece's first line");
         assert_eq!(detect(&[], &shapes, &[], &[]), Vec::<Candidate>::new());
     }
-    let visible = Shapes { boxes: vec![[40.0, 120.0, 340.0, 150.0]], rules: vec![] };
+    let visible = Shapes { boxes: vec![[40.0, 120.0, 340.0, 150.0]], rules: vec![], ..Default::default() };
     for ending in [b"% trailing\n".as_slice(), b"% trailing\r", b"% trailing\r\n"] {
         let shapes = read(&[ending, b"40 120 300 30 re S\n"]);
         assert_eq!(shapes, visible);
-        assert_eq!(detect(&[], &shapes, &[], &[]), vec![Candidate { kind: Kind::Text, rect: [41.0, 121.0, 339.0, 149.0], name: "Text1".into() }]);
+        assert_eq!(detect(&[], &shapes, &[], &[]), vec![Candidate { kind: Kind::Text, source: Source::Box, rect: [41.0, 121.0, 339.0, 149.0], name: "Text1".into() }]);
     }
     assert_eq!(read(&[b"40 120", b"", b"300 30", b"re", b"S"]), visible);
     assert_eq!(
         read(&[b"q 2 0 0 2 0 0 cm 10 10", b"60 20 re", b"S Q 10 20 m 100 20 l S"]),
-        Shapes { boxes: vec![[20.0, 20.0, 140.0, 60.0]], rules: vec![[10.0, 20.0, 100.0, 20.0]] }
+        Shapes { boxes: vec![[20.0, 20.0, 140.0, 60.0]], rules: vec![[10.0, 20.0, 100.0, 20.0]], ..Default::default() }
     );
     assert_eq!(read(&[]), empty);
     assert_eq!(read(&[b""]), empty);
@@ -3251,6 +3251,8 @@ fn dot_leaders_in_the_text_layer_and_in_pixels_are_blanks_to_fill() {
     let mixed = vec![w("A", 50.0, 700.0, 60.0), w(&dots(12), 65.0, 700.0, 200.0), w("B", 50.0, 650.0, 60.0), w("________", 65.0, 650.0, 200.0)];
     let names: Vec<String> = detect(&mixed, &Shapes::default(), &[], &[]).into_iter().map(|c| c.name).collect();
     assert_eq!(names, ["A", "B"]);
+}
+
 /// The craft-fonts Thai face is an optional build input (`CRAFT_FONTS_DIR`); CI sets
 /// `CRAFT_FONTS_REQUIRED`, where its absence fails the test instead of skipping it.
 fn thai_face() -> bool {
