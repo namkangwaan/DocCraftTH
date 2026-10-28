@@ -25,7 +25,7 @@
 
 ## 🔬 สรุปผลการวิจัยและพัฒนาเฉพาะภาษาไทย (Thai Engineering Enhancements)
 
-โครงการนี้ได้ทำการปรับปรุงและพัฒนาเพิ่มเติมใน 5 มิติหลัก:
+โครงการนี้ได้ทำการปรับปรุงและพัฒนาเพิ่มเติมใน 10 มิติหลัก:
 
 ### 1. การปรับจูน Bias โมเดลรู้จำอักขระไทย (CTC Classifier Tuning)
 - ปรับแต่งค่าน้ำหนักเวกเตอร์ `linear_8.b_0` ในโมเดล RTen (`text-recognition-th.rten`)
@@ -62,6 +62,46 @@
 - จัดทำสคริปต์ Release Build (`build_release.ps1`) รองรับคำสั่ง CPU SIMD AVX2
 - จัดทำสคริปต์ Windows System Installer (`install_system.ps1`) สำหรับติดตั้งลงสู่ `C:\Program Files\PdfCraft` พร้อมกำหนดค่า System Environment (`PATH`, `PDFCRAFT_MODELS`) โดยอิสระ
 
+### 6. การแสดงผล การตัดคำ และค้นหาข้อความไทย
+- **ฟอนต์ Sarabun (OFL-1.1)** ควบคู่ Noto Sans Thai: ตัวอักษรที่ Noto Sans Thai ไม่มีจะ fallback ไป Sarabun อัตโนมัติ (`crates/fonts`)
+- **การตัดคำและตัดบรรทัดภาษาไทย (Thai Word & Line Breaking):** รองรับการตัดบรรทัดภาษาไทยด้วยโมเดล LSTM ควบคู่พจนานุกรม (`thai_wrap.rs` และ `ThaiLineBreaker` ที่เสียบเข้ากับ `LineBreaker` ของ egui)
+- **ช่องกรอกแบบฟอร์ม (AcroForm)** แสดงตัวอักษรไทยได้ถูกต้อง ไม่เป็น `????` และมี `/ActualText` สำหรับค้นหา พร้อมรองรับเส้นประช่องกรอกข้อมูล (Form Leader Fields)
+- **FR-18 PUA Mapping:** แปลงรหัสวรรณยุกต์และสระของฟอนต์ไทยยุคเก่าใน Private Use Area (U+F700..=U+F71A) เป็น Unicode มาตรฐานตอนค้นหาและคัดลอกข้อความ
+- **ฟอนต์สำรอง CJK และชื่อเอกสารหลายภาษา:** ชื่อภาษาญี่ปุ่นและจีนในเมนูภาษาไม่แสดงเป็นกล่อง และรองรับการบันทึก/เปิดชื่อเอกสาร (Document Title) ภาษาไทย จีน ญี่ปุ่น อย่างสมบูรณ์ (`doc_title_names.rs`)
+- **ระบบวันที่ พ.ศ. และอินเทอร์เฟซภาษาไทย 100%:** แสดงปี พ.ศ. ในส่วนติดต่อผู้ใช้ภาษาไทย พร้อมคำแปล UI ภาษาไทยครบถ้วน (`th.tsv` ครอบคลุม 100% ของแคตตาล็อก)
+
+### 7. OCR สำหรับหน้าที่อ่านข้อความไม่ได้ เอกสารราชการ และสแกนความละเอียดต่ำ
+- **FR-17 Unusable Text Detection:** ตรวจหน้าที่ข้อความใช้ไม่ได้ (PUA หรือ U+FFFD เกิน 50%) แสดงแถบเตือนสีส้มพร้อมปุ่มลัดไป Recognize Text และการ์ดยืนยันก่อน OCR เฉพาะหน้านั้น
+- **Batch OCR:** `pdfcraft-cli batch --ocr-unusable-text` (พารามิเตอร์ `read_unusable_text` ของ `ocr_recognize_files`) OCR เฉพาะหน้าที่ข้อความใช้ไม่ได้ ข้ามหน้าที่ข้อความปกติสมบูรณ์อยู่แล้ว
+- **การจัดการตราประทับและเส้นประราชการ (Seal Filtering & Dot-Leader Removal):** กรองตราประทับราชการ (Seal Recovery), รวมกล่องข้อความบรรทัดเดียวกัน (Colinear Merge), และลบเส้นประช่องกรอกแบบฟอร์มก่อนทำ OCR เพื่อลดสัญญาณรบกวน
+- **Auto-upscale:** OCR ภาษาไทยจะ render สแกนที่ต่ำกว่า 200 dpi ขึ้นเป็น 200 dpi และเพิ่ม padding แนวตั้ง (บน 30%, ล่าง 18%) กันวรรณยุกต์ถูกตัด (อยู่บน branch `feat/thai-ocr-auto-upscale` รอ merge)
+
+### 8. ตัวติดตั้ง ระบบ Fork Guard และการตรวจคุณภาพ
+- **Windows installer v0.9.0:** WiX v5 (`packaging/windows/package.ps1`) ได้ `.msi`, `.zip` แบบพกพา และ `Install-DocCraftTH.bat` ฝังโมเดล OCR ไทยและอังกฤษ ผูกนามสกุล PDF และเมนูคลิกขวา "Edit with PdfCraft"
+- `packaging` ค้นหา `craft-fonts` อัตโนมัติตามโครงสร้างโฟลเดอร์ DocCraftTH
+- **ระบบกันฟีเจอร์หาย (Fork Guard — `fork/manifest.txt`, `fork/check.sh`):** ตรวจสอบไฟล์และสัญลักษณ์สำคัญของภาษาไทย (`thai_fonts.rs`, `shaping.rs`, `thai_text.rs`, `map_thai_pua`, `era_year`, `th.tsv`, `ThaiLineBreaker`) อัตโนมัติเมื่อซิงก์โค้ดจาก upstream
+- **CI ครบทุกแพลตฟอร์ม:** ตรวจ Ubuntu, Windows, ARM64, Wasm, FreeBSD และ Cargo Deny (แก้ไขเทสต์ `redraw_dedupe_work_is_bounded_on_hostile_pages` ให้วัดด้วยปริมาณงานแทนเวลาจริง เพื่อไม่ให้ล้มบนเครื่องรัน FreeBSD x86_64 ที่โหลดสูง)
+
+### 9. ชุดทดสอบ CER บนเอกสารราชการจริง และการประเมินเปรียบเทียบโมเดล (Empirical Testset & Decision Gate)
+จัดทำชุดทดสอบมาตรฐานนอกคลังโค้ด (`data/testset/`) จากเอกสารราชการจริง 84 ฉบับที่ไม่ซ้ำกัน (แบ่งเป็น `test` 16 ฉบับ, `train_candidate` 66 ฉบับ, `excluded` 2 ฉบับ) และพัฒนาชุดทดสอบ Rust [`crates/engine/tests/thai_real_docs.rs`](crates/engine/tests/thai_real_docs.rs) ที่สลับโมเดลด้วย `THAI_CANDIDATE_MODELS_DIR` / `PDFCRAFT_MODELS` พร้อมรองรับการอ่านความกว้าง Input (`image_shape: [3, 48, W]`) จาก `model_meta.json` โดยไม่เขียนทับ `assets/models/`:
+
+| ชุดทดสอบ (Benchmark Set) | โมเดลเดิมในระบบ (Baseline `8b70e6d1…`) | Candidate v1 (`d0329f75…`) | **Candidate v2 (`07626524…`)** | Candidate R4 (`fed74cec…`, W=800) | สรุปผลทางเทคนิค |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **จำนวน Output Classes** | 526 (`dict` 524) | 526 (`dict` 524) | **526 (`dict` 524)** | 241 (`dict` 239) | v2 โหลด Pretrained ครบ 100%; R4 ถูกรีเซ็ต SVTR+Head |
+| **1. Synthetic 5 Sentences** (ประโยคมาตรฐาน) | **`0.0136`** | `0.0853` | **`0.0174`** | `0.4027` | v2 แก้ปัญหา Catastrophic Forgetting สำเร็จ (-6.79% จาก v1) |
+| **2. Set A Recognizer-Only** (787 บรรทัดราชการ) | `0.2260` | `0.1932` | **`0.1915`** | `0.5423` | 🏆 **Candidate v2 ชนะเลิศ** (ดีกว่า Baseline -3.45%) |
+| **3. Set A End-to-End** (สแกนสังเคราะห์ 27 หน้า) | **`0.3358`** | `0.3788` | **`0.3619`** | `0.6732` | Baseline ทนทานต่อ Detector Noise มากกว่า |
+| **4. Set B Real-Scan Lines** (สแกนจริง 32 บรรทัดตรวจรับรอง) | **`0.1431`** | `0.2086` | **`0.1952`** | `0.6544` | ผ่าน Human Audit Gate 21.3%; Baseline แม่นยำกว่าบนสแกนจริง |
+| **คำตัดสิน (Decision Gate Ruling)** | **คงไว้ใน `assets/models/`** | ปฏิเสธ (Rejected) | **ดีที่สุดในกลุ่ม Fine-tune** | ปฏิเสธ (Rejected) | **คง Baseline เป็นโมเดลหลักใน Production** |
+
+### 10. ไปป์ไลน์ชุดข้อมูลฝึกฝนรอบใหม่ (Diverse Training Dataset v2 — 24,786 ภาพ)
+พัฒนาไปป์ไลน์สร้างชุดข้อมูลฝึกฝน (`tools/dataset_builder/`) เพื่อแก้ปัญหา Catastrophic Forgetting และเพิ่มความหลากหลายของฟอนต์:
+- **แหล่งข้อมูลผสมผสาน:** สกัดบรรทัดจากเอกสารราชการจริง 66 ฉบับ ผสานกับประโยคภาษาไทยทั่วไป (Data Replay)
+- **Multi-Font Rendering (5 ตระกูลฟอนต์):** TH Sarabun New (40%), Angsana New (15%), Cordia New (15%), Noto Sans Thai (20%), MiSans Thai (10%)
+- **Robust Data Augmentation:** จำลอง Bounding Box Jittering (±4–10%), การเอียงภาพ Skew (±1.2°), Gaussian Blur, Noise และ JPEG Compression Artifacts (Q68–90)
+- **พจนานุกรมอักขระไทย 524 ตัว (`dict-th.txt`):** รองรับอักษรไทย บาลี/สันสกฤต เลขไทย/อารบิก และสัญลักษณ์ทางราชการครบถ้วน
+- **Colab Fine-Tuning Pipeline:** สมุดบันทึก `Thai_OCR_FineTune_DocCraftTH (1).ipynb` ปรับจูนสำหรับ PP-OCRv5 Mobile Recognizer ด้วย Cosine Decay Learning Rate `1e-4`, Epoch 15, Batch Size 64 พร้อมสคริปต์แปลงเป็น ONNX (Opset 11) และ `.rten` อัตโนมัติ
+
 ---
 
 ## ⚡ คำสั่งใช้งานเบื้องต้น (Quick Start)
@@ -78,6 +118,19 @@ $env:PDFCRAFT_MODELS = "K:\data\thai-ocr-eval\bin\models"
 
 # รันคำสั่ง OCR แปลงไฟล์เอกสารสแกน
 pdfcraft-cli batch "input.pdf" --steps ocr --language th --dpi 300 --out-dir "out/"
+```
+
+### 3. รันชุดทดสอบประเมินผล CER เอกสารราชการจริง (Set A & Set B Benchmark)
+```powershell
+# กำหนดโฟลเดอร์ชุดทดสอบและโมเดลผู้สมัคร
+$env:THAI_TESTSET_DIR = "K:\src\DocCraftTH\data\testset"
+$env:THAI_CANDIDATE_MODELS_DIR = "K:\src\DocCraftTH\models\finetuned"
+
+# รันเปรียบเทียบ Set A (Recognizer-only & End-to-End) และ 5 ประโยคมาตรฐาน
+cargo test -p pdfcraft-engine --test thai_real_docs compare_models_on_real_corpus -j 2 -- --nocapture
+
+# รันประเมินผล Set B (บรรทัดสแกนจริงที่ผ่านการตรวจรับรอง Human Audit Gate)
+cargo test -p pdfcraft-engine --test thai_real_docs test_eval_set_b_real_scan_lines -j 2 -- --nocapture
 ```
 
 ---

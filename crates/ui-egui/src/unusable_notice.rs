@@ -17,7 +17,7 @@ use crate::{PdfCraftApp, widgets};
 struct Dismissed(Arc<HashSet<DocId>>);
 
 fn dismissed_id() -> egui::Id {
-    egui::Id::new("ocr-unusable-page-notice-dismissed")
+    egui::Id::unique("ocr-unusable-page-notice-dismissed")
 }
 
 impl PdfCraftApp {
@@ -55,12 +55,12 @@ impl PdfCraftApp {
             .find(egui::Rect::is_positive)
             .unwrap_or_else(|| ctx.content_rect());
         // The quick tools run down the page view's left edge: keep clear of them.
-        if let Some(bar) = ctx.memory(|m| m.area_rect(egui::Id::new("quick-bar"))).filter(|b| b.intersects(area)) {
+        if let Some(bar) = ctx.memory(|m| m.area_rect(egui::Id::unique("quick-bar"))).filter(|b| b.intersects(area)) {
             area.min.x = (bar.max.x + 8.0).min(area.max.x);
         }
         let width = 420.0_f32.min(area.width() - 32.0).max(160.0);
         let (mut open, mut later) = (false, false);
-        egui::Area::new(egui::Id::new("ocr-unusable-page-notice"))
+        egui::Area::new(egui::Id::unique("ocr-unusable-page-notice"))
             .order(egui::Order::Foreground)
             .pivot(egui::Align2::CENTER_TOP)
             .fixed_pos(area.center_top() + egui::vec2(0.0, 16.0))

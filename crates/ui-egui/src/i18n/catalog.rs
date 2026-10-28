@@ -155,8 +155,7 @@ impl Catalog {
         (c, errors)
     }
 
-    /// Rewrite every translation (each plural form on its own), e.g. into display order for a
-    /// right-to-left language. Keys are untouched.
+    /// Rewrite every translation in place (Thai soft line breaks are added this way).
     pub fn map_translations(&mut self, f: impl Fn(&str) -> String) {
         let tables = std::iter::once(&mut self.plain).chain(self.contextual.values_mut()).chain(std::iter::once(&mut self.ids));
         for translation in tables.flat_map(HashMap::values_mut).chain(self.plurals.values_mut().flatten()) {
