@@ -237,13 +237,13 @@ impl Ocr {
                 let mut out = Vec::new();
                 for [left, top, right, bottom] in merged_boxes {
                     let box_h = bottom - top;
-                    // Pad vertical bounds (25% above, 15% below) so Thai marks above/below the base
+                    // Pad vertical bounds (30% above, 18% below) so Thai marks above/below the base
                     // line are never clipped by the Latin-trained detector, plus a small horizontal margin.
                     let pad_x = (box_h * 0.15).max(2.0);
                     let x0 = (left - pad_x).floor().max(0.0) as u32;
-                    let y0 = (top - box_h * 0.25).floor().max(0.0) as u32;
+                    let y0 = (top - box_h * 0.30).floor().max(0.0) as u32;
                     let x1 = (right + pad_x).ceil().min(width as f32).max(0.0) as u32;
-                    let y1 = (bottom + box_h * 0.15).ceil().min(height as f32).max(0.0) as u32;
+                    let y1 = (bottom + box_h * 0.18).ceil().min(height as f32).max(0.0) as u32;
                     if x1 <= x0 || y1 <= y0 {
                         continue;
                     }

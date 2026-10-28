@@ -266,7 +266,11 @@ impl OcrJob {
         // sheet (up to 1 %, e.g. 2493 x 3510 px at 300 dpi = 842.4 pt) at its own resolution.
         let long = info.width.max(info.height).max(1e-3);
         let fit = if long > SHEET * 1.01 { SHEET / long } else { 1.0 };
-        native.clamp(fit, wanted * fit)
+        // For Thai text, low-resolution scans (< 200 dpi) have tone marks and vowel signs that are only
+        // a few pixels high. Ensure rendering at a floor of at least 200 dpi (up to the requested target)
+        // so the detector and recognizer receive well-formed character contours.
+        let min_scale = if self.settings.language == "th" { (200.0 / 72.0 * fit).min(wanted * fit) } else { fit };
+        native.max(min_scale).clamp(fit, wanted * fit)
     }
 }
 
