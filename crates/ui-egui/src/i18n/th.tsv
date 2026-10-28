@@ -112,7 +112,7 @@
 	All tools	เครื่องมือทั้งหมด
 	Read	อ่าน
 	Convert	แปลง
-	E-Sign	ลงนามอิเล็กทรอนิกส์
+	E-Sign	ลงนาม e-Sign
 	Print ({key})	พิมพ์ ({key})
 	Save ({key})	บันทึก ({key})
 	Document properties ({key})	คุณสมบัติเอกสาร ({key})
@@ -2726,18 +2726,18 @@ theme	Appearance	รูปลักษณ์
 	the name is not a plain file name	ชื่อนี้ไม่ใช่ชื่อไฟล์ธรรมดา
 	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	ไม่ได้ติดตั้งโมเดลการรู้จำข้อความสำหรับ {language} (ติดตั้ง PdfCraft ใหม่ หรือตั้ง PDFCRAFT_MODELS เป็นโฟลเดอร์ที่มีโมเดลนี้)
 	Continue from previous section	นับต่อจากส่วนก่อนหน้า
-	Interface font	ฟอนต์ของหน้าจอ
+	Interface font	แบบอักษรของหน้าจอ
 	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium ใช้แสดงภาษาอังกฤษและภาษาไทยบนหน้าจอ
 	Thai text	ข้อความภาษาไทย
-	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped ใช้แสดงภาษาไทยเท่านั้น ข้อความภาษาอังกฤษบนหน้าจอยังใช้ฟอนต์ของหน้าจอ
-	Thai text font	ฟอนต์สำหรับข้อความภาษาไทย
-	Show optional fonts	แสดงฟอนต์ทางเลือก
-	Primary	ตัวเลือกหลัก
-	Optional font	ตัวเลือกรอง
+	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped ใช้แสดงภาษาไทยเท่านั้น ข้อความภาษาอังกฤษบนหน้าจอยังใช้แบบอักษรของหน้าจอ
+	Thai text font	แบบอักษรสำหรับข้อความภาษาไทย
+	Show optional fonts	แสดงแบบอักษรทางเลือก
+	Primary	แบบอักษรหลัก
+	Optional font	แบบอักษรทางเลือก
 	This application	แอปพลิเคชันนี้
 	Operating system	ระบบปฏิบัติการ
 	Not installed	ไม่ได้ติดตั้ง
-	Operating system fonts are drawn on screen only. They are not written into a PDF.	ฟอนต์จากระบบปฏิบัติการใช้แสดงบนหน้าจอเท่านั้น และจะไม่ถูกเขียนลงในไฟล์ PDF
+	Operating system fonts are drawn on screen only. They are not written into a PDF.	แบบอักษรจากระบบปฏิบัติการใช้แสดงบนหน้าจอเท่านั้น และจะไม่ถูกเขียนลงในไฟล์ PDF
 	Digits	ตัวเลข
 	As recognized	ตามที่อ่านได้
 	Thai digits	เลขไทย (๐๑๒)
