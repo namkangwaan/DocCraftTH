@@ -453,7 +453,7 @@ impl Session {
             let shapes = pdfcraft_forms::detect::page_shapes(cos, page);
             let existing: Vec<[f64; 4]> = doc.form.iter().flat_map(|f| f.widgets.iter()).filter(|w| w.page == Some(page)).map(|w| w.rect).collect();
             let (found, turn) = if shapes.boxes.is_empty() && shapes.rules.is_empty() && crate::scan_fields::is_scan(doc, page, info) {
-                self.detect_on_scan(id, &mut r, page, res.text.as_deref(), &existing, &taken, leaders)
+                self.detect_on_scan((id, page), &mut r, res.text.as_deref(), &existing, &taken, leaders)
             } else {
                 let words = res.text.map(|t| detection_words(&t, info)).unwrap_or_default();
                 (pdfcraft_forms::detect::detect_with(&words, &shapes, &existing, &taken, leaders), 0)

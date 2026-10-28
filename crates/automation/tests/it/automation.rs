@@ -6733,7 +6733,11 @@ fn detecting_form_fields_preserves_content_piece_comments() {
         std::fs::write(dir.join("pieces.pdf"), pdfcraft_cos::write_full(&source, &Default::default()).unwrap()).unwrap();
         let mut a = auto(&dir);
         let doc = ok(&mut a, "doc_open", json!({"path": "pieces.pdf"}))["doc"].as_u64().unwrap();
-        let candidates = if visible { json!([{"page": 1, "kind": "text", "name": "Text1", "rect": [41.0, 121.0, 339.0, 149.0]}]) } else { json!([]) };
+        let candidates = if visible {
+            json!([{"page": 1, "kind": "text", "source": "box", "name": "Text1", "rect": [41.0, 121.0, 339.0, 149.0]}])
+        } else {
+            json!([])
+        };
         let inventory = if visible {
             json!([{"name": "Text1", "type": "text", "value": null, "page": 1, "rect": [41.0, 151.0, 339.0, 179.0], "rotation": 0, "read_only": false, "required": false, "multiline": false}])
         } else {
@@ -6801,7 +6805,11 @@ fn detecting_comb_boxes_through_tools() {
     let mut a = auto(&dir);
     let doc = ok(&mut a, "doc_open", json!({ "path": "comb.pdf" }))["doc"].as_u64().unwrap();
     let r = ok(&mut a, "form_detect_fields", json!({ "doc": doc }));
-    assert_eq!(r["fields"], json!([{ "page": 1, "kind": "text", "source": "box", "comb": 5, "name": "Postcode", "rect": [120.0, 100.0, 200.0, 120.0] }]), "{r}");
+    assert_eq!(
+        r["fields"],
+        json!([{ "page": 1, "kind": "text", "source": "box", "comb": 5, "name": "Postcode", "rect": [120.0, 100.0, 200.0, 120.0] }]),
+        "{r}"
+    );
     ok(&mut a, "form_fill", json!({ "doc": doc, "values": { "Postcode": "75001" } }));
     assert_eq!(ok(&mut a, "form_fields", json!({ "doc": doc }))["fields"][0]["value"], "75001");
 }

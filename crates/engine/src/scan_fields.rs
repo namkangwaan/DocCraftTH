@@ -108,9 +108,8 @@ impl Session {
     /// (its `/Rotate`). `text` is the page's text layer, `existing` its widget rectangles.
     pub(crate) fn detect_on_scan(
         &self,
-        id: DocId,
+        (id, page): (DocId, usize),
         r: &mut PageRenderer,
-        page: usize,
         text: Option<&PageText>,
         existing: &[[f64; 4]],
         taken: &[String],

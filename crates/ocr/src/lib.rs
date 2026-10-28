@@ -1289,7 +1289,7 @@ mod tests {
                 expected[y * w + 418 + i * 18..y * w + 427 + i * 18].fill(255);
             }
         }
-        assert_eq!(erase_dot_leaders(&img, w as u32, h as u32).expect("a leader to erase"), expected);
+        assert_eq!(erase_dot_leaders(&img, w as u32, h as u32).expect("a leader to erase").0, expected);
         // Nothing to find is empty; a buffer that is not the image is an error, never a panic.
         assert!(dot_leaders(&vec![255; w * h], w as u32, h as u32).unwrap().is_empty());
         assert!(dot_leaders(&[], 0, 0).is_err());

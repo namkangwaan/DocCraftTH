@@ -2484,7 +2484,10 @@ fn page_shapes_preserves_content_piece_boundaries() {
     for ending in [b"% trailing\n".as_slice(), b"% trailing\r", b"% trailing\r\n"] {
         let shapes = read(&[ending, b"40 120 300 30 re S\n"]);
         assert_eq!(shapes, visible);
-        assert_eq!(detect(&[], &shapes, &[], &[]), vec![Candidate { kind: Kind::Text, source: Source::Box, rect: [41.0, 121.0, 339.0, 149.0], name: "Text1".into() }]);
+        assert_eq!(
+            detect(&[], &shapes, &[], &[]),
+            vec![Candidate { kind: Kind::Text, source: Source::Box, rect: [41.0, 121.0, 339.0, 149.0], name: "Text1".into() }]
+        );
     }
     assert_eq!(read(&[b"40 120", b"", b"300 30", b"re", b"S"]), visible);
     assert_eq!(
