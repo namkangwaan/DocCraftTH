@@ -321,10 +321,13 @@ impl Session {
     }
 }
 
-/// A page's words for form-field detection, in user space (underscore runs split from the
-/// text around them).
+/// A page's words for form-field detection, in user space (underscore runs and rows of dots
+/// split from the text around them).
 fn detection_words(text: &pdfcraft_render::PageText, info: &pdfcraft_render::PageInfo) -> Vec<pdfcraft_forms::detect::Word> {
-    page_words(text, info).into_iter().map(|(text, rect)| pdfcraft_forms::detect::Word { text, rect }).collect()
+    words_split(text, true, |x, y| info.view_to_user(x, y))
+        .into_iter()
+        .map(|(text, r)| pdfcraft_forms::detect::Word { text, rect: [f64::from(r[0]), f64::from(r[1]), f64::from(r[2]), f64::from(r[3])] })
+        .collect()
 }
 
 /// A page's words in reading order, in user space ([x0, y0, x1, y1]); runs of underscores are
@@ -345,22 +348,57 @@ thread_local! {
 /// A page's words in reading order, their boxes mapped from view space by `map` (and ordered
 /// again, so that [x0, y0, x1, y1] holds whatever way `map` turns them).
 pub(crate) fn words_with(text: &pdfcraft_render::PageText, map: impl Fn(f32, f32) -> [f32; 2]) -> Vec<(String, [f32; 4])> {
+    words_split(text, false, map)
+}
+
+/// [`words_with`], where `dots` also makes a row of dots that long enough to fill in a form line
+/// (`pdfcraft_forms::detect::MIN_FIELD_DOTS`, side by side on one line) a word of its own, as
+/// underscores always are. A full stop ending a sentence stays with its word.
+pub(crate) fn words_split(text: &pdfcraft_render::PageText, dots: bool, map: impl Fn(f32, f32) -> [f32; 2]) -> Vec<(String, [f32; 4])> {
+    // Whether glyph `i` is a dot, and so whether it belongs to a row of dots long enough.
+    let dot = |i: usize| text.glyphs.get(i).is_some_and(|g| !g.text.trim().is_empty() && g.text.chars().all(pdfcraft_forms::detect::is_dot));
+    let mut in_row = vec![false; if dots { text.glyphs.len() } else { 0 }];
+    let mut i = 0;
+    while dots && i < text.glyphs.len() {
+        if !dot(i) {
+            i += 1;
+            continue;
+        }
+        let (mut end, mut count) = (i, 0);
+        while dot(end) && (end == i || text.line_of.get(end) == text.line_of.get(i)) {
+            count += text.glyphs.get(end).map_or(0, |g| pdfcraft_forms::detect::dot_count(&g.text));
+            end += 1;
+        }
+        if count >= pdfcraft_forms::detect::MIN_FIELD_DOTS {
+            for flag in in_row.iter_mut().take(end).skip(i) {
+                *flag = true;
+            }
+        }
+        i = end;
+    }
     let mut words: Vec<(String, [f32; 4])> = Vec::new();
     let mut last_line = u32::MAX;
+    let mut last_kind = 0u8;
     // A space glyph ends the word before it.
     let mut gap = false;
-    // Whether the last word is an underscore run (a form's blank), which other glyphs don't join.
-    let mut last_under = false;
     for (i, g) in text.glyphs.iter().enumerate() {
         let line = text.line_of.get(i).copied().unwrap_or(0);
         if g.text.trim().is_empty() {
             gap = true;
             continue;
         }
-        let under = g.text.chars().all(|c| c == '_');
-        #[cfg(test)]
-        UNDERSCORE_CHARS_READ.with(|n| n.set(n.get() + g.text.len()));
-        let breaks = words.is_empty() || gap || line != last_line || text.space_before.get(i).copied().unwrap_or(false) || last_under != under;
+        // 1: underscores, 2: a row of dots, 0: anything else; a word never mixes kinds.
+        let kind = if g.text.chars().all(|c| c == '_') {
+            #[cfg(test)]
+            UNDERSCORE_CHARS_READ.with(|n| n.set(n.get() + g.text.len()));
+            1
+        } else if in_row.get(i).copied().unwrap_or(false) {
+            2
+        } else {
+            0
+        };
+        let breaks = words.is_empty() || gap || line != last_line || text.space_before.get(i).copied().unwrap_or(false) || last_kind != kind;
+        last_kind = kind;
         gap = false;
         last_line = line;
         match words.last_mut() {
@@ -373,7 +411,6 @@ pub(crate) fn words_with(text: &pdfcraft_render::PageText, map: impl Fn(f32, f32
             }
             _ => {
                 words.push((g.text.clone(), g.rect));
-                last_under = under;
             }
         }
     }
@@ -392,11 +429,16 @@ impl Session {
     /// seem to ask for, named from their labels, as (page, candidate). Scanned pages (a picture
     /// and no drawn shapes) are read from their pixels, see [`crate::scan_fields`].
     pub fn detect_fields(&self, id: DocId, pages: &[usize]) -> Vec<(usize, pdfcraft_forms::detect::Candidate)> {
-        self.detect_fields_turned(id, pages).into_iter().map(|(page, c, _)| (page, c)).collect()
+        self.detect_fields_with(id, pages, true)
+    }
+
+    /// [`Self::detect_fields`], where `leaders` false leaves rows of dots out.
+    pub fn detect_fields_with(&self, id: DocId, pages: &[usize], leaders: bool) -> Vec<(usize, pdfcraft_forms::detect::Candidate)> {
+        self.detect_fields_turned(id, pages, leaders).into_iter().map(|(page, c, _)| (page, c)).collect()
     }
 
     /// [`Self::detect_fields`], with how far each field turns (`/MK /R`) to read upright.
-    fn detect_fields_turned(&self, id: DocId, pages: &[usize]) -> Vec<(usize, pdfcraft_forms::detect::Candidate, i64)> {
+    fn detect_fields_turned(&self, id: DocId, pages: &[usize], leaders: bool) -> Vec<(usize, pdfcraft_forms::detect::Candidate, i64)> {
         let Some(doc) = self.get(id) else { return Vec::new() };
         let Some(cos) = doc.editor.as_ref().map(|e| &e.cos) else { return Vec::new() };
         let config = pdfcraft_render::RenderConfig { password: doc.password.as_deref().map(std::sync::Arc::from), ..Default::default() };
@@ -411,10 +453,10 @@ impl Session {
             let shapes = pdfcraft_forms::detect::page_shapes(cos, page);
             let existing: Vec<[f64; 4]> = doc.form.iter().flat_map(|f| f.widgets.iter()).filter(|w| w.page == Some(page)).map(|w| w.rect).collect();
             let (found, turn) = if shapes.boxes.is_empty() && shapes.rules.is_empty() && crate::scan_fields::is_scan(doc, page, info) {
-                self.detect_on_scan(id, &mut r, page, res.text.as_deref(), &existing, &taken)
+                self.detect_on_scan((id, page), &mut r, res.text.as_deref(), &existing, &taken, leaders)
             } else {
                 let words = res.text.map(|t| detection_words(&t, info)).unwrap_or_default();
-                (pdfcraft_forms::detect::detect(&words, &shapes, &existing, &taken), 0)
+                (pdfcraft_forms::detect::detect_with(&words, &shapes, &existing, &taken, leaders), 0)
             };
             for c in found {
                 taken.push(c.name.clone());
@@ -426,7 +468,12 @@ impl Session {
 
     /// Detect fields and add them, as one undoable step. Returns the new fields' names.
     pub fn auto_detect_fields(&mut self, id: DocId, pages: &[usize]) -> Result<Vec<String>, EditError> {
-        let found = self.detect_fields_turned(id, pages);
+        self.auto_detect_fields_with(id, pages, true)
+    }
+
+    /// [`Self::auto_detect_fields`], where `leaders` false leaves rows of dots out.
+    pub fn auto_detect_fields_with(&mut self, id: DocId, pages: &[usize], leaders: bool) -> Result<Vec<String>, EditError> {
+        let found = self.detect_fields_turned(id, pages, leaders);
         if found.is_empty() {
             return Ok(Vec::new());
         }

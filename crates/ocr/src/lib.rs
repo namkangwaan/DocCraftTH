@@ -351,8 +351,45 @@ const LEADER_REF_WIDTH: f32 = 2413.0;
 /// The fewest dots in a row that make a leader. Forms use runs this short too, and they hurt the
 /// recogniser as much as long ones; an ellipsis ("...") in prose is lost from the text with them.
 const MIN_LEADER_DOTS: usize = 3;
-/// The most pixels [`erase_dot_leaders`] labels (4 bytes each); larger images are read as they are.
+/// The most pixels [`find_dot_leaders`] labels (4 bytes each); larger images are read as they are.
 const MAX_LEADER_PIXELS: usize = 1 << 26;
+
+/// A fill-in dot leader ("..........") found on a page image: where a form asks to be filled in.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DotLeader {
+    /// Box around all its dots in image pixels `[left, top, right, bottom]`, inside the image.
+    pub rect: [f32; 4],
+    /// How many dots it has, at least 3.
+    pub dots: usize,
+}
+
+/// The dot leaders on a page image (RGBA, RGB or grey, `width` × `height` pixels), top to
+/// bottom and left to right. The same rows of dots Thai recognition erases (see
+/// [`erase_dot_leaders`]); they do not depend on the recognition models. The buffer must be the
+/// image, as for [`Ocr::recognize`]; an image too large to scan has none.
+pub fn dot_leaders(pixels: &[u8], width: u32, height: u32) -> Result<Vec<DotLeader>, OcrError> {
+    let rgb = channels_for_ocrs(pixels, width, height)?;
+    let Some(found) = find_dot_leaders(&rgb, width, height) else { return Ok(Vec::new()) };
+    Ok(found
+        .runs
+        .iter()
+        .filter_map(|run| {
+            let rect = run.iter().fold(None, |acc: Option<[usize; 4]>, d| {
+                Some(acc.map_or(*d, |a| [a[0].min(d[0]), a[1].min(d[1]), a[2].max(d[2]), a[3].max(d[3])]))
+            })?;
+            Some(DotLeader { rect: rect.map(|v| v as f32), dots: run.len() })
+        })
+        .collect())
+}
+
+/// What [`find_dot_leaders`] found: the pixel layout it read and each leader's dots as boxes
+/// `[left, top, right, bottom)`.
+struct Leaders {
+    channels: usize,
+    /// How far around each dot [`erase_dot_leaders`] whitens, in pixels.
+    margin: usize,
+    runs: Vec<Vec<[usize; 4]>>,
+}
 
 /// Fill-in dot leaders ("..........") on a form, whitened in a copy of `pixels` (`width` ×
 /// `height`, grey or RGB), with each leader's box `[left, top, right, bottom]`; `None` when there
@@ -366,6 +403,33 @@ const MAX_LEADER_PIXELS: usize = 1 << 26;
 /// last test keeps Thai marks, which sit on or under a letter. The sizes scale with the image
 /// width, so a page scanned at 96 dpi keeps its (small) letters.
 fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<(Vec<u8>, Vec<[f32; 4]>)> {
+    let Leaders { channels, margin, runs } = find_dot_leaders(pixels, width, height)?;
+    let (w, h) = (width as usize, height as usize);
+    let mut out = pixels.to_vec();
+    for &[x0, y0, x1, y1] in runs.iter().flatten() {
+        for y in y0.saturating_sub(margin)..(y1 + margin).min(h) {
+            let row = y * w;
+            let span = (row + x0.saturating_sub(margin)) * channels..(row + (x1 + margin).min(w)) * channels;
+            if let Some(px) = out.get_mut(span) {
+                px.fill(255);
+            }
+        }
+    }
+    let spans = runs
+        .iter()
+        .filter_map(|run| {
+            let first = run.first()?;
+            let span = run.iter().fold(*first, |s, d| [s[0].min(d[0]), s[1].min(d[1]), s[2].max(d[2]), s[3].max(d[3])]);
+            Some(span.map(|v| v as f32))
+        })
+        .collect();
+    Some((out, spans))
+}
+
+/// The rows of [`MIN_LEADER_DOTS`] or more dots in a grey or RGB image (see
+/// [`erase_dot_leaders`] for what counts as a dot), or `None` when there are none, the buffer is
+/// not the image, or it is too large to scan.
+fn find_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<Leaders> {
     let (w, h) = (width as usize, height as usize);
     let n = w.checked_mul(h).filter(|&n| n > 0 && n <= MAX_LEADER_PIXELS)?;
     let channels = match pixels.len() {
@@ -449,8 +513,14 @@ fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<(Vec<u8>,
         .collect();
     dots.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.total_cmp(&b.1)));
 
-    let mut leader = Vec::new();
+    let mut runs: Vec<Vec<[usize; 4]>> = Vec::new();
     let mut run: Vec<usize> = Vec::new();
+    let mut close = |run: &mut Vec<usize>| {
+        if run.len() >= MIN_LEADER_DOTS {
+            runs.push(run.iter().filter_map(|&i| blobs.get(i)).map(|b| [b.x0, b.y0, b.x1, b.y1]).collect());
+        }
+        run.clear();
+    };
     for (at, d) in dots.iter().enumerate() {
         let joins = at > 0
             && dots.get(at - 1).is_some_and(|p| {
@@ -461,39 +531,12 @@ fn erase_dot_leaders(pixels: &[u8], width: u32, height: u32) -> Option<(Vec<u8>,
                 p.0 == d.0 && d.1 - p.1 <= gap && apart
             });
         if !joins {
-            if run.len() >= MIN_LEADER_DOTS {
-                leader.push(std::mem::take(&mut run));
-            }
-            run.clear();
+            close(&mut run);
         }
         run.push(d.2);
     }
-    if run.len() >= MIN_LEADER_DOTS {
-        leader.push(run);
-    }
-    if leader.is_empty() {
-        return None;
-    }
-    let mut out = pixels.to_vec();
-    for b in leader.iter().flatten().filter_map(|&i| blobs.get(i)) {
-        for y in b.y0.saturating_sub(margin)..(b.y1 + margin).min(h) {
-            let row = y * w;
-            let span = (row + b.x0.saturating_sub(margin)) * channels..(row + (b.x1 + margin).min(w)) * channels;
-            if let Some(px) = out.get_mut(span) {
-                px.fill(255);
-            }
-        }
-    }
-    let spans = leader
-        .iter()
-        .filter_map(|run| {
-            let mut dots = run.iter().filter_map(|&i| blobs.get(i));
-            let first = dots.next()?;
-            let span = dots.fold([first.x0, first.y0, first.x1, first.y1], |s, b| [s[0].min(b.x0), s[1].min(b.y0), s[2].max(b.x1), s[3].max(b.y1)]);
-            Some(span.map(|v| v as f32))
-        })
-        .collect();
-    Some((out, spans))
+    close(&mut run);
+    (!runs.is_empty()).then_some(Leaders { channels, margin, runs })
 }
 
 /// The smallest median component size, as a fraction of the page width, that is taken as the
@@ -1174,10 +1217,10 @@ mod tests {
         assert_eq!(merged[2][2], 900.0);
     }
 
-    /// A form line at 300 dpi (2413 px wide, an A4-ish page): a word, a leader of dots after it,
-    /// three marks sitting on letters, and a lone pair of dots. Only the leader is whitened.
-    #[test]
-    fn dot_leaders_are_erased_and_marks_kept() {
+    /// A form line at 300 dpi (2413 px wide, an A4-ish page), grey: a word, a leader of 20 dots
+    /// after it (boxes `[420 + 18 i, 150, 425 + 18 i, 155]`), three marks sitting on letters, a
+    /// lone pair of dots, and a mark broken into three touching pieces.
+    fn leader_line() -> (usize, usize, Vec<u8>) {
         let (w, h) = (2413usize, 200usize);
         let mut img = vec![255u8; w * h];
         let mut ink = |x0: usize, y0: usize, x1: usize, y1: usize| {
@@ -1200,6 +1243,13 @@ mod tests {
         ink(1700, 50, 1703, 53);
         ink(1704, 50, 1707, 53);
         ink(1708, 50, 1711, 53);
+        (w, h, img)
+    }
+
+    /// Only the leader of [`leader_line`] is whitened.
+    #[test]
+    fn dot_leaders_are_erased_and_marks_kept() {
+        let (w, h, img) = leader_line();
         let dark = |img: &[u8], x0: usize, y0: usize, x1: usize, y1: usize| (y0..y1).any(|y| img[y * w + x0..y * w + x1].iter().any(|&v| v < 128));
 
         let (out, leaders) = erase_dot_leaders(&img, w as u32, h as u32).expect("a leader to erase");
@@ -1220,6 +1270,48 @@ mod tests {
         assert!(erase_dot_leaders(&[0; 7], 3, 3).is_none());
         assert!(erase_dot_leaders(&[0], 1, 1).is_none());
         assert!(erase_dot_leaders(&[0; 4], u32::MAX, u32::MAX).is_none());
+    }
+
+    #[test]
+    fn dot_leaders_are_reported_with_their_boxes_and_dot_counts() {
+        let (w, h, img) = leader_line();
+        let found = dot_leaders(&img, w as u32, h as u32).expect("a grey image");
+        assert_eq!(found, [DotLeader { rect: [420.0, 150.0, 767.0, 155.0], dots: 20 }], "the pair and the broken mark are not leaders");
+        // RGB and RGBA read the same.
+        let rgb: Vec<u8> = img.iter().flat_map(|&v| [v; 3]).collect();
+        let rgba: Vec<u8> = img.iter().flat_map(|&v| [v, v, v, 255]).collect();
+        assert_eq!(dot_leaders(&rgb, w as u32, h as u32).unwrap(), found);
+        assert_eq!(dot_leaders(&rgba, w as u32, h as u32).unwrap(), found);
+        // The eraser whitens exactly the dots found, 2 px around each (what it did before the finder was split out).
+        let mut expected = img.clone();
+        for i in 0..20usize {
+            for y in 148..157 {
+                expected[y * w + 418 + i * 18..y * w + 427 + i * 18].fill(255);
+            }
+        }
+        assert_eq!(erase_dot_leaders(&img, w as u32, h as u32).expect("a leader to erase").0, expected);
+        // Nothing to find is empty; a buffer that is not the image is an error, never a panic.
+        assert!(dot_leaders(&vec![255; w * h], w as u32, h as u32).unwrap().is_empty());
+        assert!(dot_leaders(&[], 0, 0).is_err());
+        assert!(dot_leaders(&[0; 7], 3, 3).is_err());
+        assert!(dot_leaders(&[0; 4], u32::MAX, u32::MAX).is_err());
+    }
+
+    #[test]
+    fn each_row_of_dots_is_its_own_leader_top_to_bottom() {
+        let (w, h) = (2413usize, 120usize);
+        let mut img = vec![255u8; w * h];
+        // Three dots are the fewest that make a leader; a pair is not (see `leader_line`).
+        for (y, x0, count) in [(30usize, 200usize, 8usize), (30, 1400, 4), (80, 200, 30), (100, 800, 3), (100, 1200, 2)] {
+            for i in 0..count {
+                for yy in y..y + 5 {
+                    img[yy * w + x0 + i * 18..yy * w + x0 + i * 18 + 5].fill(0);
+                }
+            }
+        }
+        let found = dot_leaders(&img, w as u32, h as u32).unwrap();
+        let rows: Vec<(f32, f32, usize)> = found.iter().map(|l| (l.rect[1], l.rect[0], l.dots)).collect();
+        assert_eq!(rows, [(30.0, 200.0, 8), (30.0, 1400.0, 4), (80.0, 200.0, 30), (100.0, 800.0, 3)]);
     }
 
     fn rotated(w: f32, h: f32) -> rten_imageproc::RotatedRect {
@@ -1353,6 +1445,23 @@ mod tests {
             proptest::prop_assert!(merged.windows(2).all(|p| p[0][1] <= p[1][1]), "sorted top to bottom");
             for b in valid {
                 proptest::prop_assert!(merged.iter().any(|m| m[0] <= b[0] && m[1] <= b[1] && m[2] >= b[2] && m[3] >= b[3]), "{b:?} lost");
+            }
+        }
+
+        #[test]
+        fn dot_leaders_stay_inside_the_image_whatever_it_holds(
+            w in 1u32..80,
+            h in 1u32..40,
+            channels in proptest::prop_oneof![proptest::strategy::Just(1usize), proptest::strategy::Just(3), proptest::strategy::Just(4)],
+            seed in proptest::collection::vec(0u8..=255, 1..64),
+        ) {
+            let len = w as usize * h as usize * channels;
+            let pixels: Vec<u8> = (0..len).map(|i| seed.get(i % seed.len()).copied().unwrap_or(0).wrapping_mul(i as u8 | 1)).collect();
+            let found = dot_leaders(&pixels, w, h).expect("a buffer that matches the image");
+            for l in found {
+                proptest::prop_assert!(l.dots >= MIN_LEADER_DOTS);
+                proptest::prop_assert!(l.rect[0] >= 0.0 && l.rect[1] >= 0.0 && l.rect[0] < l.rect[2] && l.rect[1] < l.rect[3]);
+                proptest::prop_assert!(l.rect[2] <= w as f32 && l.rect[3] <= h as f32);
             }
         }
     }

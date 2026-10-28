@@ -1216,3 +1216,23 @@ fn a_loop_has_its_own_card_that_opens_the_formula() {
     let draft = h.state().field_props.as_ref().map(|d| (d.field.clone(), d.tab));
     assert_eq!(draft, Some(("a".to_owned(), FieldTab::Calculate)));
 }
+
+/// Prepare a form detects fields on rows of dots, and the panel's Detect form fields button adds
+/// any that were not yet created, as one undoable step.
+#[test]
+fn prepare_a_form_detects_dot_leader_fields() {
+    let dots = ".".repeat(30);
+    let text = format!("Name: {dots}\n\nEmail address: {dots}\n\nPlain text with an ellipsis... here.");
+    let bytes = pdfcraft_engine::Session::new().create_from_text("t", &text).unwrap().to_vec();
+    let mut h = harness_with("dots.pdf", bytes);
+    assert!(h.state_mut().execute("form.prepare"));
+    h.run_steps(3);
+    assert_eq!(names(&h), ["Name", "Email address"]);
+    assert_eq!(h.state().toast.as_ref().map(|(m, _)| m.as_str()), Some("Detected 2 form fields"));
+    assert!(h.state_mut().execute("edit.undo"));
+    h.run_steps(2);
+    assert!(names(&h).is_empty());
+    h.get_by_label("Detect form fields").click();
+    h.run_steps(3);
+    assert_eq!(names(&h), ["Name", "Email address"]);
+}

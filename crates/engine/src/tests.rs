@@ -4959,6 +4959,84 @@ fn detecting_fields_on_a_printed_form() {
     assert!(s.detect_fields(id, &[]).is_empty(), "nothing left to detect");
 }
 
+/// A line of dots is a blank to fill in, as an underscore run is: typed after a label with a
+/// space, or glued to it. A full stop, a short ellipsis and a sentence's end are not.
+#[test]
+fn detecting_fields_on_dot_leaders_in_the_text_layer() {
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let text = s
+        .create_from_text(
+            "t",
+            "Name: ..............................\n\nEmail address:..............................\n\nPlain text, and then an ellipsis... and the end.\n\nShort ..... leader.",
+        )
+        .unwrap();
+    let id = s.open("dots.pdf", None, text, None).unwrap();
+    let found = s.detect_fields(id, &[]);
+    let names: Vec<&str> = found.iter().map(|(_, c)| c.name.as_str()).collect();
+    assert_eq!(names, ["Name", "Email address"], "{found:?}");
+    // The field sits on the dots, right of the label, and ends with them.
+    assert!(found.iter().all(|(_, c)| c.rect[2] - c.rect[0] >= pdfcraft_forms::detect::MIN_FIELD_WIDTH));
+    assert!(found[0].1.rect[0] > 72.0 + 20.0, "{:?}", found[0].1.rect);
+    // The words other features read are unchanged: dots stay in their word.
+    let doc_words = page_texts(&s, id);
+    assert!(doc_words[0].contains("Email address:....."), "{doc_words:?}");
+    assert_eq!(s.auto_detect_fields(id, &[]).unwrap(), ["Name", "Email address"]);
+    assert!(s.detect_fields(id, &[]).is_empty(), "nothing left to detect");
+}
+
+/// The text-layer PDF `text` as a picture of its page at 150 dpi (a scan), stored upright or on
+/// its side with /Rotate 90 to turn it back.
+fn scan_of_text(text: &str, sideways: bool) -> Arc<Vec<u8>> {
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let pdf = s.create_from_text("t", text).unwrap();
+    let id = s.open("paper.pdf", None, pdf, None).unwrap();
+    let png = export::Exporter::new(s.get(id).unwrap()).png(0, 150.0).unwrap();
+    let mut img = image::load_from_memory(&png).unwrap().to_rgba8();
+    if sideways {
+        img = image::imageops::rotate270(&img);
+    }
+    let mut bytes = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut bytes, image::ImageFormat::Png).unwrap();
+    let pdf = s.create_from_images_with_resolution(&[("scan.png".into(), bytes.into_inner())], ImageResolution::Dpi(150.0)).unwrap();
+    if !sideways {
+        return pdf;
+    }
+    let id = s.open("scan.pdf", None, pdf, None).unwrap();
+    s.apply(id, Edit::RotatePages { pages: vec![0], degrees: 90 }).unwrap();
+    s.save_bytes(id).unwrap()
+}
+
+/// A scanned form that only draws dots to write on, with no line or box (so no other detection
+/// has anything to find), gets a field on each row of dots, where the same page typed as text
+/// puts them: upright, and stored sideways. The ellipsis and short run are left alone.
+#[test]
+fn detecting_fields_on_dot_leaders_of_a_scan() {
+    let text = "Name: ..............................\n\nEmail address: ..............................\n\nPlain text, an ellipsis... and a short run ..... here.";
+    let mut s = Session::new().with_clock(|| 1_700_000_000);
+    let pdf = s.create_from_text("t", text).unwrap();
+    let born = s.open("born.pdf", None, pdf, None).unwrap();
+    let want: Vec<[f64; 4]> = s.detect_fields(born, &[]).iter().map(|(_, c)| c.rect).collect();
+    assert_eq!(want.len(), 2, "the typed page has two leaders");
+    for sideways in [false, true] {
+        let id = s.open("scan.pdf", None, scan_of_text(text, sideways), None).unwrap();
+        assert_eq!(page_texts(&s, id), [""], "a picture has no text");
+        let info = s.get(id).unwrap().info.pages[0].clone();
+        let shown = |r: [f64; 4]| {
+            let a = info.user_to_view(r[0] as f32, r[1] as f32);
+            let b = info.user_to_view(r[2] as f32, r[3] as f32);
+            [a[0].min(b[0]), info.height - a[1].max(b[1]), a[0].max(b[0]), info.height - a[1].min(b[1])].map(f64::from)
+        };
+        let found = s.detect_fields(id, &[]);
+        let got: Vec<[f64; 4]> = found.iter().map(|(_, c)| shown(c.rect)).collect();
+        assert_eq!(got.len(), 2, "sideways {sideways}: {got:?}");
+        for (g, w) in got.iter().zip(&want) {
+            // Same row and the same dots, within a few points (the picture is 150 dpi).
+            assert!((g[0] - w[0]).abs() <= 5.0 && (g[2] - w[2]).abs() <= 5.0, "sideways {sideways}: {g:?} vs {w:?}");
+            assert!(((g[1] + g[3]) / 2.0 - (w[1] + w[3]) / 2.0).abs() <= 8.0, "sideways {sideways}: {g:?} vs {w:?}");
+        }
+    }
+}
+
 /// #294, #2831: a detected field sits on a line or box the page already draws, so it gets no border
 /// and no fill that would cover the printed form. A field drawn by hand keeps the defaults.
 #[test]

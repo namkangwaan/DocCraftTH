@@ -6682,6 +6682,36 @@ fn detecting_form_fields_through_tools() {
     assert_eq!(f["fields"][1]["value"], "Lisbon", "{f}");
 }
 
+/// Rows of dots are blanks to fill in like underscores, say so in `source`, can be switched off
+/// with `leaders: false`, and are created (and undone) with the others as one step.
+#[test]
+fn detecting_dot_leaders_through_tools() {
+    let dir = workdir("detect-dot-leaders");
+    let mut a = auto(&dir);
+    let dots = ".".repeat(30);
+    let text = format!("Name: {dots}\n\nCity:{dots}\n\nTitle: ____________________\n\nOnly an ellipsis... here.");
+    let doc = ok(&mut a, "doc_create", json!({ "from": "text", "text": text }))["doc"].as_u64().unwrap();
+    let r = ok(&mut a, "form_detect_fields", json!({ "doc": doc, "add": false }));
+    let got: Vec<(String, String)> = r["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|f| (f["name"].as_str().unwrap().to_string(), f["source"].as_str().unwrap().to_string()))
+        .collect();
+    assert_eq!(got, [("Name".into(), "leader".into()), ("City".into(), "leader".into()), ("Title".into(), "underscore".into())], "{r}");
+    let r = ok(&mut a, "form_detect_fields", json!({ "doc": doc, "add": false, "leaders": false }));
+    let names: Vec<&str> = r["fields"].as_array().unwrap().iter().map(|f| f["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["Title"], "{r}");
+    assert_eq!(ok(&mut a, "form_fields", json!({ "doc": doc }))["fields"].as_array().unwrap().len(), 0, "proposing adds nothing");
+    ok(&mut a, "form_detect_fields", json!({ "doc": doc }));
+    let f = ok(&mut a, "form_fields", json!({ "doc": doc }));
+    assert_eq!(f["fields"].as_array().unwrap().len(), 3, "{f}");
+    ok(&mut a, "form_fill", json!({ "doc": doc, "values": { "City": "Lisbon" } }));
+    ok(&mut a, "edit_undo", json!({ "doc": doc }));
+    ok(&mut a, "edit_undo", json!({ "doc": doc }));
+    assert_eq!(ok(&mut a, "form_fields", json!({ "doc": doc }))["fields"].as_array().unwrap().len(), 0, "one undo took all the detected fields away");
+}
+
 #[test]
 fn detecting_form_fields_preserves_content_piece_comments() {
     for visible in [false, true] {
@@ -6703,7 +6733,11 @@ fn detecting_form_fields_preserves_content_piece_comments() {
         std::fs::write(dir.join("pieces.pdf"), pdfcraft_cos::write_full(&source, &Default::default()).unwrap()).unwrap();
         let mut a = auto(&dir);
         let doc = ok(&mut a, "doc_open", json!({"path": "pieces.pdf"}))["doc"].as_u64().unwrap();
-        let candidates = if visible { json!([{"page": 1, "kind": "text", "name": "Text1", "rect": [41.0, 121.0, 339.0, 149.0]}]) } else { json!([]) };
+        let candidates = if visible {
+            json!([{"page": 1, "kind": "text", "source": "box", "name": "Text1", "rect": [41.0, 121.0, 339.0, 149.0]}])
+        } else {
+            json!([])
+        };
         let inventory = if visible {
             json!([{"name": "Text1", "type": "text", "value": null, "page": 1, "rect": [41.0, 151.0, 339.0, 179.0], "rotation": 0, "read_only": false, "required": false, "multiline": false}])
         } else {
@@ -6771,7 +6805,11 @@ fn detecting_comb_boxes_through_tools() {
     let mut a = auto(&dir);
     let doc = ok(&mut a, "doc_open", json!({ "path": "comb.pdf" }))["doc"].as_u64().unwrap();
     let r = ok(&mut a, "form_detect_fields", json!({ "doc": doc }));
-    assert_eq!(r["fields"], json!([{ "page": 1, "kind": "text", "comb": 5, "name": "Postcode", "rect": [120.0, 100.0, 200.0, 120.0] }]), "{r}");
+    assert_eq!(
+        r["fields"],
+        json!([{ "page": 1, "kind": "text", "source": "box", "comb": 5, "name": "Postcode", "rect": [120.0, 100.0, 200.0, 120.0] }]),
+        "{r}"
+    );
     ok(&mut a, "form_fill", json!({ "doc": doc, "values": { "Postcode": "75001" } }));
     assert_eq!(ok(&mut a, "form_fields", json!({ "doc": doc }))["fields"][0]["value"], "75001");
 }
