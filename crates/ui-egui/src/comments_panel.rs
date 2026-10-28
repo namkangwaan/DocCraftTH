@@ -315,6 +315,10 @@ fn card(
     let status = thread.iter().rev().filter(|r| !r.is_mark()).find_map(|r| r.state.as_deref());
     let marked = is_marked(thread);
     let replies: Vec<&&Annotation> = thread.iter().filter(|r| r.state.is_none()).collect();
+    let lang = crate::i18n::current();
+    let comment_date = a.modified.as_deref().map(|m| view.comments.formatted_date(lang, m).to_string());
+    let reply_dates: Vec<Option<String>> =
+        replies.iter().map(|r| r.modified.as_deref().map(|m| view.comments.formatted_date(lang, m).to_string())).collect();
     let editing = view.comments.editing.as_ref().is_some_and(|(p, i, _)| (*p, *i) == key);
     let fill = if selected { t.hover.gamma_multiply(0.7) } else { Color32::TRANSPARENT };
     let mut open_menu = false;
@@ -332,11 +336,8 @@ fn card(
                 // The catalogue and author names stay logical: egui lays out RTL text itself.
                 let author = a.author.as_deref().map_or_else(|| tl!("Unknown author"), |name| name);
                 ui.label(egui::RichText::new(author).font(theme::semibold(12.5)).color(t.text));
-                if let Some(m) = &a.modified {
-                    ui.add(
-                        egui::Label::new(egui::RichText::new(crate::i18n::local_pdf_date(m)).font(theme::regular(11.0)).color(t.text_faint))
-                            .truncate(),
-                    );
+                if let Some(m) = comment_date.as_deref() {
+                    ui.add(egui::Label::new(egui::RichText::new(m).font(theme::regular(11.0)).color(t.text_faint)).truncate());
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if selected && allowed {
@@ -405,7 +406,7 @@ fn card(
             });
             // Replies, each joined to the avatar above it (the comment's or the previous reply's)
             // by a thread line that runs the whole gap.
-            for r in &replies {
+            for (r, r_date) in replies.iter().zip(&reply_dates) {
                 ui.add_space(8.0);
                 let mut me = egui::Rect::NOTHING;
                 ui.horizontal(|ui| {
@@ -415,13 +416,8 @@ fn card(
                         ui.horizontal(|ui| {
                             let author = r.author.as_deref().map_or_else(|| tl!("Reply"), |name| name);
                             ui.label(egui::RichText::new(author).font(theme::semibold(12.0)));
-                            if let Some(m) = &r.modified {
-                                ui.add(
-                                    egui::Label::new(
-                                        egui::RichText::new(crate::i18n::local_pdf_date(m)).font(theme::regular(11.0)).color(t.text_faint),
-                                    )
-                                    .truncate(),
-                                );
+                            if let Some(m) = r_date.as_deref() {
+                                ui.add(egui::Label::new(egui::RichText::new(m).font(theme::regular(11.0)).color(t.text_faint)).truncate());
                             }
                         });
                         widgets::wrapped_text(ui, r.contents.as_deref().unwrap_or(""), theme::regular(12.5), t.text, false);

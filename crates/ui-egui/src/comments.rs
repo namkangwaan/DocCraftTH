@@ -532,6 +532,8 @@ pub struct CommentView {
     pub tool_done: bool,
     /// What the inline editor (`editing`) does with the keyboard the next time it is drawn.
     pub(crate) editor_focus: Option<EditorFocus>,
+    /// Cache of formatted comment modified dates keyed by language and raw date string (M7).
+    pub date_cache: std::collections::HashMap<(crate::i18n::Lang, String), String>,
 }
 
 /// A one-off change to the keyboard focus of the Comments panel's inline editor. The editor
@@ -546,6 +548,12 @@ pub(crate) enum EditorFocus {
 }
 
 impl CommentView {
+    /// Formats a comment modified timestamp for `lang`, caching the result to avoid
+    /// re-parsing and String allocations on every UI frame (M7).
+    pub fn formatted_date(&mut self, lang: crate::i18n::Lang, s: &str) -> &str {
+        self.date_cache.entry((lang, s.to_string())).or_insert_with(|| crate::i18n::local_pdf_date_in(lang, s)).as_str()
+    }
+
     /// Takes back the last point of a polygon, cloud or connected lines being drawn; the first
     /// point's removal cancels the drawing. Returns whether there was such a drawing.
     pub fn undo_point(&mut self) -> bool {
@@ -2661,6 +2669,26 @@ mod tests {
             drawn_shape(CommentTool::Arrow, &[[0.0, 0.0], [5.0, 0.0]]),
             Some(Shape::Line { start: LineEnding::None, end: LineEnding::OpenArrow, .. })
         ));
+    }
+
+    #[test]
+    fn comment_view_caches_formatted_dates_per_language() {
+        let mut cv = CommentView::default();
+        let th = crate::i18n::Lang::from_code("th").expect("th registered");
+        let en = crate::i18n::Lang::EN;
+        let date_raw = "D:20260930104512-04'00'";
+
+        let formatted_th = cv.formatted_date(th, date_raw);
+        assert_eq!(formatted_th, "2569-09-30 10:45");
+        assert_eq!(cv.date_cache.len(), 1);
+
+        let cached_th = cv.formatted_date(th, date_raw);
+        assert_eq!(cached_th, "2569-09-30 10:45");
+        assert_eq!(cv.date_cache.len(), 1);
+
+        let formatted_en = cv.formatted_date(en, date_raw);
+        assert_eq!(formatted_en, "2026-09-30 10:45");
+        assert_eq!(cv.date_cache.len(), 2);
     }
 
     #[test]
