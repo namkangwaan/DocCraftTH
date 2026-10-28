@@ -32,7 +32,9 @@ impl<'a> Recipe<'a> {
                 return Err(Args::wrong("steps", "unique convert/ocr/optimize steps, with convert first when present"));
             }
         }
-        for (keys, step) in [(&["ppi", "quality"][..], "optimize"), (&["dpi", "language", "skip_text_pages", "digits"][..], "ocr")] {
+        for (keys, step) in
+            [(&["ppi", "quality"][..], "optimize"), (&["dpi", "language", "skip_text_pages", "read_unusable_text", "digits"][..], "ocr")]
+        {
             if !steps.contains(&step) && keys.iter().any(|k| args.get(k).is_some()) {
                 return Err(failed(format!("{} settings need the {step} step", keys.join("/"))));
             }
@@ -58,7 +60,7 @@ impl<'a> Recipe<'a> {
     }
 
     fn accepts(&self, path: &Path) -> bool {
-        let extension = path.extension().and_then(|s| s.to_str()).unwrap_or("").to_ascii_lowercase();
+        let extension = path.extension().and_then(std::ffi::OsStr::to_str).unwrap_or("").to_ascii_lowercase();
         extension == "pdf" || (self.steps.contains(&"convert") && pdfcraft_engine::CONVERTIBLE.contains(&extension.as_str()))
     }
 
@@ -70,7 +72,7 @@ impl<'a> Recipe<'a> {
         if input.len() as u64 > MAX_INPUT {
             return Err(failed("input exceeds 512 MiB"));
         }
-        let name = path.file_name().and_then(|n| n.to_str()).ok_or_else(|| failed("input name is not UTF-8"))?;
+        let name = path.file_name().and_then(std::ffi::OsStr::to_str).ok_or_else(|| failed("input name is not UTF-8"))?;
         let mut bytes = Arc::new(input);
         let mut log = Vec::new();
         for step in &self.steps {
@@ -80,9 +82,12 @@ impl<'a> Recipe<'a> {
                 "ocr" => {
                     let engine = ocr::engine_for(&self.ocr.language).map_err(failed)?;
                     let result = ocr::recognize_file(name, bytes, None, self.ocr.clone(), &engine, |_, _| true).map_err(failed)?;
-                    log.push(
-                        json!({"step":"ocr","words":result.words(),"skipped_pages":result.pages.iter().filter(|p| p.skipped.is_some()).count()}),
-                    );
+                    // The pages whose own text is unusable, so a run can be repeated with read_unusable_text.
+                    let unusable: Vec<usize> = result.pages.iter().filter(|p| p.unusable_text).map(|p| p.page.saturating_add(1)).collect();
+                    log.push(json!({
+                        "step":"ocr","words":result.words(),"skipped_pages":result.pages.iter().filter(|p| p.skipped.is_some()).count(),
+                        "unusable_text_pages":unusable,
+                    }));
                     bytes = result.bytes;
                     continue;
                 }

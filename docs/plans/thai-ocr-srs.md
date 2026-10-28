@@ -375,7 +375,7 @@ render 300 dpi ─► detect ─► ขยายกรอบ ─► recognize �
 
 | ข้อค้นพบ | หลักฐาน | ข้อเสนอ |
 |---|---|---|
-| **ไฟล์โมเดลต้นฉบับอยู่ในโฟลเดอร์ชั่วคราว** | `K:\tmp\thai-ocr-model` (`docs/thai-ocr-model.md`) | ไม่ต้องย้าย เพราะ hash อยู่ในเอกสารแล้ว สร้างใหม่ได้จากขั้นตอนแปลง |
+| **ไฟล์โมเดลต้นฉบับ** | ย้ายแล้วจาก `K:\tmp\thai-ocr-model` ไป `K:\src\DocCraftTH\models\thai-ocr-model` (`docs/thai-ocr-model.md`) | อยู่นอก repo `pdfcraft` แต่ในโฟลเดอร์งาน DocCraftTH hash อยู่ในเอกสารแล้ว สร้างใหม่ได้จากขั้นตอนแปลง |
 | **remote ต้นทางปิด push แล้ว** | `upstream` push URL = `DISABLED-do-not-push-to-storytold` (board) | คงไว้ |
 | **ยังไม่มีที่เก็บชุดสแกนจริง** | - | ใช้ `K:\data\thai-ocr-eval` ซึ่งอยู่นอก `K:\src` และนอก OneDrive (CR-007) |
 | **การตั้งภาษาผ่าน control channel เขียนค่า preference จริงของผู้ใช้** | board "Machine rules" | เทส e2e ต้องคืนค่าเป็น `auto` |

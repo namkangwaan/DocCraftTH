@@ -41,6 +41,7 @@ fn local_pdf_date_follows_language() {
     assert_eq!(local_pdf_date_in(th, "yesterday"), "yesterday");
     assert_eq!(local_pdf_date_in(th, "๒๕๖๙"), "๒๕๖๙", "non-ASCII is left alone");
     assert_eq!(local_pdf_date_in(th, ""), "");
+    assert_eq!(local_pdf_date_in(th, "2026-ish draft"), "2026-ish draft", "arbitrary text starting with 4 digits and dash is left alone");
 }
 
 #[test]
@@ -78,7 +79,7 @@ fn thai_covers_commands_and_tools() {
 #[test]
 fn thai_covers_ui_literals() {
     let th = Lang::from_code("th").expect("th registered");
-    let literals = super::tests::scan_ui_literals(true);
+    let literals = super::tests::ui_literals();
     let missing: Vec<_> = literals.iter().filter(|label| !has(th, label)).collect();
     assert!(missing.is_empty(), "Untranslated Thai UI labels: {missing:#?}");
 }
@@ -159,4 +160,58 @@ fn soft_breaks_are_display_only() {
         let marked = super::th_breaks::soft_breaks(text);
         assert_eq!(super::th_breaks::without_soft_breaks(&marked), text);
     }
+}
+
+#[test]
+fn thai_leaves_no_unapproved_english_fallbacks() {
+    let th = Lang::from_code("th").expect("th registered");
+    // Authoritative allowlist for intentional English-identical Thai rows.
+    const KEEP_AS_IS: &[&str] = &[
+        "OK",
+        "Digital ID",
+        "ZIP",
+        "JavaScript",
+        "Microsoft Word (.docx)",
+        "PDF/A…",
+        "PostScript / EPS",
+        "Rich Text Format (.rtf)",
+        "CheckBox",
+        "Combo",
+        "Home / End",
+        "PushButton",
+        "Radio",
+        "Standard Business",
+        "Keychain  ·  ",
+        "{0}: {1}",
+        "{field}: {e}",
+        "{month} {y}",
+        "{n} {kind}",
+        "{rule} - {status}",
+        "+LOC",
+        "−LOC",
+        "ΔLOC",
+        "+Bin",
+        "−Bin",
+        "`{command}` {when}",
+        "English",
+        "Continue from previous section",
+    ];
+    const KEY_CAPS: &[&str] = &["Ctrl", "Shift", "Delete", "Esc", "Home", "End", "Space"];
+    let (entries, errors) = catalog::parse_entries(th.0.source, th.0.plural_forms());
+    assert!(errors.is_empty(), "{errors:?}");
+    let edges = |s: &str| (s.len() - s.trim_start().len(), s.len() - s.trim_end().len());
+    let mut unchanged = Vec::new();
+    for e in &entries {
+        let key_cap = e.context == "key" && KEY_CAPS.contains(&e.source.as_str());
+        let plain_trans = super::th_breaks::without_soft_breaks(&e.translation);
+        if e.source == plain_trans && !KEEP_AS_IS.contains(&e.source.as_str()) && !key_cap {
+            unchanged.push((e.context.clone(), e.source.clone()));
+        }
+        assert!(!e.translation.contains("..."), "use … rather than three dots: {:?}", e.translation);
+        assert_eq!(edges(&e.translation), edges(&e.source), "stray whitespace: {:?}", e.translation);
+        if e.context == "@plural" {
+            assert!(!e.translation.contains('|'), "Thai @plural is one form: {:?}", e.translation);
+        }
+    }
+    assert!(unchanged.is_empty(), "unapproved English Thai catalog entries: {unchanged:#?}");
 }

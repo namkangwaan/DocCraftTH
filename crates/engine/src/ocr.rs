@@ -68,8 +68,17 @@ pub struct OcrSettings {
     /// text" and skips them). When `false`, such pages are read too (a picture on a page that
     /// also has text, #1028) and only the words that aren't already there are added.
     pub skip_text_pages: bool,
+    /// Read pages whose own text is unusable ([`OcrPage::unusable_text`]) even while
+    /// `skip_text_pages` leaves the others alone: the user's confirmation of the suggestion
+    /// (SRS FR-17), which never reaches a page whose text is fine.
+    pub read_unusable_text: bool,
     /// How recognised digits are written into the text layer.
     pub digits: Digits,
+    /// What counts as the page's text when `skip_text_pages` is on: only its own (page content
+    /// and form fields). Comments and text boxes are left out, and are not drawn into the picture
+    /// that is read, so a scan with a few comments on it is still a scan. `false`: everything
+    /// the page shows.
+    pub native_text_only: bool,
 }
 
 /// A recognised word whose box is at least this much covered by the page's own text is that
@@ -101,7 +110,14 @@ fn covered(word: [f32; 4], text: &[[f32; 4]]) -> f32 {
 
 impl Default for OcrSettings {
     fn default() -> Self {
-        OcrSettings { dpi: 300.0, language: "en".into(), skip_text_pages: true, digits: Digits::AsRead }
+        OcrSettings {
+            dpi: 300.0,
+            language: "en".into(),
+            skip_text_pages: true,
+            native_text_only: false,
+            read_unusable_text: false,
+            digits: Digits::AsRead,
+        }
     }
 }
 
@@ -132,7 +148,7 @@ pub fn engine_for(lang: &str) -> Result<Arc<Ocr>, String> {
         "en" | "eng" | "" => "en",
         other => other,
     };
-    let mut guard = OCR.lock().unwrap_or_else(|e| e.into_inner());
+    let mut guard = OCR.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let map = guard.get_or_insert_with(std::collections::HashMap::new);
     if let Some(o) = map.get(key) {
         return Ok(o.clone());
@@ -173,7 +189,8 @@ impl OcrJob {
     /// Read the pages. `progress(done, total)` is called before each page; returning `false`
     /// stops (the pages read so far are returned).
     pub fn run(self, ocr: &Ocr, mut progress: impl FnMut(usize, usize) -> bool) -> Vec<OcrPage> {
-        let config = RenderConfig { password: self.password.as_deref().map(Arc::from), ..Default::default() };
+        let config =
+            RenderConfig { password: self.password.as_deref().map(Arc::from), hide_comments: self.settings.native_text_only, ..Default::default() };
         let mut r = PageRenderer::new(self.bytes.clone(), config);
         let mut out = Vec::new();
         let total = self.pages.len();
@@ -191,12 +208,13 @@ impl OcrJob {
                 .map(|t| t.glyphs.iter().filter(|g| g.text.chars().any(|c| !c.is_whitespace() && !unreadable(c))).map(|g| g.rect).collect())
                 .unwrap_or_default();
             // The user confirms replacing unusable text (SRS D11) by reading the page again with
-            // `skip_text_pages` off.
-            if self.settings.skip_text_pages && unusable_text {
+            // `skip_text_pages` off, or with `read_unusable_text`, which reads only such pages.
+            let read_over = unusable_text && self.settings.read_unusable_text;
+            if self.settings.skip_text_pages && unusable_text && !read_over {
                 out.push(skip(UNUSABLE_TEXT));
                 continue;
             }
-            if self.settings.skip_text_pages && !existing.is_empty() {
+            if self.settings.skip_text_pages && !read_over && !existing.is_empty() {
                 out.push(skip("the page already contains text"));
                 continue;
             }
@@ -248,7 +266,11 @@ impl OcrJob {
         // sheet (up to 1 %, e.g. 2493 x 3510 px at 300 dpi = 842.4 pt) at its own resolution.
         let long = info.width.max(info.height).max(1e-3);
         let fit = if long > SHEET * 1.01 { SHEET / long } else { 1.0 };
-        native.clamp(fit, wanted * fit)
+        // For Thai text, low-resolution scans (< 200 dpi) have tone marks and vowel signs that are only
+        // a few pixels high. Ensure rendering at a floor of at least 200 dpi (up to the requested target)
+        // so the detector and recognizer receive well-formed character contours.
+        let min_scale = if self.settings.language == "th" { (200.0 / 72.0 * fit).min(wanted * fit) } else { fit };
+        native.max(min_scale).clamp(fit, wanted * fit)
     }
 }
 

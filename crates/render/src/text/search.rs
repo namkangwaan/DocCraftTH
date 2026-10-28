@@ -10,7 +10,10 @@ pub(super) fn find(page: &PageText, query: &str, sensitive: bool, whole_words: b
     if limit == 0 {
         return Vec::new();
     }
-    let fold = |s: &str| if sensitive { s.to_owned() } else { fold_case(s) };
+    let fold = |s: &str| {
+        let pua: String = s.chars().map(super::map_thai_pua).collect();
+        if sensitive { pua } else { fold_case(&pua) }
+    };
     let needle = fold(query).split_whitespace().collect::<Vec<_>>().join(" ").chars().map(|c| (c, 0, 0, false)).collect();
     let needle: Vec<char> = normalise(needle).into_iter().map(|e| e.0).collect();
     if needle.is_empty() {

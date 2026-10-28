@@ -20,6 +20,9 @@ use crate::{EditError, MarkKind, check, contents, matrix_number, n, page_list, p
 
 const TAG: &str = "Added";
 
+/// The most character spacing an added text takes either way, in points: as far as the font size goes.
+pub const CHAR_SPACING_LIMIT: f64 = 500.0;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum Family {
     #[default]
@@ -116,6 +119,8 @@ pub struct AddedText {
     pub size: f64,
     pub color: [f64; 3],
     pub align: Align,
+    /// Extra space after every character, in points: the PDF's character spacing (`Tc`).
+    pub char_spacing: f64,
 }
 
 impl Default for AddedText {
@@ -129,6 +134,7 @@ impl Default for AddedText {
             size: 12.0,
             color: [0.0; 3],
             align: Align::Left,
+            char_spacing: 0.0,
         }
     }
 }
@@ -143,7 +149,8 @@ pub struct AddedImage {
     pub rotation: u8,
     pub flip_h: bool,
     pub flip_v: bool,
-    /// The fraction trimmed from each side of the image: left, bottom, right, top.
+    /// The fraction trimmed from each side of the image: left, bottom, right, top (see
+    /// [`AddedImage::crop_valid`]).
     pub crop: [f64; 4],
 }
 
@@ -152,12 +159,43 @@ impl AddedImage {
         AddedImage { rect, image, rotation: 0, flip_h: false, flip_v: false, crop: [0.0; 4] }
     }
 
+    /// The least of the image's width and of its height that a crop keeps.
+    pub const MIN_CROP_KEEP: f64 = 0.05;
+
+    /// How far a sum of two sides may pass the most a crop trims: `0.05 + 0.9` is
+    /// `0.9500000000000001` in floating point and still keeps 5 %.
+    const CROP_ROUNDING: f64 = 1e-9;
+
+    /// Whether `crop` trims every side by a fraction from 0 to under 1 and keeps at least
+    /// [`AddedImage::MIN_CROP_KEEP`] across each axis: one side may trim 95 % when its opposite
+    /// trims nothing.
+    pub fn crop_valid(crop: [f64; 4]) -> bool {
+        let [l, b, r, t] = crop;
+        let most = 1.0 - Self::MIN_CROP_KEEP;
+        crop.iter().all(|v| v.is_finite() && (0.0..1.0).contains(v)) && l + r <= most + Self::CROP_ROUNDING && b + t <= most + Self::CROP_ROUNDING
+    }
+
+    /// `crop` brought into [`AddedImage::crop_valid`] range, for one read from a file: each side
+    /// in range, and an axis that trims too much keeps its two sides' proportion.
+    pub fn clamp_crop(crop: [f64; 4]) -> [f64; 4] {
+        let most = 1.0 - Self::MIN_CROP_KEEP;
+        let [l, b, r, t] = crop.map(|v| if v.is_finite() { v.max(0.0) } else { 0.0 });
+        // Scaled from the halves, whose sum can't overflow, so the pair keeps its proportion;
+        // a pair within the limit keeps each side within it too.
+        let fit = |a: f64, c: f64| {
+            let half = a / 2.0 + c / 2.0;
+            if half > (most + Self::CROP_ROUNDING) / 2.0 { (a / 2.0 / half * most, c / 2.0 / half * most) } else { (a, c) }
+        };
+        let ((l, r), (b, t)) = (fit(l, r), fit(b, t));
+        [l, b, r, t]
+    }
+
     /// The matrix from image space (the unit square) to display space: crop, flip, rotate,
     /// then fill the box.
     fn matrix(&self) -> pdfcraft_content::Matrix {
         use pdfcraft_content::Matrix as M;
-        let [l, b, r, t] = self.crop.map(|v| v.clamp(0.0, 0.45));
-        let (cw, ch) = ((1.0 - l - r).max(0.05), (1.0 - b - t).max(0.05));
+        let [l, b, r, t] = Self::clamp_crop(self.crop);
+        let (cw, ch) = (1.0 - l - r, 1.0 - b - t);
         let mut m = M([1.0 / cw, 0.0, 0.0, 1.0 / ch, -l / cw, -b / ch]);
         if self.flip_h {
             m = m.then(&M([-1.0, 0.0, 0.0, 1.0, 1.0, 0.0]));
@@ -192,7 +230,9 @@ impl Content {
     fn scaled(self, factor: f64) -> Content {
         match self {
             _ if factor == 1.0 => self,
-            Content::Text(t) => Content::Text(AddedText { rect: t.rect.map(|v| v * factor), size: t.size * factor, ..t }),
+            Content::Text(t) => {
+                Content::Text(AddedText { rect: t.rect.map(|v| v * factor), size: t.size * factor, char_spacing: t.char_spacing * factor, ..t })
+            }
             Content::Image(i) => Content::Image(AddedImage { rect: i.rect.map(|v| v * factor), ..i }),
         }
     }
@@ -230,14 +270,28 @@ fn norm(r: [f64; 4]) -> [f64; 4] {
     [r[0].min(r[2]), r[1].min(r[3]), r[0].max(r[2]), r[1].max(r[3])]
 }
 
+/// The advance of `s` in the item's standard font: its glyphs' widths and the character spacing
+/// after each of them, as `Tc` moves the pen (ISO 32000-2 §9.3.2).
+fn latin_width(t: &AddedText, s: &str) -> f64 {
+    t.family.width(s, t.size, t.bold, t.italic) + t.char_spacing * s.chars().count() as f64
+}
+
 /// The lines of a text item after wrapping to its box width.
 pub fn lines(t: &AddedText) -> Vec<String> {
     wrapped(t).into_iter().map(|(line, _)| line).collect()
 }
 
+#[cfg(test)]
+thread_local! {
+    /// How often [`wrapped`] laid a text out on this thread, for the test that keeps it out of per-line loops.
+    pub(crate) static WRAP_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// [`lines`], each with whether its paragraph runs right to left (its first strong character
 /// does).
 fn wrapped(t: &AddedText) -> Vec<(String, bool)> {
+    #[cfg(test)]
+    WRAP_CALLS.with(|c| c.set(c.get().saturating_add(1)));
     let width = (t.rect[2] - t.rect[0]).max(t.size);
     let mut out = Vec::new();
     for para in t.text.split('\n') {
@@ -256,7 +310,7 @@ fn wrapped(t: &AddedText) -> Vec<(String, bool)> {
         // sum of its words' and shaping stays linear in the paragraph's length. The space is the
         // paragraph's; a space between Latin words is drawn in the item's font, a few hundredths
         // of an em apart.
-        let measure = |s: &str| if rtl_script || thai { shaped_width(t, s, rtl) } else { t.family.width(s, t.size, t.bold, t.italic) };
+        let measure = |s: &str| if rtl_script || thai { shaped_width(t, s, rtl) } else { latin_width(t, s) };
         let space = measure(" ");
         let (mut line, mut line_w) = (String::new(), 0.0);
         for word in para.split(' ') {
@@ -285,10 +339,10 @@ fn thai_lines(t: &AddedText, para: &str, width: f64) -> Result<Vec<String>, Edit
     let mut atoms = Vec::new();
     for piece in pieces {
         match piece {
-            Piece::Shaped(clusters) => atoms.extend(clusters.into_iter().map(|c| (c.text, c.advance * t.size))),
+            Piece::Shaped(clusters) => atoms.extend(clusters.into_iter().map(|c| (c.text, c.advance * t.size + t.char_spacing))),
             Piece::Latin(s) => atoms.extend(s.chars().map(|c| {
                 let text = c.to_string();
-                let w = t.family.width(&text, t.size, t.bold, t.italic);
+                let w = latin_width(t, &text);
                 (text, w)
             })),
         }
@@ -463,7 +517,7 @@ fn shaped_layout(t: &AddedText, line: &str, rtl: bool) -> Result<(Vec<Piece>, f6
                 let shaped = match script {
                     ShapedScript::Arabic => shape_arabic(&s, run_rtl).map_err(|e| arabic_error(e, &s))?,
                     ShapedScript::Hebrew => shape_hebrew(&s, run_rtl).map_err(|e| hebrew_error(e, &s))?,
-                    ShapedScript::Thai => shape_thai(&s).map_err(|e| thai_error(e, &s))?,
+                    ShapedScript::Thai | ShapedScript::ThaiSarabun => shape_thai(&s).map_err(|e| thai_error(e, &s))?,
                 };
                 Piece::Shaped(shaped)
             } else if run_rtl {
@@ -476,8 +530,9 @@ fn shaped_layout(t: &AddedText, line: &str, rtl: bool) -> Result<(Vec<Piece>, f6
     let width = pieces
         .iter()
         .map(|p| match p {
-            Piece::Latin(s) => t.family.width(s, t.size, t.bold, t.italic),
-            Piece::Shaped(clusters) => clusters.iter().map(|c| c.advance).sum::<f64>() * t.size,
+            Piece::Latin(s) => latin_width(t, s),
+            // Each cluster is shown on its own, so the spacing follows each once.
+            Piece::Shaped(clusters) => clusters.iter().map(|c| c.advance * t.size + t.char_spacing).sum::<f64>(),
         })
         .sum();
     Ok((pieces, width))
@@ -486,7 +541,7 @@ fn shaped_layout(t: &AddedText, line: &str, rtl: bool) -> Result<(Vec<Piece>, f6
 /// The width of `s` in a shaped-text item; the item's font's estimate if it can't be shaped (drawing
 /// then reports why).
 fn shaped_width(t: &AddedText, s: &str, rtl: bool) -> f64 {
-    shaped_layout(t, s, rtl).map(|(_, w)| w).unwrap_or_else(|_| t.family.width(s, t.size, t.bold, t.italic))
+    shaped_layout(t, s, rtl).map(|(_, w)| w).unwrap_or_else(|_| latin_width(t, s))
 }
 
 fn arabic_error(e: GlyphError, text: &str) -> EditError {
@@ -524,6 +579,61 @@ pub fn text_rect(t: &AddedText) -> [f64; 4] {
     let r = norm(t.rect);
     let h = lines(t).len().max(1) as f64 * t.size * 1.2;
     [r[0], r[3] - h, r[2], r[3]]
+}
+
+/// How far each paste onto a page already holding the copy is offset, down and to the right, so a
+/// copy doesn't hide what it was copied from (points).
+pub const PASTE_STEP: f64 = 18.0;
+
+/// Where a pasted item of box `rect` goes on a page of `size` (display space): with its top-left
+/// corner at `at`, else where it was, `steps` paste steps ([`PASTE_STEP`]) down and to the right.
+/// It is kept on the page; one larger than the page keeps its left and top edges on it. A page
+/// or point that isn't a number leaves the box where it was.
+pub fn paste_rect(rect: [f64; 4], size: [f64; 2], steps: u32, at: Option<[f64; 2]>) -> [f64; 4] {
+    let [x0, y0, x1, y1] = norm(rect);
+    let (w, h) = (x1 - x0, y1 - y0);
+    let (left, top) = match at {
+        Some([x, y]) => (x, y),
+        None => {
+            let d = PASTE_STEP * f64::from(steps);
+            (x0 + d, y1 - d)
+        }
+    };
+    if !size.iter().chain(&[left, top, w, h]).all(|v| v.is_finite()) {
+        return rect;
+    }
+    let left = left.min(size[0] - w).max(0.0);
+    let top = top.max(h).min(size[1]);
+    [left, top - h, left + w, top]
+}
+
+/// Most paste steps [`paste_place`] tries before giving up on finding a free place.
+const MAX_PASTE_STEPS: u32 = 64;
+
+/// Where Edit ▸ Paste puts `content` on a page of `size` already holding `items` (display space):
+/// where it was, or as many paste steps down and to the right as it takes not to land exactly on
+/// a copy of it (the original it was copied from, or an earlier paste).
+pub fn paste_place<'a>(items: impl IntoIterator<Item = &'a Content>, content: &Content, size: [f64; 2]) -> [f64; 4] {
+    let same = copy_key(content);
+    let copies: Vec<[f64; 4]> = items.into_iter().filter(|i| copy_key(i) == same).map(Content::rect).collect();
+    let taken = |rect: [f64; 4]| copies.iter().any(|c| c.iter().zip(rect).all(|(a, b)| (a - b).abs() < 0.5));
+    let mut rect = paste_rect(content.rect(), size, 0, None);
+    for steps in 1..=MAX_PASTE_STEPS {
+        if !taken(rect) {
+            break;
+        }
+        rect = paste_rect(content.rect(), size, steps, None);
+    }
+    rect
+}
+
+/// What makes two items copies of each other for [`paste_place`]: all but the box, and for an
+/// image all but the object holding its picture, which a paste into another document stores anew.
+fn copy_key(c: &Content) -> Content {
+    match c.with_rect([0.0; 4]) {
+        Content::Image(img) => Content::Image(AddedImage { image: ObjRef::new(0, 0), ..img }),
+        text => text,
+    }
 }
 
 /// The widest explicit line before wrapping, measured with the PDF writing fonts.
@@ -592,7 +702,7 @@ fn draw_laid_shaped(
                 entry.insert(outline(c.script, *id).map_err(|e| match c.script {
                     ShapedScript::Arabic => arabic_error(e, &c.text),
                     ShapedScript::Hebrew => hebrew_error(e, &c.text),
-                    ShapedScript::Thai => thai_error(e, &c.text),
+                    ShapedScript::Thai | ShapedScript::ThaiSarabun => thai_error(e, &c.text),
                 })?);
             }
         }
@@ -616,6 +726,9 @@ fn draw_laid_shaped(
     }
     let [cr, cg, cb] = t.color.map(|v| v.clamp(0.0, 1.0));
     out.extend(format!("BT {} {} {} rg\n", n(cr), n(cg), n(cb)).bytes());
+    if t.char_spacing != 0.0 {
+        out.extend(format!("{} Tc\n", n(t.char_spacing)).bytes());
+    }
     for (i, (line, rtl, pieces, w)) in laid.iter().enumerate() {
         // Shaped glyphs are painted in visual order. Keep the original line's typing order
         // explicitly, including marks, ligatures, digits and mixed-script punctuation.
@@ -641,7 +754,7 @@ fn draw_laid_shaped(
                     out.extend(literal(&win_ansi(s)));
                     out.extend_from_slice(b" Tj\n");
                     current = Some(latin_font);
-                    pen += t.family.width(s, t.size, t.bold, t.italic) + tw * s.matches(' ').count() as f64;
+                    pen += latin_width(t, s) + tw * s.matches(' ').count() as f64;
                 }
                 Piece::Shaped(clusters) => {
                     for c in clusters {
@@ -656,7 +769,7 @@ fn draw_laid_shaped(
                         out.extend(format!("1 0 0 1 {} {} Tm ", n(pen), n(y)).bytes());
                         out.extend(literal(&[code]));
                         out.extend_from_slice(b" Tj\n");
-                        pen += c.advance * t.size + if c.text == " " { tw } else { 0.0 };
+                        pen += c.advance * t.size + t.char_spacing + if c.text == " " { tw } else { 0.0 };
                     }
                 }
             }
@@ -693,8 +806,8 @@ fn split_script_spans(line: &str) -> Vec<(bool, String)> {
     out
 }
 
-/// Width of one header line. Thai spans use cluster advance. The rest uses Helvetica.
-pub(crate) fn header_line_width(line: &str, size: f64) -> Result<f64, EditError> {
+/// Width of one header line. Thai spans use cluster advance. The rest uses the header's standard `family`.
+pub(crate) fn header_line_width(line: &str, size: f64, family: Family) -> Result<f64, EditError> {
     let mut width = 0.0;
     for (thai, span) in split_script_spans(line) {
         if thai {
@@ -702,7 +815,7 @@ pub(crate) fn header_line_width(line: &str, size: f64) -> Result<f64, EditError>
             let advance = clusters.iter().map(|c| c.advance).sum::<f64>();
             width += advance * size;
         } else {
-            width += pdfcraft_fonts::helvetica_width(&span, size);
+            width += family.width(&span, size, false, false);
         }
     }
     if !width.is_finite() {
@@ -711,7 +824,7 @@ pub(crate) fn header_line_width(line: &str, size: f64) -> Result<f64, EditError>
     Ok(width)
 }
 
-/// Paint one header line. Latin stays on `/PCHelv`. Thai goes through [`shape_thai`] and
+/// Paint one header line. Latin stays on the page resource `latin_font` (a standard face of `family`). Thai goes through [`shape_thai`] and
 /// [`draw_laid_shaped`], which is the Add Text Type 3 writer.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn paint_header_line(
@@ -724,6 +837,8 @@ pub(crate) fn paint_header_line(
     taken: &Dict,
     fonts: &mut Dict,
     out: &mut Vec<u8>,
+    family: Family,
+    latin_font: &str,
 ) -> Result<(), EditError> {
     let mut pieces = Vec::new();
     for (thai, span) in split_script_spans(line) {
@@ -735,9 +850,10 @@ pub(crate) fn paint_header_line(
         }
     }
     let top = baseline + 0.95 * size;
-    let t = AddedText { rect: [x, baseline, x + 1.0e6, top], text: line.to_string(), size, color, align: Align::Left, ..AddedText::default() };
+    let t =
+        AddedText { rect: [x, baseline, x + 1.0e6, top], text: line.to_string(), size, color, align: Align::Left, family, ..AddedText::default() };
     let laid = [(line.to_string(), false, pieces, 0.0)];
-    draw_laid_shaped(doc, &t, &laid, taken, fonts, out, "PCHelv", shaped_glyph)
+    draw_laid_shaped(doc, &t, &laid, taken, fonts, out, latin_font, shaped_glyph)
 }
 
 /// What makes two clusters the same Type 3 glyph: text, glyphs, offsets and advance (bit for bit;
@@ -806,6 +922,7 @@ fn type3_shaped(doc: &mut Document, clusters: &[&ShapedCluster], outlines: &Hash
                 ShapedScript::Arabic => "Arabic",
                 ShapedScript::Hebrew => "Hebrew",
                 ShapedScript::Thai => "Thai",
+                ShapedScript::ThaiSarabun => "Sarabun",
             },
             |f| f.family,
         ),
@@ -881,8 +998,12 @@ fn draw(doc: &mut Document, c: &Content, view: [f64; 6], taken: &Dict, existing:
             let r = text_rect(t);
             let [cr, cg, cb] = t.color.map(|v| v.clamp(0.0, 1.0));
             out.extend(format!("BT /{name} {} Tf {} {} {} rg\n", n(t.size), n(cr), n(cg), n(cb)).bytes());
-            for (i, line) in lines(t).iter().enumerate() {
-                let w = t.family.width(line, t.size, t.bold, t.italic);
+            if t.char_spacing != 0.0 {
+                out.extend(format!("{} Tc\n", n(t.char_spacing)).bytes());
+            }
+            let all = lines(t);
+            for (i, line) in all.iter().enumerate() {
+                let w = latin_width(t, line);
                 let x = match t.align {
                     Align::Left | Align::Justify => r[0],
                     Align::Center => r[0] + ((r[2] - r[0]) - w) / 2.0,
@@ -891,7 +1012,6 @@ fn draw(doc: &mut Document, c: &Content, view: [f64; 6], taken: &Dict, existing:
                 // Baseline: 0.8 em below the line top.
                 let y = r[3] - (i as f64 * 1.2 + 0.95) * t.size;
                 // Justified: word spacing makes every line but the last fill the box.
-                let all = lines(t);
                 let spaces = line.matches(' ').count();
                 let tw =
                     if t.align == Align::Justify && i + 1 < all.len() && spaces > 0 { ((r[2] - r[0]) - w).max(0.0) / spaces as f64 } else { 0.0 };
@@ -954,6 +1074,9 @@ fn params(c: &Content) -> Dict {
                 }),
             );
             d.set(b"Rect".to_vec(), arr(&text_rect(t)));
+            if t.char_spacing != 0.0 {
+                d.set(b"CharSpacing".to_vec(), Object::Real(t.char_spacing));
+            }
         }
         Content::Image(i) => {
             d.set(b"Kind".to_vec(), Object::name("Image"));
@@ -997,6 +1120,8 @@ fn parse(doc: &Document, d: &Dict) -> Option<Content> {
                     Some(3) => Align::Justify,
                     _ => Align::Left,
                 },
+                // Items written before character spacing have none.
+                char_spacing: d.get(b"CharSpacing").and_then(Object::as_f64).filter(|v| v.is_finite()).unwrap_or(0.0),
             }))
         }
         b"Image" => {
@@ -1097,6 +1222,11 @@ fn validate(c: &Content) -> Result<(), EditError> {
             if !(t.size.is_finite() && (1.0..=500.0).contains(&t.size)) {
                 return Err(EditError::Invalid("the font size must be between 1 and 500 points".into()));
             }
+            if !(t.char_spacing.is_finite() && (-CHAR_SPACING_LIMIT..=CHAR_SPACING_LIMIT).contains(&t.char_spacing)) {
+                return Err(EditError::Invalid(format!(
+                    "the character spacing must be between -{CHAR_SPACING_LIMIT} and {CHAR_SPACING_LIMIT} points"
+                )));
+            }
             if (r[2] - r[0]).abs() < 1.0 {
                 return Err(EditError::Invalid("the text box is too narrow".into()));
             }
@@ -1143,6 +1273,9 @@ fn write(doc: &mut Document, page: usize, c: &Content, obj: Option<ObjRef>) -> R
     }
     let taken = pres.get(b"Font").map(|f| doc.resolve(f)).and_then(|f| f.as_dict().cloned()).unwrap_or_default();
     let (content, res) = draw(doc, c, view, &taken, obj.is_some())?;
+    if obj.is_none() {
+        crate::check_on_top(doc, p)?;
+    }
     for (k, v) in res.iter() {
         let mut sub = pres.get(k).map(|s| doc.resolve(s)).and_then(|s| s.as_dict().cloned()).unwrap_or_default();
         for (n2, o) in v.as_dict().into_iter().flat_map(|d| d.iter()) {
@@ -1225,6 +1358,21 @@ pub fn delete_content(doc: &mut Document, page: usize, index: usize) -> Result<(
         if let Some(r) = res {
             d.set(b"Resources".to_vec(), Object::Dict(r));
         }
+    })?;
+    Ok(())
+}
+
+/// Leave only item `index` on `page`: its contents become the item's own stream and its
+/// annotations go, so a render of the page (on a transparent backdrop) is the item's pixels
+/// alone. For previews on a copy of the document; the page's resources stay as they are.
+pub fn isolate_content(doc: &mut Document, page: usize, index: usize) -> Result<(), EditError> {
+    let a = find(doc, page, index)?;
+    let p = page_list(doc).swap_remove(page);
+    // An item's stream starts from the page's initial graphics state: `place_tagged` closes
+    // everything drawn before it, so it draws the same on its own.
+    doc.update_dict(p.obj, |d| {
+        d.set(b"Contents".to_vec(), Object::Array(vec![Object::Ref(a.obj)]));
+        d.remove(b"Annots");
     })?;
     Ok(())
 }

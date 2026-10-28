@@ -31,7 +31,7 @@ Status: spec, 2026-10-16. Fork: GitHub `DocCraftTH`. Scope: this fork only; upst
 
 ## Phase 1 — no tofu for Thai strings (small, ship first)
 **Task 1.1 Installed Thai fallback face.**
-- Test first (`crates/ui-egui/tests/fonts.rs`): `system_fallback_covers_thai` modelled on `system_fallback_covers_telugu` — the embedded-only definitions never name `SYSTEM_THAI_FALLBACK`; the installed ones contain it exactly once per family; `has_glyphs` is true for `"ไฟล์ภาษาไทย น้ำใจ ปฏิบัติ"` (stacked marks, ฏ/ฐ descenders); layout widths finite and > 0. Windows and macOS always ship a Thai face, so on those the test must not skip.
+- Test first (`crates/ui-egui/tests/it/fonts.rs`): `system_fallback_covers_thai` modelled on `system_fallback_covers_telugu` — the embedded-only definitions never name `SYSTEM_THAI_FALLBACK`; the installed ones contain it exactly once per family; `has_glyphs` is true for `"ไฟล์ภาษาไทย น้ำใจ ปฏิบัติ"` (stacked marks, ฏ/ฐ descenders); layout widths finite and > 0. Windows and macOS always ship a Thai face, so on those the test must not skip.
 - Implement in `system_fonts.rs`: `THAI_PROBE = 'ก'` (U+0E01), `thai_candidates()` — Windows `LeelawUI.ttf`, `leelawad.ttf`, `tahoma.ttf`; macOS `/System/Library/Fonts/Supplemental/Thonburi.ttc`, `Ayuthaya.ttf`, `Silom.ttf`; Linux Noto Sans Thai / Noto Sans Thai UI / TLWG (Loma, Garuda, Sarabun) paths via `unix_fonts`; `thai_fallback()`.
 - Wire it in `theme.rs` next to `SYSTEM_TAMIL_FALLBACK` (one line in the list plus the constant).
 - Expected: test fails before the wiring (fallback missing), passes after.

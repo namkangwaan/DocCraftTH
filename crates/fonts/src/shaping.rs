@@ -28,6 +28,7 @@ pub enum ShapedScript {
     Arabic,
     Hebrew,
     Thai,
+    ThaiSarabun,
 }
 
 impl ShapedScript {
@@ -36,6 +37,7 @@ impl ShapedScript {
             Self::Arabic => crate::document_arabic_font(),
             Self::Hebrew => crate::document_hebrew_font(false),
             Self::Thai => crate::document_thai_font(),
+            Self::ThaiSarabun => crate::document_thai_font_named("Sarabun"),
         }
     }
 }
@@ -44,10 +46,12 @@ fn face(script: ShapedScript) -> Option<&'static (FontRef<'static>, ShaperData)>
     static FACE: OnceLock<Option<(FontRef<'static>, ShaperData)>> = OnceLock::new();
     static HEBREW: OnceLock<Option<(FontRef<'static>, ShaperData)>> = OnceLock::new();
     static THAI: OnceLock<Option<(FontRef<'static>, ShaperData)>> = OnceLock::new();
+    static THAI_SARABUN: OnceLock<Option<(FontRef<'static>, ShaperData)>> = OnceLock::new();
     let cache = match script {
         ShapedScript::Arabic => &FACE,
         ShapedScript::Hebrew => &HEBREW,
         ShapedScript::Thai => &THAI,
+        ShapedScript::ThaiSarabun => &THAI_SARABUN,
     };
     cache
         .get_or_init(|| {
@@ -81,14 +85,44 @@ pub fn shape_hebrew(text: &str, rtl: bool) -> Result<Vec<ShapedCluster>, GlyphEr
     shape_script(text, rtl, ShapedScript::Hebrew)
 }
 
+/// Whether any available Thai document face (Noto Sans Thai or Sarabun) has a glyph for `c`.
 pub fn thai_has(c: char) -> bool {
-    face(ShapedScript::Thai).is_some_and(|(font, _)| font.charmap().map(c).is_some())
+    thai_has_in(ShapedScript::Thai, c) || thai_has_in(ShapedScript::ThaiSarabun, c)
+}
+
+/// Whether a specific Thai face has a glyph for `c`.
+pub fn thai_has_in(script: ShapedScript, c: char) -> bool {
+    face(script).is_some_and(|(font, _)| font.charmap().map(c).is_some())
 }
 
 /// Shape Thai with grapheme clusters so Sara Am decomposition and stacked marks keep their
 /// original Unicode text exactly once, including when wrapped or copied from the saved PDF.
+/// Falls back to Sarabun if the primary Thai face lacks glyphs for the text.
 pub fn shape_thai(text: &str) -> Result<Vec<ShapedCluster>, GlyphError> {
-    shape_script(text, false, ShapedScript::Thai)
+    match shape_script(text, false, ShapedScript::Thai) {
+        Ok(clusters) => Ok(clusters),
+        Err(GlyphError::Missing) if ShapedScript::ThaiSarabun.font().is_some() => shape_script(text, false, ShapedScript::ThaiSarabun),
+        Err(e) => Err(e),
+    }
+}
+
+/// Shape Thai explicitly using a specified script face.
+pub fn shape_thai_with(text: &str, script: ShapedScript) -> Result<Vec<ShapedCluster>, GlyphError> {
+    shape_script(text, false, script)
+}
+
+/// Shape Thai text using the named family (e.g. "Sarabun" or "Noto Sans Thai"),
+/// falling back to the default Thai font if the named font lacks glyphs.
+pub fn shape_thai_named(text: &str, family: &str) -> Result<Vec<ShapedCluster>, GlyphError> {
+    if family.eq_ignore_ascii_case("Sarabun") && ShapedScript::ThaiSarabun.font().is_some() {
+        match shape_script(text, false, ShapedScript::ThaiSarabun) {
+            Ok(c) => Ok(c),
+            Err(GlyphError::Missing) => shape_script(text, false, ShapedScript::Thai),
+            Err(e) => Err(e),
+        }
+    } else {
+        shape_thai(text)
+    }
 }
 
 fn shape_script(text: &str, rtl: bool, kind: ShapedScript) -> Result<Vec<ShapedCluster>, GlyphError> {
@@ -101,12 +135,12 @@ fn shape_script(text: &str, rtl: bool, kind: ShapedScript) -> Result<Vec<ShapedC
     buffer.set_script(match kind {
         ShapedScript::Arabic => script::ARABIC,
         ShapedScript::Hebrew => script::HEBREW,
-        ShapedScript::Thai => script::THAI,
+        ShapedScript::Thai | ShapedScript::ThaiSarabun => script::THAI,
     });
     // Preserve the historical Arabic per-character mapping; Hebrew and Thai marks stay with their base.
     buffer.set_cluster_level(match kind {
         ShapedScript::Arabic => BufferClusterLevel::Characters,
-        ShapedScript::Hebrew | ShapedScript::Thai => BufferClusterLevel::MonotoneGraphemes,
+        ShapedScript::Hebrew | ShapedScript::Thai | ShapedScript::ThaiSarabun => BufferClusterLevel::MonotoneGraphemes,
     });
     let shaped = shaper.shape(buffer, ShapeOptions::new());
     // Clusters are byte offsets into `text`; a cluster shows the characters up to the next one.
@@ -264,6 +298,23 @@ mod thai_tests {
         assert!(stacked[0].glyphs.iter().any(|(_, p)| p[0] != 0.0 || p[1] != 0.0));
         assert_eq!(shape_thai("日"), Err(GlyphError::Missing));
         assert_eq!(shaped_glyph(ShapedScript::Thai, u32::MAX).map(|_| ()), Err(GlyphError::Missing));
+    }
+
+    #[test]
+    fn sarabun_font_and_fallback_shape_thai() {
+        if crate::document_thai_font_named("Sarabun").is_none() {
+            return;
+        }
+        let clusters = shape_thai_named("ทดสอบสารบรรณ", "Sarabun").unwrap();
+        assert_eq!(clusters.iter().map(|c| c.text.as_str()).collect::<String>(), "ทดสอบสารบรรณ");
+        for c in clusters {
+            assert_eq!(c.script, ShapedScript::ThaiSarabun);
+            for (id, _) in c.glyphs {
+                shaped_glyph(c.script, id).unwrap();
+            }
+        }
+        assert!(thai_has_in(ShapedScript::ThaiSarabun, 'ก'));
+        assert!(thai_has_in(ShapedScript::ThaiSarabun, '๑'));
     }
 }
 
