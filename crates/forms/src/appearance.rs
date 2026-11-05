@@ -762,7 +762,7 @@ fn resolve_field_text(f: &Field, values: &[String]) -> String {
     if f.has(flags::PASSWORD) { "*".repeat(text.chars().count()) } else { text }
 }
 
-fn resolve_field_font(doc: &Document, f: &Field, font_name: &str, held: &str) -> (String, ObjRef, FontText) {
+fn resolve_field_font(doc: &Document, f: &Field, font_name: &str, held: &str) -> (String, Object, FontText) {
     let can_show = |enc: &FontText| {
         if f.kind == FieldKind::List {
             f.options.iter().all(|(_, display)| enc.can_encode(display))
