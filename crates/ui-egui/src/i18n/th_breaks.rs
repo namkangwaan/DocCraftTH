@@ -12,6 +12,7 @@ use pdfcraft_fonts::thai::{is_thai, may_break};
 const SOFT_BREAK: char = '\u{200B}';
 
 /// `text` with U+200B wherever a line may end inside Thai text. Borrows when there is none.
+#[allow(dead_code)]
 pub(crate) fn soft_breaks(text: &str) -> Cow<'_, str> {
     let offsets = pdfcraft_fonts::thai::break_offsets(text);
     if offsets.is_empty() {

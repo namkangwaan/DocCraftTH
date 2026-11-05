@@ -5,7 +5,7 @@ use super::place::{
     END, Isolation, add_page_resources, add_resources, begin, check, check_on_top, contents, free_font_name, isolation, page_fonts, page_list, place,
     place_inside_wrapper, stream_tag, text_op, undrawable, wrapper_role,
 };
-use super::{Document, EditError, Object, added, backdrop, helvetica_width};
+use super::{Dict, Document, EditError, Object, added, backdrop, helvetica_width};
 
 /// Commit one complete mark operation only after every selected page succeeds. The snapshot
 /// shares original bytes, cross-references, caches and unchanged objects; only the overlay table

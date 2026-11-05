@@ -6,6 +6,7 @@ use super::{
     Content, Dict, Document, EditError, GlyphError, GlyphOutline, HashMap, HashSet, ObjRef, Object, PdfString, ShapedCluster, ShapedScript, Stream,
     align_code, literal, matrix_number, n, shaped_glyph, win_ansi,
 };
+use pdfcraft_fonts::shape_thai;
 
 fn font_name(base: &str) -> String {
     format!("PCF{}", base.replace('-', ""))
@@ -463,6 +464,6 @@ pub(crate) fn paint_header_line(
     let top = baseline + 0.95 * size;
     let t =
         AddedText { rect: [x, baseline, x + 1.0e6, top], text: line.to_string(), size, color, align: Align::Left, family, ..AddedText::default() };
-    let laid = [(line.to_string(), false, pieces, 0.0)];
+    let laid = [(line.to_string(), false, 0usize, pieces, 0.0)];
     draw_laid_shaped(doc, &t, &laid, taken, fonts, out, latin_font, shaped_glyph)
 }
