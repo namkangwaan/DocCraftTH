@@ -1,3 +1,7 @@
+# Untranslated: English text until a translator fills these in.
+	Lowering this forgets the oldest files. At 0 there is no list.	Lowering this forgets the oldest files. At 0 there is no list.
+	Recent files to keep	Recent files to keep
+
 	Menu	Мәзір
 	File	Файл
 	Edit	Түзету
@@ -780,14 +784,9 @@
 	Copy Image in Original Format	Суретті бастапқы пішімде көшіру
 	The image has been copied as a {ext} file	Сурет {ext} файлы ретінде көшірілді
 	The page has changed; select the image again	Бет өзгерді; суретті қайта таңдаңыз
-	Check for updates	Жаңартуларды тексеру
 	No check has run yet.	Тексеру әлі жүргізілген жоқ.
-	Checking for a newer version…	Жаңа нұсқа бар ма екені тексерілуде…
 	PdfCraft {v} is available.	PdfCraft {v} қолжетімді.
 	You have version {c}. Download the new version from its release page.	Сізде {c} нұсқасы бар. Жаңа нұсқаны шығарылым бетінен жүктеп алыңыз.
-	PdfCraft {c} is up to date.	PdfCraft {c} нұсқасы ең соңғы.
-	Couldn't check for updates: {e}	Жаңартуларды тексеру мүмкін болмады: {e}
-	You have version {c}. All releases are listed at {page}.	Сізде {c} нұсқасы бар. Барлық шығарылымдар {page} бетінде көрсетілген.
 	Asks GitHub for the latest release. Nothing is downloaded or installed automatically.	GitHub-тан соңғы шығарылымды сұрайды. Ештеңе автоматты түрде жүктелмейді немесе орнатылмайды.
 	Download	Жүктеп алу
 	Later	Кейінірек
@@ -1603,7 +1602,6 @@
 	Recognized {n} words	{n} сөз танылды
 	{words} on {pages}	{pages} бетте {words} сөз
 	; 1 page already had text	; 1 бетте мәтін бұрыннан бар еді
-	; some pages have unreadable text (turn on “{option}” to read them)	; кейбір беттердегі мәтін оқылмайды (оларды тану үшін «{option}» параметрін қосыңыз)
 	; {n} pages already had text	; {n} бетте мәтін бұрыннан бар еді
 	Recognized {w} words in 1 file	1 файлда {w} сөз танылды
 	Recognized {w} words in {n} files	{n} файлда {w} сөз танылды
@@ -2519,18 +2517,26 @@ animation effects	Off	Өшірулі
 	Make properties default	Қасиеттерді әдепкі ету
 	Pages selected	Таңдалған беттер
 	Page properties	Бет қасиеттері
-	Continue from previous section	Continue from previous section
-	Digits	Цифрлар
-	As recognized	Танылған күйінде
-	Thai digits	Тай цифрлары
-	Arabic digits	Араб цифрлары
-	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 беттегі мәтін оқылмайды. Ондағы мәтінді тану керек пе? Бар мәтін сақталады, ал мұны бір қадаммен болдырмауға болады.
-	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Мәтіні оқылмайтын беттер: {n}. Тек солардағы мәтінді тану керек пе? Бар мәтін сақталады, ал мұны бір қадаммен болдырмауға болады.
-	Recognize these pages	Осы беттерді тану
-	This page has unusable text	Бұл бетте пайдалануға болмайтын мәтін бар
-	It can't be searched or copied. Recognizing text on this page can fix that.	Оны іздеу не көшіру мүмкін емес. Осы беттегі мәтінді тану мұны түзете алады.
-	Recognize text on this page…	Осы беттегі мәтінді тану…
-	Also recognize pages whose text is unusable	Пайдалануға болмайтын мәтіні бар беттерді де тану
+	Clear search	Іздеуді тазалау
+	Pin	Бекіту
+	Pin a tool…	Құралды бекіту…
+	Pin to Home	Басты бетке бекіту
+	Pin tools to Home	Құралдарды басты бетке бекіту
+	Pin your favorite tools here for quick access.	Жылдам қол жеткізу үшін таңдаулы құралдарды осында бекітіңіз.
+	Pinned	Бекітілген
+	Pinned Tools	Бекітілген құралдар
+	Search tools…	Құралдарды іздеу…
+	Select tools to display on your Home page for quick access.	Жылдам қол жеткізу үшін басты бетте көрсетілетін құралдарды таңдаңыз.
+	Unpin from Home	Басты беттен алып тастау
+	Unpin tool	Құралды бекітуден шығару
+	Transform image	Кескінді түрлендіру
+	Select Tool	Таңдау құралы
+	Hand Tool	Қол құралы
+	Marquee Zoom	Аймақты масштабтау
+	Paste	Қою
+	Edit this PDF	Осы PDF файлын түзету
+	Export this PDF	Осы PDF файлын экспорттау
+	Find text or tools	Мәтінді немесе құралдарды табу
 	Create & Edit	Жасау және өңдеу
 	Review & Compare	Шолу және салыстыру
 	Forms & Signatures	Пішіндер және қолтаңбалар
@@ -2578,6 +2584,13 @@ animation effects	Off	Өшірулі
 	field names can't contain a period: {name}	өріс атауларында нүкте болмауы керек: {name}
 	two cells would both be named {name}	екі ұяшықтың да атауы {name} болар еді
 	a field named {name} already exists	{name} атты өріс бар
+	Arrange image	Суретті реттеу
+	Bring forward	Алға жылжыту
+	Bring to front	Алдыңғы планға шығару
+	Crop	Қию
+	Remove crop	Қиюды алып тастау
+	Send backward	Артқа жылжыту
+	Send to back	Артқы планға жіберу
 
 # Date picker: Today button (#4274) (AI-assisted, not separately native-reviewed)
 	Today	Бүгін
@@ -2594,3 +2607,11 @@ animation effects	Off	Өшірулі
 # Comments panel: each reply's own "…" menu (AI-assisted, not separately native-reviewed)
 	Options for this reply	Осы жауаптың параметрлері
 	Export value	Экспорт мәні
+	Show Page Edge Shadows	Бет жиектерінің көлеңкелерін көрсету
+
+# Image paste and Home notifications (AI-assisted; not separately native-reviewed)
+	Search…	Іздеу…
+	Image pasted	Сурет қойылды
+	No image on clipboard to paste	Алмасу буферінде қоятын сурет жоқ
+	Pinned {tool} to Home	{tool} басты бетке бекітілді
+	Unpinned {tool} from Home	{tool} басты беттен ажыратылды

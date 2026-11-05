@@ -4,6 +4,10 @@
 # consult the Lietuvos Respublikos terminų bankas (terminai.vlkk.lt) when selecting terminology.
 # Product and format names (PdfCraft, PDF, PDF/A, OCR, XFA, Word…) remain unchanged.
 
+# Untranslated: English text until a translator fills these in.
+	Lowering this forgets the oldest files. At 0 there is no list.	Lowering this forgets the oldest files. At 0 there is no list.
+	Recent files to keep	Recent files to keep
+
 	Menu	Meniu
 	Edit	Redaguoti
 	Pages	Puslapiai
@@ -220,7 +224,6 @@
 	9 digit, A letter, O letter or digit, X any character	9 – skaitmuo, A – raidė, O – raidė arba skaitmuo, X – bet kuris simbolis
 	; 1 page already had text	; 1 puslapyje tekstas jau buvo
 	; failed: {list}	; nepavyko: {list}
-	; some pages have unreadable text (turn on “{option}” to read them)	; kai kuriuose puslapiuose tekstas neįskaitomas (norėdami juos atpažinti, įjunkite „{option}“)
 	; {n} pages already had text	; {n} puslapiuose tekstas jau buvo
 	? of {n}	? iš {n}
 	A clean-room, open-source PDF application written in Rust. MIT OR Apache-2.0.	Švarių patalpų principu kuriama atvirojo kodo PDF programa, parašyta „Rust“ kalba. MIT OR Apache-2.0.
@@ -345,12 +348,10 @@
 	Check Again	Tikrinti dar kartą
 	Check again	Tikrinti dar kartą
 	Check box is checked by default	Žymimasis langelis pažymėtas pagal numatytuosius parametrus
-	Check for updates	Tikrinti, ar yra naujinimų
 	Check spelling	Tikrinti rašybą
 	Check the pages	Tikrinti puslapius
 	Check the pages of {name}: {why}	Tikrinti dokumento {name} puslapius: {why}
 	Checking Options ({on} of 32 in all categories)	Tikrinimo parinktys (visose kategorijose: {on} iš 32)
-	Checking for a newer version…	Tikrinama, ar yra naujesnė versija…
 	Choose a PNG or JPEG image (up to 4 MiB). Transparency is preserved.	Pasirinkite PNG arba JPEG paveikslėlį (iki 4 MiB). Skaidrumas išsaugomas.
 	Choose a folder for the exported files	Pasirinkite aplanką eksportuojamiems failams
 	Choose a folder for the extracted pages	Pasirinkite aplanką išskirtiems puslapiams
@@ -412,7 +413,6 @@
 	Copies:	Kopijų skaičius:
 	Copy selected text	Kopijuoti pažymėtą tekstą
 	Copy text	Kopijuoti tekstą
-	Couldn't check for updates: {e}	Nepavyko patikrinti, ar yra naujinimų: {e}
 	Couldn't open the printer's preferences: {e}	Nepavyko atverti spausdintuvo nuostatų: {e}
 	Counterclockwise 90 degrees	90 laipsnių prieš laikrodžio rodyklę
 	Country/Region	Šalis / regionas
@@ -917,7 +917,6 @@
 	Patterns (graphics objects)	Šablonai (grafiniai objektai)
 	PdfCraft didn't shut down normally. These documents had changes that were autosaved:	„PdfCraft“ buvo uždaryta netinkamai. Šių dokumentų pakeitimai buvo automatiškai įrašyti:
 	PdfCraft works offline. No telemetry, no account, and no cloud processing unless you add a provider.	„PdfCraft“ veikia neprisijungus. Nerenkami telemetrijos duomenys, nereikia paskyros ir nenaudojamos debesijos paslaugos, nebent pridėtumėte jų teikėją.
-	PdfCraft {c} is up to date.	Naudojate naujausią „PdfCraft“ versiją {c}.
 	PdfCraft {v} is available.	Išleista „PdfCraft“ versija {v}.
 	Percentage	Procentai
 	Permissions password	Teisių slaptažodis
@@ -1345,7 +1344,6 @@
 	XFA form: its fields and its XFA data are kept in step, so other viewers show what you fill in.	XFA forma: jos laukai ir XFA duomenys sinchronizuojami, todėl kitose žiūryklėse rodoma tai, ką įvedate.
 	You are about to apply 1 redaction mark. Text, images and drawings under the marks, and comments and form fields that overlap them, are removed permanently.	Ketinate pritaikyti 1 šalinimo žymą. Po žymomis esantis tekstas, paveikslėliai ir brėžiniai, taip pat su jomis persidengiantys komentarai ir formos laukai bus pašalinti visam laikui.
 	You are about to apply {n} redaction marks. Text, images and drawings under the marks, and comments and form fields that overlap them, are removed permanently.	Ketinate pritaikyti šalinimo žymų: {n}. Po žymomis esantis tekstas, paveikslėliai ir brėžiniai, taip pat su jomis persidengiantys komentarai ir formos laukai bus pašalinti visam laikui.
-	You have version {c}. All releases are listed at {page}.	Turite versiją {c}. Visos laidos išvardytos čia: {page}.
 	You have version {c}. Download the new version from its release page.	Turite versiją {c}. Atsisiųskite naują versiją iš jos laidos puslapio.
 	Your changes will be lost if you don't save them.	Jei pakeitimų neįrašysite, jie bus prarasti.
 	ZIP	ZIP
@@ -2491,7 +2489,6 @@ comment menu	Edit	Redaguoti
 	the image is empty	paveikslėlis tuščias
 	the password is incorrect	slaptažodis netinkamas
 	the text recognition models are not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them)	teksto atpažinimo modeliai neįdiegti (iš naujo įdiekite „PdfCraft“ arba nustatykite PDFCRAFT_MODELS aplanką, kuriame jie laikomi)
-	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	{language} teksto atpažinimo modelis neįdiegtas (iš naujo įdiekite „PdfCraft“ arba nustatykite PDFCRAFT_MODELS aplanką, kuriame jis laikomas)
 	the title must not be empty	pavadinimas negali būti tuščias
 	there are no pages to print	nėra spausdintinų puslapių
 	there are no redaction marks to apply	nėra pritaikytinų konfidencialios informacijos šalinimo žymų
@@ -2772,6 +2769,12 @@ key	Space	Tarpas
 	Make properties default	Nustatyti ypatybes kaip numatytąsias
 	Pages selected	Pasirinkti puslapiai
 	Page properties	Puslapio ypatybės
+	Bring forward	Perkelti į priekį
+	Bring to front	Iškelti į priekį
+	Crop image	Apkarpyti paveikslėlį
+	Remove crop	Pašalinti apkarpymą
+	Send backward	Perkelti atgal
+	Send to back	Nukelti į galą
 	Create & Edit	Kūrimas ir redagavimas
 	Review & Compare	Peržiūra ir palyginimas
 	Forms & Signatures	Formos ir parašai
@@ -2780,7 +2783,6 @@ key	Space	Tarpas
 	No tools match your search.	Paieškos neatitinka joks įrankis.
 	Expand all tools	Išskleisti visus įrankius
 	Collapse all tools	Suskleisti visus įrankius
-
 # AI-assisted additions for concurrently merged UI features (2026-10-15).
 # These additions have not had separate native-speaker review.
 	Mouse wheel scroll speed	Pelės ratuko slinkimo greitis
@@ -2788,33 +2790,25 @@ key	Space	Tarpas
 	The password must have at least 6 characters.	Slaptažodį turi sudaryti bent 6 simboliai.
 	This file changed on disk. Reload it to see the new version; your unsaved changes will be lost.	Šis failas diske pasikeitė. Įkelkite jį iš naujo, kad pamatytumėte naują versiją; neįrašyti pakeitimai bus prarasti.
 theme	Appearance	Išvaizda
-
-# AI-assisted additions: Thai page numbers and the Thai text font (2026-10-19, DocCraftTH).
-# These additions have not had separate native-speaker review.
-	Continue from previous section	Tęsti nuo ankstesnio skyriaus
-	Interface font	Sąsajos šriftas
-	Not installed	Neįdiegta
-	Noto Sans Thai Looped draws Thai only. English interface text stays on the interface font.	Noto Sans Thai Looped rodo tik tajų tekstą. Angliškas sąsajos tekstas lieka sąsajos šriftu.
-	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium rodo anglišką ir tajų sąsają.
-	Operating system fonts are drawn on screen only. They are not written into a PDF.	Operacinės sistemos šriftai rodomi tik ekrane. Jie neįrašomi į PDF.
-	Operating system	Operacinė sistema
-	Optional font	Pasirenkamas šriftas
-	Primary	Pagrindinis
-	Show optional fonts	Rodyti pasirenkamus šriftus
-	Thai text font	Tajų teksto šriftas
-	Thai text	Tajų tekstas
-	This application	Ši programa
-	Digits	Skaitmenys
-	As recognized	Kaip atpažinta
-	Thai digits	Tajų skaitmenys
-	Arabic digits	Arabiški skaitmenys
-	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 puslapyje tekstas neįskaitomas. Atpažinti jame tekstą? Jo tekstas liks, o atšaukti galėsite vienu žingsniu.
-	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Puslapių su neįskaitomu tekstu: {n}. Atpažinti tekstą tik juose? Jų tekstas liks, o atšaukti galėsite vienu žingsniu.
-	Recognize these pages	Atpažinti šiuos puslapius
-	This page has unusable text	Šiame puslapyje yra netinkamo naudoti teksto
-	It can't be searched or copied. Recognizing text on this page can fix that.	Jo negalima ieškoti ar kopijuoti. Teksto atpažinimas šiame puslapyje gali tai ištaisyti.
-	Recognize text on this page…	Atpažinti tekstą šiame puslapyje…
-	Also recognize pages whose text is unusable	Taip pat atpažinti puslapius su netinkamu naudoti tekstu
+	Clear search	Išvalyti paiešką
+	Pin	Prisegti
+	Pin a tool…	Prisegti įrankį…
+	Pin to Home	Prisegti pradžioje
+	Pin tools to Home	Prisegti įrankius pradžioje
+	Pin your favorite tools here for quick access.	Prisekite mėgstamus įrankius čia, kad greitai pasiektumėte.
+	Pinned	Prisegta
+	Pinned Tools	Prisegti įrankiai
+	Search tools…	Ieškoti įrankių…
+	Select tools to display on your Home page for quick access.	Pasirinkite įrankius, kuriuos norite rodyti pradžios puslapyje.
+	Unpin from Home	Atsegti nuo pradžios
+	Unpin tool	Atsegti įrankį
+	Transform image	Transformuoti paveikslėlį
+	Select Tool	Pasirinkimo įrankis
+	Hand Tool	Rankos įrankis
+	Marquee Zoom	Didinti pažymėtą sritį
+	Edit this PDF	Redaguoti šį PDF
+	Export this PDF	Eksportuoti šį PDF
+	Find text or tools	Rasti tekstą arba įrankius
 	Attach a file…	Pridėti failą…
 	Delete attachment	Ištrinti priedą
 	Attaching files is not available on the web yet	Failų pridėjimas žiniatinklyje dar negalimas
@@ -2857,6 +2851,8 @@ theme	Appearance	Išvaizda
 	a table has 1 to {max} columns	lentelėje gali būti nuo 1 iki {max} stulpelių
 	the first row number can be at most {max}	pirmosios eilutės numeris gali būti ne didesnis nei {max}
 	the area, the spacing and the column widths must be numbers, the spacing 0 or more and each width more than 0	sritis, tarpai ir stulpelių pločiai turi būti skaičiai, tarpai – 0 arba daugiau, o kiekvienas plotis – daugiau nei 0
+	Arrange image	Tvarkyti vaizdą
+	Crop	Apkarpyti
 
 # Date picker: Today button (#4274) (AI-assisted, not separately native-reviewed)
 	Today	Šiandien
@@ -2873,3 +2869,11 @@ theme	Appearance	Išvaizda
 # Comments panel: each reply's own "…" menu (AI-assisted, not separately native-reviewed)
 	Options for this reply	Šio atsakymo parinktys
 	Export value	Eksporto reikšmė
+	Show Page Edge Shadows	Rodyti puslapių kraštų šešėlius
+
+# Image paste and Home notifications (AI-assisted; not separately native-reviewed)
+	Search…	Ieškoti…
+	Image pasted	Paveikslėlis įklijuotas
+	No image on clipboard to paste	Iškarpinėje nėra paveikslėlio įklijuoti
+	Pinned {tool} to Home	{tool} prisegtas pradžios puslapyje
+	Unpinned {tool} from Home	{tool} atsegtas nuo pradžios puslapio

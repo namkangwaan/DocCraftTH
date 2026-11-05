@@ -8,6 +8,10 @@
 # Product and technology names (PdfCraft, PDF, Acrobat JavaScript ...) are not translated;
 # the trailing "…" of dialog commands is kept.
 
+# Untranslated: English text until a translator fills these in.
+	Lowering this forgets the oldest files. At 0 there is no list.	Lowering this forgets the oldest files. At 0 there is no list.
+	Recent files to keep	Recent files to keep
+
 	Menu	Menu
 	File	Arquivo
 	Rotation:	Rotação:
@@ -441,14 +445,9 @@
 	Copy Image in Original Format	Copiar imagem no formato original
 	The image has been copied as a {ext} file	A imagem foi copiada como arquivo {ext}
 	The page has changed; select the image again	A página mudou; selecione a imagem novamente
-	Check for updates	Verificar atualizações
 	No check has run yet.	Nenhuma verificação foi executada ainda.
-	Checking for a newer version…	Verificando se há uma versão mais recente…
 	PdfCraft {v} is available.	O PdfCraft {v} está disponível.
 	You have version {c}. Download the new version from its release page.	Você tem a versão {c}. Baixe a nova versão na página de lançamentos.
-	PdfCraft {c} is up to date.	O PdfCraft {c} está atualizado.
-	Couldn't check for updates: {e}	Não foi possível verificar atualizações: {e}
-	You have version {c}. All releases are listed at {page}.	Você tem a versão {c}. Todos os lançamentos estão listados em {page}.
 	Asks GitHub for the latest release. Nothing is downloaded or installed automatically.	Consulta o GitHub para obter o lançamento mais recente. Nada é baixado ou instalado automaticamente.
 	Download	Baixar
 	Later	Mais tarde
@@ -1551,7 +1550,6 @@
 	Recognized {n} words	{n} palavras reconhecidas
 	{words} on {pages}	{words} em {pages}
 	; 1 page already had text	; 1 página já continha texto
-	; some pages have unreadable text (turn on “{option}” to read them)	; algumas páginas têm texto ilegível (ative “{option}” para reconhecê-las)
 	; {n} pages already had text	; {n} páginas já continham texto
 	Recognized {w} words in 1 file	{w} palavras reconhecidas em 1 arquivo
 	Recognized {w} words in {n} files	{w} palavras reconhecidas em {n} arquivos
@@ -2535,18 +2533,25 @@ animation effects	Off	Desativados
 	Make properties default	Tornar propriedades padrão
 	Pages selected	Páginas selecionadas
 	Page properties	Propriedades da página
-	Continue from previous section	Continue from previous section
-	Digits	Algarismos
-	As recognized	Como reconhecidos
-	Thai digits	Algarismos tailandeses
-	Arabic digits	Algarismos arábicos
-	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 página tem texto ilegível. Reconhecer o texto nela? O texto dela permanece, e você pode desfazer isso em uma única etapa.
-	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} páginas têm texto ilegível. Reconhecer o texto apenas nessas páginas? O texto delas permanece, e você pode desfazer isso em uma única etapa.
-	Recognize these pages	Reconhecer estas páginas
-	This page has unusable text	Esta página tem texto inutilizável
-	It can't be searched or copied. Recognizing text on this page can fix that.	Ele não pode ser pesquisado nem copiado. Reconhecer o texto desta página pode resolver isso.
-	Recognize text on this page…	Reconhecer texto nesta página…
-	Also recognize pages whose text is unusable	Reconhecer também as páginas com texto inutilizável
+	Clear search	Limpar pesquisa
+	Pin	Fixar
+	Pin a tool…	Fixar uma ferramenta…
+	Pin to Home	Fixar no Início
+	Pin tools to Home	Fixar ferramentas no Início
+	Pin your favorite tools here for quick access.	Fixe suas ferramentas favoritas aqui para acesso rápido.
+	Pinned	Fixado
+	Pinned Tools	Ferramentas fixadas
+	Search tools…	Pesquisar ferramentas…
+	Select tools to display on your Home page for quick access.	Selecione ferramentas para exibir na página Início para acesso rápido.
+	Unpin from Home	Desafixar do Início
+	Unpin tool	Desafixar ferramenta
+	Transform image	Transformar imagem
+	Select Tool	Ferramenta Seleção
+	Hand Tool	Ferramenta Mão
+	Marquee Zoom	Zoom por seleção
+	Edit this PDF	Editar este PDF
+	Export this PDF	Exportar este PDF
+	Find text or tools	Localizar texto ou ferramentas
 	Create & Edit	Criar e editar
 	Review & Compare	Revisar e comparar
 	Forms & Signatures	Formulários e assinaturas
@@ -2865,6 +2870,14 @@ theme	Appearance	Aparência
 	a table has 1 to {max} columns	uma tabela tem de 1 a {max} colunas
 	the first row number can be at most {max}	o número da primeira linha pode ser no máximo {max}
 	the area, the spacing and the column widths must be numbers, the spacing 0 or more and each width more than 0	a área, o espaçamento e as larguras das colunas devem ser números, o espaçamento 0 ou mais e cada largura maior que 0
+	Bring forward	Avançar
+	Bring to front	Trazer para a frente
+	Crop image	Cortar imagem
+	Remove crop	Remover corte
+	Send backward	Recuar
+	Send to back	Enviar para trás
+	Arrange image	Organizar imagem
+	Crop	Cortar
 
 # Date picker: Today button (#4274) (AI-assisted, not separately native-reviewed)
 	Today	Hoje
@@ -2881,3 +2894,11 @@ theme	Appearance	Aparência
 # Comments panel: each reply's own "…" menu (AI-assisted, not separately native-reviewed)
 	Options for this reply	Opções desta resposta
 	Export value	Valor de exportação
+	Show Page Edge Shadows	Mostrar sombras nas bordas das páginas
+
+# Image paste and Home notifications (AI-assisted; not separately native-reviewed)
+	Search…	Pesquisar…
+	Image pasted	Imagem colada
+	No image on clipboard to paste	Nenhuma imagem na área de transferência para colar
+	Pinned {tool} to Home	{tool} fixado no Início
+	Unpinned {tool} from Home	{tool} desafixado do Início

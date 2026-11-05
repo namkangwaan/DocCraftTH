@@ -4,6 +4,10 @@
 #
 # Clean-room: clean-room translations of PdfCraft's English UI labels, no proprietary localisation resources.
 
+# Untranslated: English text until a translator fills these in.
+	Lowering this forgets the oldest files. At 0 there is no list.	Lowering this forgets the oldest files. At 0 there is no list.
+	Recent files to keep	Recent files to keep
+
 	Menu	Menü
 	File	Dosya
 	Edit	Düzen
@@ -779,14 +783,9 @@
 	Copy Image in Original Format	Resmi Özgün Biçimde Kopyala
 	The image has been copied as a {ext} file	Resim {ext} dosyası olarak kopyalandı
 	The page has changed; select the image again	Sayfa değişti; resmi yeniden seçin
-	Check for updates	Güncellemeleri denetle
 	No check has run yet.	Henüz denetim yapılmadı.
-	Checking for a newer version…	Daha yeni bir sürüm denetleniyor…
 	PdfCraft {v} is available.	PdfCraft {v} kullanılabilir.
 	You have version {c}. Download the new version from its release page.	{c} sürümüne sahipsiniz. Yeni sürümü sürüm sayfasından indirin.
-	PdfCraft {c} is up to date.	PdfCraft {c} güncel.
-	Couldn't check for updates: {e}	Güncellemeler denetlenemedi: {e}
-	You have version {c}. All releases are listed at {page}.	{c} sürümüne sahipsiniz. Tüm sürümler {page} adresinde listelenmiştir.
 	Asks GitHub for the latest release. Nothing is downloaded or installed automatically.	En son sürüm için GitHub'ı sorgular. Hiçbir şey otomatik olarak indirilmez veya kurulmaz.
 	Download	İndir
 	Later	Daha sonra
@@ -1628,7 +1627,6 @@
 	Recognized {n} words	{n} sözcük tanındı
 	{words} on {pages}	{pages} üzerinde {words}
 	; 1 page already had text	; 1 sayfada zaten metin vardı
-	; some pages have unreadable text (turn on “{option}” to read them)	; bazı sayfalarda okunamayan metin var (tanımak için “{option}” seçeneğini açın)
 	; {n} pages already had text	; {n} sayfada zaten metin vardı
 	Recognized {w} words in 1 file	1 dosyada {w} sözcük tanındı
 	Recognized {w} words in {n} files	{n} dosyada {w} sözcük tanındı
@@ -2517,18 +2515,26 @@ animation effects	Off	Kapalı
 	Make properties default	Özellikleri varsayılan yap
 	Pages selected	Seçilen sayfalar
 	Page properties	Sayfa özellikleri
-	Continue from previous section	Continue from previous section
-	Digits	Rakamlar
-	As recognized	Tanındığı gibi
-	Thai digits	Tay rakamları
-	Arabic digits	Arap rakamları
-	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	1 sayfada okunamayan metin var. Bu sayfadaki metin tanınsın mı? Mevcut metin kalır ve bunu tek adımda geri alabilirsiniz.
-	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	{n} sayfada okunamayan metin var. Yalnızca bu sayfalardaki metin tanınsın mı? Mevcut metin kalır ve bunu tek adımda geri alabilirsiniz.
-	Recognize these pages	Bu sayfaları tanı
-	This page has unusable text	Bu sayfada kullanılamayan metin var
-	It can't be searched or copied. Recognizing text on this page can fix that.	Metin aranamıyor veya kopyalanamıyor. Bu sayfadaki metni tanımak bunu düzeltebilir.
-	Recognize text on this page…	Bu sayfadaki metni tanı…
-	Also recognize pages whose text is unusable	Kullanılamayan metin içeren sayfaları da tanı
+	Clear search	Aramayı temizle
+	Pin	Sabitle
+	Pin a tool…	Bir aracı sabitle…
+	Pin to Home	Giriş'e sabitle
+	Pin tools to Home	Araçları Giriş'e sabitle
+	Pin your favorite tools here for quick access.	Hızlı erişim için favori araçlarınızı buraya sabitleyin.
+	Pinned	Sabitlendi
+	Pinned Tools	Sabitlenen Araçlar
+	Search tools…	Araçları ara…
+	Select tools to display on your Home page for quick access.	Hızlı erişim için Giriş sayfanızda görüntülenecek araçları seçin.
+	Unpin from Home	Giriş'ten sabitlemeyi kaldır
+	Unpin tool	Aracın sabitlemesini kaldır
+	Transform image	Görüntüyü dönüştür
+	Select Tool	Seçim Aracı
+	Hand Tool	El Aracı
+	Marquee Zoom	Seçim yakınlaştırma
+	Paste	Yapıştır
+	Edit this PDF	Bu PDF'i düzenle
+	Export this PDF	Bu PDF'i dışa aktar
+	Find text or tools	Metin veya araç bul
 	Create & Edit	Oluştur ve Düzenle
 	Review & Compare	İncele ve Karşılaştır
 	Forms & Signatures	Formlar ve İmzalar
@@ -2576,6 +2582,13 @@ animation effects	Off	Kapalı
 	field names can't contain a period: {name}	alan adları nokta içeremez: {name}
 	two cells would both be named {name}	iki hücrenin de adı {name} olurdu
 	a field named {name} already exists	{name} adlı bir alan zaten var
+	Arrange image	Resmi düzenle
+	Bring forward	Öne getir
+	Bring to front	En öne getir
+	Crop	Kırp
+	Remove crop	Kırpmayı kaldır
+	Send backward	Arkaya gönder
+	Send to back	En arkaya gönder
 
 # Date picker: Today button (#4274) (AI-assisted, not separately native-reviewed)
 	Today	Bugün
@@ -2592,3 +2605,11 @@ animation effects	Off	Kapalı
 # Comments panel: each reply's own "…" menu (AI-assisted, not separately native-reviewed)
 	Options for this reply	Bu yanıtın seçenekleri
 	Export value	Dışa aktarma değeri
+	Show Page Edge Shadows	Sayfa kenarı gölgelerini göster
+
+# Image paste and Home notifications (AI-assisted; not separately native-reviewed)
+	Search…	Ara…
+	Image pasted	Görüntü yapıştırıldı
+	No image on clipboard to paste	Panoda yapıştırılacak görüntü yok
+	Pinned {tool} to Home	{tool} Ana Sayfaya sabitlendi
+	Unpinned {tool} from Home	{tool} Ana Sayfadan kaldırıldı

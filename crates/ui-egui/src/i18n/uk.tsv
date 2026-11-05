@@ -18,6 +18,10 @@
 # Integer plurals (CLDR uk): one (1, 21) | few (2–4, 22–24) | many (0, 5–19); 11–14 take many.
 # Commands use infinitives. Fixed-count templates use count-neutral wording.
 
+# Untranslated: English text until a translator fills these in.
+	Lowering this forgets the oldest files. At 0 there is no list.	Lowering this forgets the oldest files. At 0 there is no list.
+	Recent files to keep	Recent files to keep
+
 	Menu	Меню
 	File	Файл
 	Edit	Редагування
@@ -821,14 +825,9 @@
 	Copy Image in Original Format	Копіювати зображення в оригінальному форматі
 	The image has been copied as a {ext} file	Зображення скопійовано як файл {ext}
 	The page has changed; select the image again	Сторінка змінилася; виберіть зображення ще раз
-	Check for updates	Перевірити оновлення
 	No check has run yet.	Перевірку ще не виконано.
-	Checking for a newer version…	Перевірка наявності новішої версії…
 	PdfCraft {v} is available.	Доступна версія PdfCraft {v}.
 	You have version {c}. Download the new version from its release page.	У вас версія {c}. Завантажте нову версію зі сторінки випуску.
-	PdfCraft {c} is up to date.	Ваша версія PdfCraft {c} актуальна.
-	Couldn't check for updates: {e}	Не вдалося перевірити оновлення: {e}
-	You have version {c}. All releases are listed at {page}.	У вас версія {c}. Усі випуски наведено на {page}.
 	Asks GitHub for the latest release. Nothing is downloaded or installed automatically.	Запитує в GitHub найновіший випуск. Нічого не завантажується й не встановлюється автоматично.
 	Download	Завантажити
 	Later	Пізніше
@@ -1662,7 +1661,6 @@
 	Recognized {n} words	Розпізнано слів: {n}
 	{words} on {pages}	{words} на {pages}
 	; 1 page already had text	; 1 сторінка вже мала текст
-	; some pages have unreadable text (turn on “{option}” to read them)	; на деяких сторінках текст нечитабельний (увімкніть «{option}», щоб розпізнати їх)
 	; {n} pages already had text	; сторінки ({n}) вже мали текст
 	Recognized {w} words in 1 file	Розпізнано слів ({w}) в 1 файлі
 	Recognized {w} words in {n} files	Розпізнано слів ({w}) у файлах ({n})
@@ -2543,18 +2541,26 @@ animation effects	Off	Вимкнено
 	Make properties default	Зробити властивості типовими
 	Pages selected	Вибрані сторінки
 	Page properties	Властивості сторінки
-	Continue from previous section	Continue from previous section
-	Digits	Цифри
-	As recognized	Як розпізнано
-	Thai digits	Тайські цифри
-	Arabic digits	Арабські цифри
-	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	На 1 сторінці текст нечитабельний. Розпізнати текст на ній? Її текст залишиться, а скасувати це можна одним кроком.
-	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	Сторінок із нечитабельним текстом: {n}. Розпізнати текст лише на них? Їхній текст залишиться, а скасувати це можна одним кроком.
-	Recognize these pages	Розпізнати ці сторінки
-	This page has unusable text	На цій сторінці непридатний текст
-	It can't be searched or copied. Recognizing text on this page can fix that.	Його не можна знайти пошуком чи скопіювати. Розпізнавання тексту на цій сторінці може це виправити.
-	Recognize text on this page…	Розпізнати текст на цій сторінці…
-	Also recognize pages whose text is unusable	Розпізнавати й сторінки з непридатним текстом
+	Clear search	Очистити пошук
+	Pin	Закріпити
+	Pin a tool…	Закріпити інструмент…
+	Pin to Home	Закріпити на Головній
+	Pin tools to Home	Закріпити інструменти на Головній
+	Pin your favorite tools here for quick access.	Закріпіть улюблені інструменти тут для швидкого доступу.
+	Pinned	Закріплено
+	Pinned Tools	Закріплені інструменти
+	Search tools…	Шукати інструменти…
+	Select tools to display on your Home page for quick access.	Виберіть інструменти для відображення на Головній для швидкого доступу.
+	Unpin from Home	Відкріпити від Головної
+	Unpin tool	Відкріпити інструмент
+	Transform image	Трансформувати зображення
+	Select Tool	Інструмент виділення
+	Hand Tool	Інструмент «Рука»
+	Marquee Zoom	Масштабувати виділену область
+	Paste	Вставити
+	Edit this PDF	Редактировать цей PDF
+	Export this PDF	Експортувати цей PDF
+	Find text or tools	Знайти текст або інструменти
 	Create & Edit	Створення й редагування
 	Review & Compare	Рецензування й порівняння
 	Forms & Signatures	Форми й підписи
@@ -2602,6 +2608,13 @@ animation effects	Off	Вимкнено
 	field names can't contain a period: {name}	імена полів не можуть містити крапку: {name}
 	two cells would both be named {name}	дві клітинки мали б однакове ім'я {name}
 	a field named {name} already exists	поле з іменем {name} уже існує
+	Arrange image	Упорядкувати зображення
+	Bring forward	Перемістити вперед
+	Bring to front	На передній план
+	Crop	Обрізати
+	Remove crop	Прибрати обрізання
+	Send backward	Перемістити назад
+	Send to back	На задній план
 
 # Date picker: Today button (#4274) (AI-assisted, not separately native-reviewed)
 	Today	Сьогодні
@@ -2618,3 +2631,11 @@ animation effects	Off	Вимкнено
 # Comments panel: each reply's own "…" menu (AI-assisted, not separately native-reviewed)
 	Options for this reply	Параметри цієї відповіді
 	Export value	Значення експорту
+	Show Page Edge Shadows	Показувати тіні на краях сторінок
+
+# Image paste and Home notifications (AI-assisted; not separately native-reviewed)
+	Search…	Пошук…
+	Image pasted	Зображення вставлено
+	No image on clipboard to paste	У буфері обміну немає зображення для вставлення
+	Pinned {tool} to Home	{tool} закріплено на головній
+	Unpinned {tool} from Home	{tool} відкріплено від головної
