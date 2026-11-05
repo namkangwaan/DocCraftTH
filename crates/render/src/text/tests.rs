@@ -1761,17 +1761,12 @@ fn truetype_without_an_encoding_reads_its_codes_as_win_ansi() {
 }
 
 fn parts(parts: &[&str]) -> PageText {
-    PageText {
-        glyphs: parts.iter().map(|t| g(t, 0.0, 0.0, 1.0)).collect(),
-        line_of: vec![0; parts.len()],
-        space_before: vec![false; parts.len()],
-    }
+    PageText { glyphs: parts.iter().map(|t| g(t, 0.0, 0.0, 1.0)).collect(), line_of: vec![0; parts.len()], space_before: vec![false; parts.len()] }
 }
 
 #[test]
 fn thai_and_ascii_digits_find_each_other() {
-    let page =
-        |s: &str| layout(s.chars().enumerate().map(|(i, c)| g(&c.to_string(), 10.0 + 8.0 * i as f32, 10.0, 18.0 + 8.0 * i as f32)).collect());
+    let page = |s: &str| layout(s.chars().enumerate().map(|(i, c)| g(&c.to_string(), 10.0 + 8.0 * i as f32, 10.0, 18.0 + 8.0 * i as f32)).collect());
     let (ascii, thai) = (page("ปี2569"), page("ปี๒๕๖๙"));
     assert_eq!(ascii.find("๒๕๖๙"), vec![2..6]);
     assert_eq!(thai.find("2569"), vec![2..6]);

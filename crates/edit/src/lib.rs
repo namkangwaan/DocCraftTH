@@ -72,9 +72,9 @@ mod place;
 
 pub use apply::{add_background, add_header_footer, add_watermark, marks_present, remove_marks};
 #[cfg(test)]
-use marks::bates_start;
-#[cfg(test)]
 pub(crate) use marks::THAI_CONSONANTS;
+#[cfg(test)]
+use marks::bates_start;
 pub use marks::{Background, Context, HeaderFooter, MarkKind, MarkSource, PageNumberStyle, Watermark, expand};
 use marks::{matrix_number, n};
 pub(crate) use place::undrawable;

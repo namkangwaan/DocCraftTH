@@ -271,7 +271,7 @@ impl PageText {
             })
             .min_by(|a, b| a.1.total_cmp(&b.1).then(a.2.total_cmp(&b.2)))
             .map(|(i, _, _)| i)
-        }
+    }
 
     /// The word around glyph `i` as its first and last glyph (double-click): it stops at word
     /// gaps, blank glyphs and line ends.

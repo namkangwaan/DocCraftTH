@@ -481,13 +481,7 @@ pub fn stamp(doc: &mut Document, page: usize, tag: &str, content: Vec<u8>) -> Re
     stamp_with_fonts(doc, page, tag, content, &[])
 }
 
-pub fn stamp_with_fonts(
-    doc: &mut Document,
-    page: usize,
-    tag: &str,
-    content: Vec<u8>,
-    fonts: &[(String, Vec<char>)],
-) -> Result<ObjRef, EditError> {
+pub fn stamp_with_fonts(doc: &mut Document, page: usize, tag: &str, content: Vec<u8>, fonts: &[(String, Vec<char>)]) -> Result<ObjRef, EditError> {
     let all = page_list(doc);
     check(&[page], all.len())?;
     check_on_top(doc, &all[page])?;
