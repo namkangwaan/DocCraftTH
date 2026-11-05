@@ -740,51 +740,62 @@ pub fn value_overflow(doc: &Document, f: &Field, w: &Widget) -> Option<Overflow>
     field_appearance_fit(doc, f, w, &f.value, true).2
 }
 
-/// [`field_appearance_drawn`], and whether the text drawn is cut off by the box.
-fn field_appearance_fit(doc: &Document, f: &Field, w: &Widget, values: &[String], format: bool) -> (Stream, Option<char>, Option<Overflow>) {
-    // The Format event: what is shown, not what is stored.
-    let formatted: Vec<String>;
-    let values = if format
+fn resolve_formatted_values<'a>(f: &Field, values: &'a [String], format: bool, formatted: &'a mut Vec<String>) -> &'a [String] {
+    if format
         && matches!(f.kind, crate::FieldKind::Text | crate::FieldKind::Combo)
         && values.len() == 1
         && f.actions.format != crate::af::Format::None
     {
-        formatted = vec![crate::af::format_value(&f.actions.format, &values[0])];
+        *formatted = vec![crate::af::format_value(&f.actions.format, &values[0])];
         &formatted[..]
     } else {
         values
-    };
-    let wobj = doc.get(w.obj);
-    let wd = wobj.as_dict().cloned().unwrap_or_default();
-    let (page_w, page_h) = ((w.rect[2] - w.rect[0]).max(1.0), (w.rect[3] - w.rect[1]).max(1.0));
-    let place = placement(mk_rotation(doc, &wd), page_w, page_h);
-    let (width, height) = (place.layout_w, place.layout_h);
-    let da = parse_da(wd.get(b"DA").and_then(|o| doc.resolve(o).as_string().map(|s| s.to_text())).as_deref().unwrap_or(&f.da));
+    }
+}
+
+fn resolve_field_text(f: &Field, values: &[String]) -> String {
     let text: String = if f.kind == FieldKind::Combo {
         values.iter().map(|v| f.options.iter().find(|(e, _)| e == v).map_or(v.clone(), |(_, d)| d.clone())).collect::<Vec<_>>().join(", ")
     } else {
         values.first().cloned().unwrap_or_default()
     };
-    let text = if f.has(flags::PASSWORD) { "*".repeat(text.chars().count()) } else { text };
-    let comb = f.has(flags::COMB) && !f.has(flags::MULTILINE) && !f.has(flags::PASSWORD) && f.max_len.is_some_and(|m| m > 0);
-    // Thai is drawn as outlines from the craft-fonts face whatever the field's font is (a
-    // CID font addressed by Unicode would report it as encodable and draw nothing), so the
-    // font only has to hold the rest.
-    let thai = (matches!(f.kind, FieldKind::Text | FieldKind::Combo) && !comb).then(|| Thai::new(&text)).flatten();
-    let held = if thai.is_some() { without_thai(&text) } else { text.clone() };
+    if f.has(flags::PASSWORD) { "*".repeat(text.chars().count()) } else { text }
+}
+
+fn resolve_field_font(doc: &Document, f: &Field, font_name: &str, held: &str) -> (String, ObjRef, FontText) {
     let can_show = |enc: &FontText| {
         if f.kind == FieldKind::List {
             f.options.iter().all(|(_, display)| enc.can_encode(display))
         } else if f.kind == FieldKind::Text && f.has(flags::MULTILINE) {
             held.split(['\n', '\r']).all(|line| enc.can_encode(line))
         } else {
-            enc.can_encode(&held)
+            enc.can_encode(held)
         }
     };
-    let (font_name, font_obj, enc) = match dr_font(doc, &da.font).filter(|(_, enc)| can_show(enc)) {
-        Some((o, enc)) => (da.font.clone(), o, enc),
+    match dr_font(doc, font_name).filter(|(_, enc)| can_show(enc)) {
+        Some((o, enc)) => (font_name.to_string(), o, enc),
         None => ("Helv".to_string(), helvetica(), FontText::WinAnsi),
-    };
+    }
+}
+
+/// [`field_appearance_drawn`], and whether the text drawn is cut off by the box.
+fn field_appearance_fit(doc: &Document, f: &Field, w: &Widget, values: &[String], format: bool) -> (Stream, Option<char>, Option<Overflow>) {
+    let mut formatted = Vec::new();
+    let values = resolve_formatted_values(f, values, format, &mut formatted);
+    let wobj = doc.get(w.obj);
+    let wd = wobj.as_dict().cloned().unwrap_or_default();
+    let (page_w, page_h) = ((w.rect[2] - w.rect[0]).max(1.0), (w.rect[3] - w.rect[1]).max(1.0));
+    let place = placement(mk_rotation(doc, &wd), page_w, page_h);
+    let (width, height) = (place.layout_w, place.layout_h);
+    let da = parse_da(wd.get(b"DA").and_then(|o| doc.resolve(o).as_string().map(|s| s.to_text())).as_deref().unwrap_or(&f.da));
+    let text = resolve_field_text(f, values);
+    let comb = f.has(flags::COMB) && !f.has(flags::MULTILINE) && !f.has(flags::PASSWORD) && f.max_len.is_some_and(|m| m > 0);
+    // Thai is drawn as outlines from the craft-fonts face whatever the field's font is (a
+    // CID font addressed by Unicode would report it as encodable and draw nothing), so the
+    // font only has to hold the rest.
+    let thai = (matches!(f.kind, FieldKind::Text | FieldKind::Combo) && !comb).then(|| Thai::new(&text)).flatten();
+    let held = if thai.is_some() { without_thai(&text) } else { text.clone() };
+    let (font_name, font_obj, enc) = resolve_field_font(doc, f, &da.font, &held);
     let width_of = |text: &str, size: f64| enc.width(text, size);
     let (mut c, bw) = frame(doc, &wd, width, height);
     let pad = 2.0 + bw;
