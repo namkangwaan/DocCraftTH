@@ -390,8 +390,8 @@ mod expand_tests {
     #[test]
     fn expand_token_after_extra_angle_brackets() {
         let cx = Context::default();
-        assert_eq!(expand("<<<1>>>", 3, 9, 1, &cx), "<3>");
-        assert_eq!(expand("<< <<1>>", 3, 9, 1, &cx), "<< 3");
-        assert_eq!(expand("<<x>> <<1>>", 3, 9, 1, &cx), "<<x>> 3");
+        assert_eq!(expand("<<<1>>>", 3, 9, 1, &cx, PageNumberStyle::Decimal), "<3>");
+        assert_eq!(expand("<< <<1>>", 3, 9, 1, &cx, PageNumberStyle::Decimal), "<< 3");
+        assert_eq!(expand("<<x>> <<1>>", 3, 9, 1, &cx, PageNumberStyle::Decimal), "<<x>> 3");
     }
 }
