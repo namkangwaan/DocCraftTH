@@ -314,7 +314,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
                 Digits::Thai => tl!("Thai digits"),
                 Digits::Arabic => tl!("Arabic digits"),
             };
-            egui::ComboBox::from_id_salt("ocr-digits").selected_text(digits_label).width(220.0).show_ui(ui, |ui| {
+            craft_ui::ComboBox::from_id_salt("ocr-digits").selected_text(digits_label).width(220.0).show_ui(ui, |ui| {
                 ui.selectable_value(&mut d.digits, Digits::AsRead, tl!("As recognized"));
                 ui.selectable_value(&mut d.digits, Digits::Thai, tl!("Thai digits"));
                 ui.selectable_value(&mut d.digits, Digits::Arabic, tl!("Arabic digits"));

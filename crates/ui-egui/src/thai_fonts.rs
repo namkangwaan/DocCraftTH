@@ -138,7 +138,7 @@ pub fn preferences_section(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens)
     ui.horizontal(|ui| {
         let name = ui.label(say("Thai text font"));
         let selected = choice_label(&app.thai_font);
-        let combo = egui::ComboBox::from_id_salt("thai-text-font").selected_text(selected).show_ui(ui, |ui| {
+        let combo = craft_ui::ComboBox::from_id_salt("thai-text-font").selected_text(selected).show_ui(ui, |ui| {
             for face in choices(app.thai_optional_fonts, &app.thai_font) {
                 let label = choice_label(face.family);
                 if ui.selectable_value(&mut app.thai_font, face.family.to_owned(), label).clicked() {

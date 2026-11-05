@@ -535,7 +535,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, kind: M
                     },
                 );
                 let style_label = NUMBER_STYLES.iter().find(|(style, _)| *style == d.hf.number_style).map(|(_, label)| *label).unwrap_or("1, 2, 3");
-                egui::ComboBox::from_id_salt("hf-number-style").selected_text(style_label).show_ui(ui, |ui| {
+                craft_ui::ComboBox::from_id_salt("hf-number-style").selected_text(style_label).show_ui(ui, |ui| {
                     for (style, label) in NUMBER_STYLES {
                         ui.selectable_value(&mut d.hf.number_style, style, label);
                     }
