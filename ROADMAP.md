@@ -3,6 +3,7 @@
 **Stage: alpha** · next: beta, ~25% (ready for real work 50% → 75%) and ~400–700 h away
 
 > **Last reviewed:** 2026-10-28 · **Last updated:** 2026-10-28 · **Change:** minor (M6: automatic form field detection finds dot leaders of five or more dots at least 40 pt wide in the text layer and on scanned pages, reports candidate `source` (`underscore`, `leader`, `rule`, `box`), and accepts `leaders: false`; estimates unchanged)
+> **Last reviewed:** 2026-10-27 | **Last updated:** 2026-10-27 | **Change:** minor (M10: OCR model downloads use verified ONNX pairs with legacy discovery fallback; estimates unchanged)
 > **Last reviewed:** 2026-10-25 | **Last updated:** 2026-10-25 | **Change:** minor (M14 localization current state: Arabic logical catalog, explicit RTL label direction and mirrored stock chrome; native/browser RTL workflows unqualified. Native release Hans face via LXGW WenKai Lite; estimates unchanged)
 > **Last reviewed:** 2026-10-23 · **Last updated:** 2026-10-23 · **Change:** minor (M7, #2636 partial: pasting added text boxes and images in the engine and through `content_copy`; estimates unchanged)
 > **Last reviewed:** 2026-10-23 · **Last updated:** 2026-10-23 · **Change:** minor (M11: image optimization accounts for page-local UserUnit; estimates unchanged)
@@ -200,6 +201,7 @@ Ranked; detail and the full milestone table in [docs/roadmap.md](docs/roadmap.md
 
 ## Progress log
 
+- **2026-10-27 (M10, OCR models):** Model staging downloads and verifies the ONNX pair after the upstream RTEN URL brownout; runtime discovery prefers complete ONNX pairs per directory, retains complete RTEN fallback and preserves directory precedence.
 - **2026-10-26 (DocCraftTH, upstream sync):** Merged storytold/pdfcraft `main` (egui 0.37 fork, tests under `tests/it/`, 35 interface languages) into the Thai fork. The vendored epaint patch is replaced by `ThaiLineBreaker` on egui's new `LineBreaker` hook, and `thai_wrap` now runs with the embedded craft-fonts Thai face; header and footer text in Thai follows the new font-family choice; the Thai catalog gained 96 keys upstream added; GPU-render tests could not run in the sync environment (no adapter).
 - **2026-10-20 (M10, Thai OCR FR-17):** Batch OCR reads pages whose own text is unusable on request: `read_unusable_text` on `ocr_recognize_files` and `doc_batch` (default off; good-text pages stay skipped), `doc_batch` reports `unusable_text_pages`, and `pdfcraft-cli batch --ocr-unusable-text`. Estimates unchanged.
 - **2026-10-24 (M10, #4158 partial):** Word, HTML, RTF and PowerPoint export keep a block that continues another on its line (an italic case name, a link, a superscript) as a run in its own style inside that paragraph, with the source's word space, instead of a paragraph of its own. Style changes that wrap onto the next line still split paragraphs (the reading blocks keep style boundaries). Estimates unchanged.
@@ -686,6 +688,7 @@ Newest first: the date, what moved, and the new overall estimate.
 | Date | Change | Summary |
 |---|---|---|
 | 2026-10-28 | minor | M6: automatic form field detection finds dot leaders of five or more dots at least 40 pt wide in the text layer and on scanned pages, reports candidate `source` (`underscore`, `leader`, `rule`, `box`), and accepts `leaders: false`; estimates unchanged. |
+| 2026-10-27 | minor | M10: OCR stages SHA-256-verified ONNX models after the upstream RTEN URL brownout; discovery prefers a complete ONNX pair per directory, falls back to a complete RTEN pair, and never mixes formats or directories; language/web limits and estimates unchanged. |
 | 2026-10-23 | minor | M8, #3205 follow-up: phone-pattern redaction includes the +39 country code on labelled Italian geographic numbers with a slash; dates, protocol identifiers and whole-run guards remain. Estimates unchanged. |
 | 2026-10-23 | minor | M11: image downsampling measures physical resolution after page-local UserUnit scaling, including shared nested forms; synthetic measurement and optimization regressions. Estimates unchanged. |
 | 2026-10-23 | minor | M10: Word table cells use the grid columns they span, including cells after a merged cell; synthetic export regression and CLI reproduction. Estimates unchanged. |

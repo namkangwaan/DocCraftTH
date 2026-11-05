@@ -19,8 +19,8 @@ use std::path::{Path, PathBuf};
 pub use pdfcraft_fonts::helvetica_width;
 
 /// The model files, as named in ATTRIBUTION.toml.
-pub const DETECTION_MODEL: &str = "text-detection.rten";
-pub const RECOGNITION_MODEL: &str = "text-recognition.rten";
+pub const DETECTION_MODEL: &str = "text-detection.onnx";
+pub const RECOGNITION_MODEL: &str = "text-recognition.onnx";
 pub const THAI_RECOGNITION_MODEL: &str = "text-recognition-th.rten";
 pub const THAI_DICT: &str = "dict-th.txt";
 
@@ -57,20 +57,23 @@ pub struct Models {
 }
 
 impl Models {
-    /// The default (English/Latin) models in `dir`, if both files are there.
+    /// A complete model pair in `dir`, preferring current ONNX files over legacy RTEN files.
+    /// An incomplete update never mixes formats or hides an intact legacy pair.
     pub fn in_dir(dir: &Path) -> Option<Models> {
-        let m = Models { detection: dir.join(DETECTION_MODEL), recognition: dir.join(RECOGNITION_MODEL), dictionary: None };
-        (m.detection.is_file() && m.recognition.is_file()).then_some(m)
+        [(DETECTION_MODEL, RECOGNITION_MODEL), ("text-detection.rten", "text-recognition.rten")].into_iter().find_map(|(detection, recognition)| {
+            let m = Models { detection: dir.join(detection), recognition: dir.join(recognition), dictionary: None };
+            (m.detection.is_file() && m.recognition.is_file()).then_some(m)
+        })
     }
 
     /// The models for `lang` (`"en"` or `"th"`) in `dir`, if all required files are there.
     pub fn in_dir_for(dir: &Path, lang: &str) -> Option<Models> {
         match lang {
             "th" | "tha" => {
-                let detection = dir.join(DETECTION_MODEL);
+                let detection = [DETECTION_MODEL, "text-detection.rten"].into_iter().map(|f| dir.join(f)).find(|p| p.is_file())?;
                 let recognition = dir.join(THAI_RECOGNITION_MODEL);
                 let dict = dir.join(THAI_DICT);
-                (detection.is_file() && recognition.is_file() && dict.is_file()).then_some(Models { detection, recognition, dictionary: Some(dict) })
+                (recognition.is_file() && dict.is_file()).then_some(Models { detection, recognition, dictionary: Some(dict) })
             }
             "en" | "eng" | "" => Self::in_dir(dir),
             _ => None,
@@ -1135,6 +1138,63 @@ mod tests {
         let w = PlacedWord::place(&Word { text: "Up".into(), rect: [0.0, 0.0, 50.0, 10.0] }, to_user);
         assert_eq!(w.across, [0.0, 50.0]);
         assert_eq!(w.up, [-10.0, 0.0]);
+    }
+
+    /// The current ONNX pair wins when an installation also retains both legacy models.
+    #[test]
+    fn model_discovery_prefers_the_complete_onnx_pair() {
+        let dir = tempfile::tempdir().unwrap();
+        for file in ["text-detection.onnx", "text-recognition.onnx"] {
+            std::fs::write(dir.path().join(file), b"model").unwrap();
+        }
+        let expected = Some(Models { detection: dir.path().join("text-detection.onnx"), recognition: dir.path().join("text-recognition.onnx") });
+        assert_eq!(Models::in_dir(dir.path()), expected, "a complete ONNX pair is sufficient");
+        for file in ["text-detection.rten", "text-recognition.rten"] {
+            std::fs::write(dir.path().join(file), b"model").unwrap();
+        }
+        assert_eq!(Models::in_dir(dir.path()), expected, "the complete ONNX pair takes precedence over legacy models");
+    }
+
+    /// An interrupted ONNX update still permits an intact legacy pair in the same directory.
+    #[test]
+    fn model_discovery_falls_back_to_legacy_when_the_onnx_pair_is_incomplete() {
+        for current in ["text-detection.onnx", "text-recognition.onnx"] {
+            let dir = tempfile::tempdir().unwrap();
+            for file in [current, "text-detection.rten", "text-recognition.rten"] {
+                std::fs::write(dir.path().join(file), b"model").unwrap();
+            }
+            assert_eq!(
+                Models::in_dir(dir.path()),
+                Some(Models { detection: dir.path().join("text-detection.rten"), recognition: dir.path().join("text-recognition.rten") }),
+                "{current} alone must not hide a complete legacy pair"
+            );
+        }
+    }
+
+    /// Detection and recognition must come from one complete format pair, never a mixed update.
+    #[test]
+    fn model_discovery_refuses_mixed_format_pairs() {
+        for pair in [["text-detection.onnx", "text-recognition.rten"], ["text-detection.rten", "text-recognition.onnx"]] {
+            let dir = tempfile::tempdir().unwrap();
+            for file in pair {
+                std::fs::write(dir.path().join(file), b"model").unwrap();
+            }
+            assert_eq!(Models::in_dir(dir.path()), None, "{pair:?} is not a complete model pair");
+        }
+    }
+
+    /// Existing source builds and PDFCRAFT_MODELS overrides retain their complete RTEN pair.
+    #[test]
+    fn model_discovery_keeps_legacy_only_installations() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(Models::in_dir(dir.path()), None);
+        std::fs::write(dir.path().join("text-detection.rten"), b"model").unwrap();
+        assert_eq!(Models::in_dir(dir.path()), None, "one legacy model is incomplete");
+        std::fs::write(dir.path().join("text-recognition.rten"), b"model").unwrap();
+        assert_eq!(
+            Models::in_dir(dir.path()),
+            Some(Models { detection: dir.path().join("text-detection.rten"), recognition: dir.path().join("text-recognition.rten") })
+        );
     }
 
     /// #103: every release package's layout puts the models where the installed app looks.

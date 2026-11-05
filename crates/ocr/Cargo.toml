@@ -13,9 +13,10 @@ workspace = true
 [dependencies]
 pdfcraft-fonts = { workspace = true }
 ocrs = { version = "0.13.1", default-features = false, features = ["rten"] }
-rten = { version = "0.26.0", default-features = false, features = ["rten_format"] }
+rten = { version = "0.26.0", default-features = false, features = ["onnx_format", "rten_format"] }
 rten-imageproc = "0.26.0"
 thiserror.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
+tempfile = "3.27"
