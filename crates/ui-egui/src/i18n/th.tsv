@@ -10,8 +10,8 @@
 @id	language.name	ไทย
 
 # Untranslated: English text until a translator fills these in.
-	Lowering this forgets the oldest files. At 0 there is no list.	Lowering this forgets the oldest files. At 0 there is no list.
-	Recent files to keep	Recent files to keep
+	Lowering this forgets the oldest files. At 0 there is no list.	การลดจำนวนนี้จะละทิ้งไฟล์ที่เก่าที่สุด หากตั้งเป็น 0 จะไม่มีรายการแสดง
+	Recent files to keep	จำนวนไฟล์ล่าสุดที่จะเก็บไว้
 
 	Menu	เมนู
 	File	ไฟล์
@@ -595,7 +595,7 @@
 	Space Audit	ตรวจสอบการใช้พื้นที่
 	Bytes	ไบต์
 	Content Streams	สตรีมเนื้อหา
-	X Object Forms	X Object Forms
+	X Object Forms	แบบฟอร์ม XObject
 	Structure Info	ข้อมูลโครงสร้าง
 	Thumbnails	ภาพขนาดย่อ
 	Named Destinations	ปลายทางที่มีชื่อ
@@ -785,7 +785,7 @@
 	Later	ภายหลัง
 	none	ไม่มี
 	Declared conformance: {shown}	ความสอดคล้องที่ประกาศไว้: {shown}
-	Output intent: {list}	Output intent: {list}
+	Output intent: {list}	เจตนาผลลัพธ์: {list}
 	Conformance level:	ระดับความสอดคล้อง:
 	No problems found: the document conforms to {level}.	ไม่พบปัญหา: เอกสารสอดคล้องกับ {level}
 	 (page {p})	 (หน้า {p})
@@ -2743,12 +2743,12 @@ theme	Appearance	ลักษณะที่ปรากฏ
 # Comments panel: each reply's own "…" menu (AI-assisted, not separately native-reviewed)
 	Options for this reply	ตัวเลือกของการตอบกลับนี้
 # Untranslated: English text until a translator fills these in.
-	Reads {name}, which the form doesn't have, so it gets no value there.	Reads {name}, which the form doesn't have, so it gets no value there.
-	Its script also reads fields whose names it builds as it runs, so those reads can't be checked.	Its script also reads fields whose names it builds as it runs, so those reads can't be checked.
-	Missing field	Missing field
-	Unchecked reads	Unchecked reads
-	{field} reads fields named as it runs	{field} reads fields named as it runs
-	Some names are built as it runs	Some names are built as it runs
+	Reads {name}, which the form doesn't have, so it gets no value there.	อ่านค่า {name} ซึ่งไม่มีในแบบฟอร์ม จึงไม่ได้ค่าจากช่องดังกล่าว
+	Its script also reads fields whose names it builds as it runs, so those reads can't be checked.	สคริปต์นี้ยังอ่านค่าช่องข้อมูลที่สร้างชื่อขึ้นขณะทำงาน จึงไม่สามารถตรวจสอบการอ่านค่าเหล่านั้นได้
+	Missing field	ไม่มีช่องข้อมูลนี้
+	Unchecked reads	การอ่านค่าที่ไม่ได้ตรวจสอบ
+	{field} reads fields named as it runs	{field} อ่านค่าช่องข้อมูลที่ตั้งชื่อขณะทำงาน
+	Some names are built as it runs	บางชื่อถูกสร้างขึ้นขณะทำงาน
 
 # Image paste and Home notifications (AI-assisted; not separately native-reviewed)
 	Search…	ค้นหา…
@@ -2827,3 +2827,117 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	Show or hide the side panel	แสดงหรือซ่อนแผงด้านข้าง
 	Custom scale	ขนาดกำหนดเอง
 	Window	หน้าต่าง
+	Add text field table	เพิ่มตารางช่องข้อความ
+	Attach a file…	แนบไฟล์…
+	Calculation order	ลำดับการคำนวณ
+	Freehand-Highlight	ไฮไลต์อิสระ
+	Hand	มือ
+	New bookmarks from text styles…	ที่คั่นหน้าใหม่จากลักษณะข้อความ…
+	Page properties…	คุณสมบัติของหน้า…
+	Select	เลือก
+	Text field table	ตารางช่องข้อความ
+	1 line	1 บรรทัด
+	1 page has unreadable text. Recognize text on it? Its text stays, and you can undo this in one step.	มี 1 หน้าที่มีข้อความที่อ่านไม่ออก ต้องการรู้จำข้อความในหน้านั้นหรือไม่? ข้อความเดิมจะยังคงอยู่ และคุณสามารถเลิกทำได้ในขั้นตอนเดียว
+	Add Tools to Hotbar	เพิ่มเครื่องมือลงในแถบด่วน
+	Add fields	เพิ่มช่องข้อมูล
+	Alignment	การจัดแนว
+	Also recognize pages whose text is unusable	รู้จำหน้าที่ข้อความใช้งานไม่ได้ด้วย
+	Always use my default zoom and page layout	ใช้การซูมและเค้าโครงหน้าเริ่มต้นของฉันเสมอ
+	Arabic digits	เลขอารบิก
+	As recognized	ตามที่รู้จำได้
+	Back to Prepare a form	กลับไปที่เตรียมแบบฟอร์ม
+	Bulleted list	รายการสัญลักษณ์แสดงหัวข้อย่อย
+	Close menu	ปิดเมนู
+	Column spacing	ระยะห่างคอลัมน์
+	Column widths	ความกว้างคอลัมน์
+	Column {n}	คอลัมน์ {n}
+	Columns	คอลัมน์
+	Delete attachment	ลบไฟล์แนบ
+	Digits	ตัวเลข
+	Distribute evenly	กระจายเท่ากัน
+	Dock navigation rail on Left	ตรึงแถบนำทางไว้ทางซ้าย
+	Dock navigation rail on Right	ตรึงแถบนำทางไว้ทางขวา
+	Drag a field to move it, or select it and press {up} or {down}.	ลากช่องข้อมูลเพื่อย้าย หรือเลือกช่องข้อมูลแล้วกด {up} หรือ {down}
+	Drag hotbar	ลากแถบด่วน
+	Earlier in calculation order	ก่อนหน้าในลำดับการคำนวณ
+	Edit {field}'s formula	แก้ไขสูตรของ {field}
+	Every field calculates after the fields it reads.	ทุกช่องจะคำนวณหลังช่องที่ช่องนั้นอ่านค่า
+	Every field outside a loop calculates after the fields it reads.	ทุกช่องที่อยู่นอกลูปจะคำนวณหลังช่องที่ช่องนั้นอ่านค่า
+	Every line set in the style chosen for a level becomes a bookmark of that level, under a new first bookmark.	ทุกบรรทัดที่ตั้งค่าในลักษณะที่เลือกสำหรับแต่ละระดับจะกลายเป็นที่คั่นหน้าของระดับนั้น ภายใต้ที่คั่นหน้าแรกอันใหม่
+	Export value	ค่าที่ส่งออก
+	Extend the docked toolbar along the entire side. Choose a side above to enable.	ขยายแถบเครื่องมือที่ตรึงไว้ตลอดทั้งด้าน เลือกด้านด้านบนเพื่อเปิดใช้งาน
+	Field names	ชื่อช่องข้อมูล
+	First row number	หมายเลขแถวแรก
+	Fix order	แก้ไขลำดับ
+	Float	ลอยตัว
+	Full-side strip	แถบเต็มด้าน
+	General & Interface	ทั่วไปและหน้าจอโปรแกรม
+	Hotbar settings	การตั้งค่าแถบด่วน
+	Hotbar settings / add tools	การตั้งค่าแถบด่วน / เพิ่มเครื่องมือ
+	Hotbar tools	เครื่องมือแถบด่วน
+	Invert middle-button drag	สลับทิศทางการลากด้วยปุ่มกลางเมาส์
+	It can't be searched or copied. Recognizing text on this page can fix that.	ไม่สามารถค้นหาหรือคัดลอกได้ การรู้จำข้อความในหน้านี้สามารถแก้ไขปัญหานี้ได้
+	Larger thumbnails	ภาพขนาดย่อขนาดใหญ่ขึ้น
+	Later in calculation order	ถัดไปในลำดับการคำนวณ
+	Layer options	ตัวเลือกเลเยอร์
+	Layout & Sizing	เค้าโครงและขนาด
+	Less	น้อยลง
+	Level {n}	ระดับ {n}
+	Links on page	ลิงก์ในหน้า
+	Loop	ลูป
+	Missing from the calculation order saved in the PDF: other PDF viewers may not calculate it.	ไม่มีในลำดับการคำนวณที่บันทึกไว้ใน PDF: โปรแกรมดู PDF อื่นอาจไม่คำนวณ
+	Move only what must move, so every field calculates after the fields it reads.	ย้ายเฉพาะสิ่งที่จำเป็นต้องย้าย เพื่อให้ทุกช่องคำนวณหลังช่องที่ช่องนั้นอ่านค่า
+	Moves only what must move	ย้ายเฉพาะสิ่งที่จำเป็นต้องย้าย
+	N or {row} is the row number, {col} the column number, {seq} the cell number. With none of them, the row number goes last.	N หรือ {row} คือหมายเลขแถว, {col} คือหมายเลขคอลัมน์, {seq} คือหมายเลขเซลล์ หากไม่ได้ระบุ หมายเลขแถวจะอยู่ท้ายสุด
+	Navigation rail side	ด้านของแถบนำทาง
+	New bookmarks from text styles	ที่คั่นหน้าใหม่จากลักษณะข้อความ
+	No field in this form calculates its value yet. Give a field a calculation on the Calculate tab of its properties, and it shows here.	ยังไม่มีช่องข้อมูลใดในแบบฟอร์มนี้ที่คำนวณค่า กำหนดการคำนวณให้ช่องข้อมูลในแท็บ 'คำนวณ' ของคุณสมบัติ แล้วจะแสดงที่นี่
+	No field reads it	ไม่มีช่องข้อมูลใดอ่านค่านี้
+	No order can fix a loop. Change one of the formulas.	ไม่มีลำดับใดแก้ไขลูปได้ โปรดเปลี่ยนสูตรใดสูตรหนึ่ง
+	Not in order	ไม่อยู่ในลำดับ
+	Numbered list	รายการลำดับเลข
+	Order · top calculates first	ลำดับ · ด้านบนคำนวณก่อน
+	Other options	ตัวเลือกอื่น ๆ
+	Page Properties	คุณสมบัติของหน้า
+	Panning or auto-scrolling with the middle (wheel) button moves the page the other way.	การเลื่อนมุมมองหรือเลื่อนหน้าจออัตโนมัติด้วยปุ่มกลางเมาส์ (ล้อเลื่อน) จะย้ายหน้าไปในทิศทางตรงกันข้าม
+	Paragraph spacing	ระยะห่างย่อหน้า
+	Paste bookmarks	วางที่คั่นหน้า
+	Printer default	ค่าเริ่มต้นของเครื่องพิมพ์
+	Reading the printer's settings…	กำลังอ่านการตั้งค่าเครื่องพิมพ์…
+	Reads {names}, which read it back. No order can fix a loop: change one of the formulas.	อ่านค่า {names} ซึ่งอ่านค่านี้กลับ ไม่มีลำดับใดแก้ไขลูปได้: โปรดเปลี่ยนสูตรใดสูตรหนึ่ง
+	Reads {name}, which calculates later, so it shows an old value.	อ่านค่า {name} ซึ่งคำนวณทีหลัง จึงแสดงค่าเก่า
+	Recognize text on this page…	รู้จำข้อความในหน้านี้…
+	Recognize these pages	รู้จำหน้าเหล่านี้
+	Remove from hotbar	ลบออกจากแถบด่วน
+	Reset to Initial Visibility	รีเซ็ตเป็นการมองเห็นเริ่มต้น
+	Row spacing	ระยะห่างแถว
+	Script	สคริปต์
+	Search all tools…	ค้นหาเครื่องมือทั้งหมด…
+	Search settings…	ค้นหาการตั้งค่า…
+	Show Page Edge Shadows	แสดงเงาขอบหน้ากระดาษ
+	Show on the page which fields each field reads	แสดงบนหน้าว่าแต่ละช่องอ่านค่าจากช่องใดบ้าง
+	Shrink the page content to make room for the header and footer	ย่อเนื้อหาหน้าเพื่อเว้นที่สำหรับหัวกระดาษและท้ายกระดาษ
+	Smaller thumbnails	ภาพขนาดย่อขนาดเล็กลง
+	Stick to a side:	ชิดด้านใดด้านหนึ่ง:
+	Subscript	ตัวห้อย
+	Superscript	ตัวยก
+	Tab Order	ลำดับแท็บ
+	Text Field Table	ตารางช่องข้อความ
+	Thai digits	เลขไทย
+	The document's security settings don't allow printing	การตั้งค่าความปลอดภัยของเอกสารไม่อนุญาตให้พิมพ์
+	The order saved in the PDF needs tidying	ลำดับที่บันทึกไว้ใน PDF จำเป็นต้องจัดระเบียบ
+	This document has no text to make bookmarks from.	เอกสารนี้ไม่มีข้อความที่จะนำมาสร้างที่คั่นหน้า
+	This page has unusable text	หน้านี้มีข้อความที่ใช้งานไม่ได้
+	Thumbnail size	ขนาดภาพขนาดย่อ
+	Too early	เร็วเกินไป
+	Toolbar size	ขนาดแถบเครื่องมือ
+	Unspecified	ไม่ได้ระบุ
+	Use Column Order	ใช้ลำดับตามคอลัมน์
+	Use Document Structure	ใช้โครงสร้างเอกสาร
+	Use Row Order	ใช้ลำดับตามแถว
+	Vertical layout	เค้าโครงแนวตั้ง
+	bold	ตัวหนา
+	italic	ตัวเอียง
+	{font}, {size} pt	{font}, {size} pt
+	{n} lines	{n} บรรทัด
+	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	มี {n} หน้าที่มีข้อความที่อ่านไม่ออก ต้องการรู้จำข้อความเฉพาะหน้าเหล่านั้นหรือไม่? ข้อความเดิมจะยังคงอยู่ และคุณสามารถเลิกทำได้ในขั้นตอนเดียว

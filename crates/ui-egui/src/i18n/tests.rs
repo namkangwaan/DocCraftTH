@@ -14,7 +14,7 @@ macro_rules! needs_catalogs {
 
 /// The rows of `text` (catalog format) as (context, English source, translation), escapes
 /// undone; comments, blank and malformed lines left out.
-fn rows(text: &str) -> Vec<(String, String, String)> {
+pub(super) fn rows(text: &str) -> Vec<(String, String, String)> {
     let unescape = |s: &str| s.replace("\\\\", "\u{0}").replace("\\n", "\n").replace("\\t", "\t").replace('\u{0}', "\\");
     text.lines()
         .map(|l| l.strip_suffix('\r').unwrap_or(l))

@@ -40,11 +40,53 @@ use craft_i18n::I18n;
 
 include!(concat!(env!("OUT_DIR"), "/craft_i18n.rs"));
 
+/// Process the embedded Thai catalog to insert soft breaks (U+200B) at word boundaries
+/// for line breaking in the UI, keeping th.tsv clean.
+fn prepare_catalogs(embedded: &'static craft_i18n::Embedded) -> &'static craft_i18n::Embedded {
+    let mut list = embedded.to_vec();
+    for entry in &mut list {
+        if entry.0 == "th" {
+            let processed = process_th_tsv(entry.2);
+            entry.2 = Box::leak(processed.into_boxed_str());
+        }
+    }
+    Box::leak(list.into_boxed_slice())
+}
+
+fn process_th_tsv(tsv: &str) -> String {
+    let mut out = String::with_capacity(tsv.len() + 2048);
+    for line in tsv.lines() {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.starts_with('#') || line.trim().is_empty() {
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 3 {
+            out.push_str(parts[0]);
+            out.push('\t');
+            out.push_str(parts[1]);
+            out.push('\t');
+            out.push_str(&th_breaks::soft_breaks(parts[2]));
+            for p in &parts[3..] {
+                out.push('\t');
+                out.push_str(p);
+            }
+        } else {
+            out.push_str(line);
+        }
+        out.push('\n');
+    }
+    out
+}
+
 /// The embedded catalogs, offering exactly the languages in [`LANGUAGES`]. Built on first use; a
 /// locale is parsed on its first lookup.
 static I18N: LazyLock<I18n> = LazyLock::new(|| {
     let offered: Vec<&str> = LANGUAGES.iter().map(|l| l.code).collect();
-    let (i18n, problems) = I18n::new(CRAFT_I18N, &offered);
+    let embedded = prepare_catalogs(CRAFT_I18N);
+    let (i18n, problems) = I18n::new(embedded, &offered);
     for problem in problems {
         log::warn!("interface catalogs: {problem}");
     }
@@ -339,7 +381,7 @@ impl Lang {
 /// Whether this build embeds the craft-i18n catalogs (`CRAFT_I18N_DIR` was set). Without them the
 /// interface is English only; tests that need a translation skip with a note.
 pub fn catalogs_embedded() -> bool {
-    !CRAFT_I18N.is_empty()
+    CRAFT_I18N.iter().any(|(code, ..)| *code != "th")
 }
 
 /// The canonical `language` preference for user input: [`AUTO`] or a registered code (any case).

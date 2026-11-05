@@ -10292,7 +10292,6 @@ fn need_appearances_buttons_are_displayed_from_their_captions() {
     }
 }
 
-<<<<<<< HEAD
 /// Rows of words that cover the whole page and whose text maps to private-use code points, as a
 /// legacy Thai font's ToUnicode does.
 fn private_use_words(w: f64, h: f64) -> Vec<ocr::PlacedWord> {
@@ -10456,7 +10455,8 @@ fn thai_ocr_marks_stay_in_their_word() {
         assert!(plain.contains("หลักเกณฑ์") && plain.contains("วิธีการ"), "gap {gap}: {plain:?}");
         assert!(!text.find("หลักเกณฑ์").is_empty(), "gap {gap}: {plain:?}");
     }
-=======
+}
+
 #[test]
 fn repeated_backdrop_artwork_survives_background_undo_redo_and_both_save_modes() {
     let white = "1 g";
@@ -10510,7 +10510,6 @@ fn repeated_backdrop_artwork_survives_background_undo_redo_and_both_save_modes()
     black(&s, rewritten);
     s.apply(rewritten, Edit::RemoveMarks { kind: MarkKind::Background }).unwrap();
     black(&s, rewritten);
->>>>>>> 24bb8530
 }
 
 fn contains(haystack: &[u8], needle: &[u8]) -> bool {

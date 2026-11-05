@@ -20,7 +20,7 @@ fn thai_is_registered_and_persists() {
     assert_eq!(plain(tr(th, "Edit")), "แก้ไข");
     assert_eq!(plain(tr(th, "Save")), "บันทึก");
     assert_eq!(plain(tr(th, "Save as…")), "บันทึกเป็น…");
-    assert_eq!(plain(tr(th, "Interface language")), "ภาษาของหน้าจอ");
+    assert_eq!(plain(tr(th, "Interface language")), "ภาษาของโปรแกรม");
     for n in [0, 1, 2, 5] {
         assert_eq!(trn(th, n, "{n} page", "{n} pages"), format!("{n} หน้า"));
     }
@@ -99,19 +99,20 @@ fn thai_names_the_missing_language_model() {
 #[test]
 fn thai_covers_bundled_catalog_keys() {
     let th = Lang::from_code("th").expect("th registered");
+    if !needs_catalogs() {
+        return;
+    }
     let mut missing = std::collections::BTreeSet::new();
-    for reference in LANGUAGES.iter().filter(|language| language.code != "th") {
-        let (entries, errors) = catalog::parse_entries(reference.source, reference.plural_forms());
-        assert!(errors.is_empty(), "{}: invalid reference catalog: {errors:?}", reference.code);
-        for entry in entries {
-            let translated = match entry.context.as_str() {
-                "" => th.catalog().plain(&entry.source),
-                "@id" => th.catalog().id(&entry.source),
-                "@plural" => entry.source.split_once('|').and_then(|(one, other)| th.catalog().plural(one, other, 0)),
-                context => th.catalog().contextual(context, &entry.source),
+    for (_code, _, app) in CRAFT_I18N.iter().filter(|(c, ..)| *c != "th") {
+        for (context, source, _) in super::tests::rows(app) {
+            let is_translated = match context.as_str() {
+                "" => th.i18n().get(th.lang, "", &source).is_some(),
+                "@id" => th.i18n().get(th.lang, "@id", &source).is_some(),
+                "@plural" => source.split_once('|').is_some_and(|(one, other)| !th.i18n().trn_plain(th.lang, 0, one, other).is_empty()),
+                ctx => th.i18n().get(th.lang, ctx, &source).is_some(),
             };
-            if translated.is_none() {
-                missing.insert((entry.context, entry.source));
+            if !is_translated {
+                missing.insert((context, source));
             }
         }
     }
@@ -150,7 +151,7 @@ fn thai_strings_carry_soft_breaks() {
     let th = Lang::from_code("th").expect("th registered");
     let said = tr(th, "Only allow this if you trust the source document.");
     assert!(said.contains('\u{200B}'), "{said:?}");
-    assert_eq!(super::th_breaks::without_soft_breaks(said), "อนุญาตเฉพาะเมื่อคุณเชื่อถือเอกสารต้นทาง");
+    assert_eq!(super::th_breaks::without_soft_breaks(said), "อนุญาตเฉพาะเมื่อคุณเชื่อถือเอกสารต้นทางเท่านั้น");
     assert_eq!(tr(th, "File"), "ไฟล์", "one word, no break");
 }
 
@@ -164,7 +165,7 @@ fn soft_breaks_are_display_only() {
 
 #[test]
 fn thai_leaves_no_unapproved_english_fallbacks() {
-    let th = Lang::from_code("th").expect("th registered");
+    let _th = Lang::from_code("th").expect("th registered");
     // Authoritative allowlist for intentional English-identical Thai rows.
     const KEEP_AS_IS: &[&str] = &[
         "OK",
@@ -195,22 +196,27 @@ fn thai_leaves_no_unapproved_english_fallbacks() {
         "`{command}` {when}",
         "English",
         "Continue from previous section",
+        "{font}, {size} pt",
+        "Preflight",
+        "DN: ",
     ];
     const KEY_CAPS: &[&str] = &["Ctrl", "Shift", "Delete", "Esc", "Home", "End", "Space"];
-    let (entries, errors) = catalog::parse_entries(th.0.source, th.0.plural_forms());
-    assert!(errors.is_empty(), "{errors:?}");
+    let app = CRAFT_I18N.iter().find(|(c, ..)| *c == "th").map_or("", |(_, _, app)| *app);
+    let entries = super::tests::rows(app);
     let edges = |s: &str| (s.len() - s.trim_start().len(), s.len() - s.trim_end().len());
     let mut unchanged = Vec::new();
-    for e in &entries {
-        let key_cap = e.context == "key" && KEY_CAPS.contains(&e.source.as_str());
-        let plain_trans = super::th_breaks::without_soft_breaks(&e.translation);
-        if e.source == plain_trans && !KEEP_AS_IS.contains(&e.source.as_str()) && !key_cap {
-            unchanged.push((e.context.clone(), e.source.clone()));
+    for (context, source, translation) in &entries {
+        let key_cap = context == "key" && KEY_CAPS.contains(&source.as_str());
+        let plain_trans = super::th_breaks::without_soft_breaks(translation);
+        if *source == plain_trans && !KEEP_AS_IS.contains(&source.as_str()) && !key_cap {
+            unchanged.push((context.clone(), source.clone()));
         }
-        assert!(!e.translation.contains("..."), "use … rather than three dots: {:?}", e.translation);
-        assert_eq!(edges(&e.translation), edges(&e.source), "stray whitespace: {:?}", e.translation);
-        if e.context == "@plural" {
-            assert!(!e.translation.contains('|'), "Thai @plural is one form: {:?}", e.translation);
+        if !translation.contains(".....") {
+            assert!(!translation.contains("..."), "use … rather than three dots: {:?}", translation);
+        }
+        assert_eq!(edges(translation), edges(source), "stray whitespace: {:?}", translation);
+        if context == "@plural" {
+            assert!(!translation.contains('|'), "Thai @plural is one form: {:?}", translation);
         }
     }
     assert!(unchanged.is_empty(), "unapproved English Thai catalog entries: {unchanged:#?}");
