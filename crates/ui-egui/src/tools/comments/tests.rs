@@ -553,4 +553,3 @@ fn the_hover_outline_goes_round_what_a_press_would_take() {
     let selected = CommentView { selected: Some((0, 0)), ..CommentView::default() };
     assert!(hover_outline(&cx, &selected, Some(&comment)).is_none(), "the selected comment has its own frame");
 }
-}
