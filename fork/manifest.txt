@@ -35,7 +35,7 @@ crates/ui-egui/src/system_fonts.rs::pub fn thai_fallback
 crates/ui-egui/src/system_fonts.rs::pub fn cjk_fallback
 crates/ui-egui/src/i18n/mod.rs::code: "th"
 crates/engine/src/dates.rs::pub fn era_year
-crates/engine/src/lib.rs::pub fn display_name
+crates/engine/src/document.rs::pub fn display_name
 crates/render/src/text.rs::fn map_thai_pua
 crates/render/src/text.rs::fn is_combining_mark
 crates/render/src/text.rs::pub fn fold_case
