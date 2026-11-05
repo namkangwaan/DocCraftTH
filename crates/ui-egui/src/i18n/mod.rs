@@ -301,6 +301,12 @@ impl PartialEq for Lang {
 
 impl Eq for Lang {}
 
+impl std::hash::Hash for Lang {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.code.hash(state);
+    }
+}
+
 impl Lang {
     pub const EN: Lang = Lang(&LANGUAGES[0]);
 
@@ -667,7 +673,7 @@ pub fn local_year(y: i64) -> i64 {
 /// A PDF date shown as [`pdfcraft_render::pretty_date`] does (`2026-09-30 10:45`), with the year
 /// in `lang`'s era. Strings that aren't such a date come back unchanged.
 pub fn local_pdf_date_in(lang: Lang, s: &str) -> String {
-    let pretty = pdfcraft_render::pretty_date(s);
+    let mut pretty = pdfcraft_render::pretty_date(s);
     let offset = pdfcraft_engine::dates::era_year(lang.code(), 0);
     if offset == 0 || !is_pretty_date(&pretty) {
         return pretty;
@@ -675,7 +681,13 @@ pub fn local_pdf_date_in(lang: Lang, s: &str) -> String {
     let Some(year) = pretty.get(..4).and_then(|y| y.parse::<i64>().ok()) else {
         return pretty;
     };
-    format!("{}{}", year.saturating_add(offset), &pretty[4..])
+    let local_year = year.saturating_add(offset);
+    if (1000..=9999).contains(&local_year) {
+        pretty.replace_range(0..4, &local_year.to_string());
+        pretty
+    } else {
+        format!("{}{}", local_year, &pretty[4..])
+    }
 }
 
 fn is_pretty_date(s: &str) -> bool {
