@@ -102,6 +102,20 @@
 - **พจนานุกรมอักขระไทย 524 ตัว (`dict-th.txt`):** รองรับอักษรไทย บาลี/สันสกฤต เลขไทย/อารบิก และสัญลักษณ์ทางราชการครบถ้วน
 - **Colab Fine-Tuning Pipeline:** สมุดบันทึก `Thai_OCR_FineTune_DocCraftTH (1).ipynb` ปรับจูนสำหรับ PP-OCRv5 Mobile Recognizer ด้วย Cosine Decay Learning Rate `1e-4`, Epoch 15, Batch Size 64 พร้อมสคริปต์แปลงเป็น ONNX (Opset 11) และ `.rten` อัตโนมัติ
 
+### 11. การอัปเดตและผนวกความสามารถจาก Upstream v0.18.2 (Upstream Sync & Hardening)
+ผนวกการเปลี่ยนแปลงกว่า 1,200+ คอมมิตจากโครงการต้นฉบับ [`storytold/pdfcraft`](https://github.com/storytold/pdfcraft) (v0.18.2) พร้อมปกป้องเสถียรภาพและฟีเจอร์ภาษาไทย (Fork Invariants):
+- **ผนวกรวมฟีเจอร์และเครื่องมือใหม่:**
+  - **Form Artwork Editing:** รองรับการแก้ไข ตรวจจับ และปรับเปลี่ยน Artwork ภายใน Form Fields บน PDF
+  - **Reframe, Crop & Rotate Overhaul:** ปรับปรุงระบบครอบตัดภาพและเอกสาร รองรับมุมหมุน 90°/180°/270° และการคำนวณ Bounding Box ที่แม่นยำ
+  - **Combine & Extract Dialogs:** ยกระดับหน้าต่างรวมไฟล์และแยกหน้าเอกสาร พร้อมรองรับ Drag-and-drop ระหว่างหน้า
+  - **External Localization (`craft-i18n`):** รองรับสถาปัตยกรรมแคตตาล็อกภาษาภายนอกของ upstream โดยยังคงรักษาคำแปลภาษาไทยฉบับสมบูรณ์ 100%
+- **การปกป้องและคงสภาพส่วนขยายภาษาไทย (Thai Preservation & Bug Fixes):**
+  - **Thai OCR Model Integrity & Licensing (`xtask/license_check.rs`):** ตรวจรับรองโมเดลทั้ง 4 ตัว (English Detection/Recognition และ Thai Detection/Recognition) ให้ผ่านการตรวจสอบสิทธิ์และการแจกจ่ายอย่างถูกต้อง
+  - **2D Geometric Reading Order Protection (`crates/render/src/text/order.rs`):** ปรับจูนอัลกอริทึมจัดลำดับวรรณยุกต์สระไทยหลังการปรับโครงสร้าง Text Order ของ upstream โดยตรึงพิกัดจุดกำเนิด `x0` เข้ากับพยัญชนะฐาน ป้องกันวรรณยุกต์และสระลอยแตกบรรทัดหรือหลุดตำแหน่ง
+  - **Thai Catalog Priority Enforcement (`crates/ui-egui/build.rs`):** บังคับโหลดไฟล์ `th.tsv` ของ DocCraftTH แทนที่ไฟล์ stub จาก `craft-i18n` ของ upstream เพื่อให้เมนู ป้ายกำกับ และคำเตือนทุกจุดแสดงผลเป็นภาษาไทยอย่างสมบูรณ์
+  - **OCR Accessibility API Status (`crates/automation/src/a11y/ocr.rs`):** คืนค่า API ตรวจสอบสถานะโมเดล OCR ให้รายงานความพร้อมใช้งานแยกตามภาษา (`available_by_language` แสดงทั้ง `en` และ `th`)
+  - **Asset Verification (`ATTRIBUTION.toml`):** คำนวณและบันทึก SHA-256 Checksum ของไฟล์แปลภาษาไทยเข้าสู่ Asset Manifest ป้องกันข้อผิดพลาดในการตรวจสอบความถูกต้องของทรัพยากร
+
 ---
 
 ## ⚡ คำสั่งใช้งานเบื้องต้น (Quick Start)

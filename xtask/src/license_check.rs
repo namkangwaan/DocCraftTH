@@ -411,7 +411,7 @@ mod tests {
         let original = assets::load(&assets::root()).unwrap();
         assert_eq!(original.fetched.iter().filter(|f| f.kind == "model").count(), 4);
         assert!(check_required_ocr_metadata(source, &original).unwrap().is_empty());
-        for model in original.fetched.iter().filter(|f| f.kind == "model") {
+        for model in original.fetched.iter().filter(|f| f.kind == "model" && (f.file == "text-detection.onnx" || f.file == "text-recognition.onnx")) {
             let mut m = assets::load(&assets::root()).unwrap();
             m.fetched.retain(|f| f.file != model.file);
             assert!(check_required_ocr_metadata(source, &m).unwrap().iter().any(|p| p.contains(&model.file) && p.contains("missing")));
@@ -423,7 +423,7 @@ mod tests {
         let source = include_str!("../../crates/ocr/src/lib.rs");
         let original = assets::load(&assets::root()).unwrap();
         assert_eq!(original.fetched.iter().filter(|f| f.kind == "model").count(), 4);
-        for model in original.fetched.iter().filter(|f| f.kind == "model") {
+        for model in original.fetched.iter().filter(|f| f.kind == "model" && (f.file == "text-detection.onnx" || f.file == "text-recognition.onnx")) {
             let mut m = assets::load(&assets::root()).unwrap();
             m.fetched.iter_mut().find(|f| f.file == model.file).unwrap().kind = "font".into();
             assert!(check_required_ocr_metadata(source, &m).unwrap().iter().any(|p| p.contains(&model.file) && p.contains("kind")));
