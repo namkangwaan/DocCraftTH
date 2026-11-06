@@ -2167,6 +2167,17 @@ kind = "data"
 usage = "Decodes every PRC Double (coordinates, transforms, colours) in 3D annotations' PRC streams. Non-visual data."
 sha256 = "8e705c5cde6a3ef778e8aca69759e38845b228b3f7f12949e587b19855d2114c"
 
+[[asset]]
+path = "crates/ui-egui/src/i18n/th.tsv"
+title = "Thai interface translation catalog"
+author = "PdfCraft contributors"
+source = "Contributor-original: clean-room translations of PdfCraft's English UI labels, no proprietary localisation resources"
+licence = "MIT OR Apache-2.0"
+licence_file = "LICENSE-MIT"
+kind = "translation"
+usage = "Thai UI strings, compiled in by crates/ui-egui/src/i18n.rs"
+sha256 = "3da1f17642e5678a38084efab1ac91fa8df7c5ecd221a3c378287cec6aa55f0e"
+
 [[bundled]]
 crate = "epaint_default_fonts"
 version = "0.37.0"

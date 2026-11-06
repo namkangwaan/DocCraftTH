@@ -2941,3 +2941,5 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	{font}, {size} pt	{font}, {size} pt
 	{n} lines	{n} บรรทัด
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	มี {n} หน้าที่มีข้อความที่อ่านไม่ออก ต้องการรู้จำข้อความเฉพาะหน้าเหล่านั้นหรือไม่? ข้อความเดิมจะยังคงอยู่ และคุณสามารถเลิกทำได้ในขั้นตอนเดียว
+	Field names with + - * / and parentheses; put \ before spaces in names.	ชื่อช่องที่มีเครื่องหมาย + - * / และวงเล็บ; ใส่ \ หน้าช่องว่างในชื่อ
+	This page couldn't be displayed.\n{e}	ไม่สามารถแสดงหน้านี้ได้\n{e}

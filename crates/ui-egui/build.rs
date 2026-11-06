@@ -62,9 +62,13 @@ fn craft_i18n() -> String {
         }
     };
     let th_tsv = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/i18n/th.tsv");
-    if th_tsv.is_file() && !entries.iter().any(|(code, _, _)| code == "th") {
+    if th_tsv.is_file() {
         println!("cargo::rerun-if-changed={}", th_tsv.display());
-        entries.push(("th".to_string(), None, th_tsv));
+        if let Some(entry) = entries.iter_mut().find(|(code, _, _)| code == "th") {
+            entry.2 = th_tsv;
+        } else {
+            entries.push(("th".to_string(), None, th_tsv));
+        }
     }
     let mut o = String::from("/// (locale, shared catalog, PdfCraft's catalog), one entry per locale; `\"\"` for a missing file.\n");
     o.push_str("pub static CRAFT_I18N: &craft_i18n::Embedded = &[\n");

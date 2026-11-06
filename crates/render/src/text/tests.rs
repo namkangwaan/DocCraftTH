@@ -1525,7 +1525,7 @@ fn a_dense_overprint_joins_its_runs_and_keeps_each_whole() {
     let refs: Vec<&TextGlyph> = v.iter().collect();
     let height = |i: usize| (refs[i].rect[3] - refs[i].rect[1]).max(0.1);
     let mut sc = Scratch { text: (0..150).map(|k| Run { start: 3 * k, end: 3 * k + 3 }).collect(), ..Default::default() };
-    assert!(collide(&refs, &height, 10.0, &mut sc), "more pairs than the budget");
+    assert!(collide(&refs, &height, &|i| refs[i].rect[0], 10.0, &mut sc), "more pairs than the budget");
     assert_eq!(sc.units.len(), 1, "one component");
 
     let v = overprinted_runs(150, true);

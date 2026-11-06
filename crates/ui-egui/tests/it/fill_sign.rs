@@ -1875,6 +1875,7 @@ fn fill_sign_enter_adds_lines_outside_click_commits_and_escape_cancels() {
     assert!(h.state().views[0].fill_text.is_none());
     assert_eq!(items(&h), [("FreeText".to_owned(), Some(text.to_owned()))]);
     let id = h.state().views[0].id;
+    h.state_mut().session = std::mem::take(&mut h.state_mut().session).with_clock(|| 1_700_000_000);
     let saved = h.state().session.save_bytes(id).unwrap();
     let mut session = pdfcraft_engine::Session::new();
     let reopened = session.open("again.pdf", None, saved.clone(), None).unwrap();

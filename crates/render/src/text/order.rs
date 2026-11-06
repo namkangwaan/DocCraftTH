@@ -245,9 +245,17 @@ pub(super) fn restarts_run(glyphs: &[&TextGlyph], start: usize, next: usize, pro
 /// their glyph-by-glyph order, so the common case is one sort. A run of zero-width glyphs (a combining mark) has no
 /// extent of its own, so it goes next to the glyph it starts at.
 pub(super) fn place_glyphs(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32, s: &Seg, sc: &mut Scratch) {
-    let x0 = |i: usize| glyphs[i].rect[0];
     let zero_width = |i: usize| glyphs[i].rect[2] - glyphs[i].rect[0] <= 0.05 * height(i);
+    let mut starts: Vec<usize> = s.runs().map(|run| run.start).collect();
+    starts.sort_unstable();
     let mark = |i: usize| zero_width(i) || (!glyphs[i].text.is_empty() && glyphs[i].text.chars().all(super::is_combining_mark));
+    let x0 = |i: usize| {
+        let mut k = i;
+        while k > 0 && mark(k) && starts.binary_search(&k).is_err() {
+            k -= 1;
+        }
+        if mark(k) { glyphs[i].rect[0] } else { glyphs[k].rect[0] }
+    };
     sc.text.clear();
     sc.marks.clear();
     sc.placed.clear();
@@ -264,7 +272,7 @@ pub(super) fn place_glyphs(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32,
         sc.placed.extend(sc.text.iter().flat_map(|run| run.range()));
         sc.placed.sort_unstable_by(|a, b| x0(*a).total_cmp(&x0(*b)).then(a.cmp(b)));
     } else {
-        collide(glyphs, height, s.h, sc);
+        collide(glyphs, height, &x0, s.h, sc);
     }
     // Each mark goes before the first placed glyph whose x is greater than its own. Marks are visited in x order, and
     // that position never moves back, so one pass over `placed` puts all of them in.
@@ -290,8 +298,7 @@ pub(super) fn place_glyphs(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32,
 /// The sweep tests each glyph against the glyphs after it that start before its right edge. Its work is bounded by the
 /// budget, so a page costs O(glyphs) pair tests plus the sorts. A dense segment is joined with one pass over its runs,
 /// which keeps each run whole. It may keep runs whole that do not overprint, but never interleaves overprinted glyphs.
-pub(super) fn collide(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32, h: f32, sc: &mut Scratch) -> bool {
-    let x0 = |i: usize| glyphs[i].rect[0];
+pub(super) fn collide(glyphs: &[&TextGlyph], height: &dyn Fn(usize) -> f32, x0: &dyn Fn(usize) -> f32, h: f32, sc: &mut Scratch) -> bool {
     let runs = sc.text.len();
     sc.owner.clear();
     for (r, run) in sc.text.iter().enumerate() {
