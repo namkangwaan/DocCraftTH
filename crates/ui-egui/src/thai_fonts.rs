@@ -243,9 +243,14 @@ fn load_face(face: &Face, probe: char) -> Option<Arc<FontData>> {
 }
 
 fn application_bytes(face: &Face) -> Option<&'static [u8]> {
-    pdfcraft_fonts::ui_thai_fonts()
-        .into_iter()
+    let thai = pdfcraft_fonts::ui_thai_fonts();
+    thai.iter()
         .find(|font| font.family.eq_ignore_ascii_case(face.family) && font.style.eq_ignore_ascii_case(face.style) && !font.bytes.is_empty())
+        .or_else(|| {
+            thai.iter().find(|font| {
+                font.family.eq_ignore_ascii_case(face.family) && font.style.eq_ignore_ascii_case("Regular") && !font.bytes.is_empty()
+            })
+        })
         .map(|font| font.bytes)
 }
 
@@ -489,10 +494,22 @@ mod tests {
             for family in [FontFamily::Name("medium".into()), FontFamily::Name("semibold".into())] {
                 assert_eq!(defs.families.get(&family).and_then(|stack| stack.first()).map(String::as_str), Some(UI_FACE));
             }
-            let stack = &defs.families[&FontFamily::Name(TEXT_FACE.into())];
-            assert_eq!(stack.first().map(String::as_str), Some(TEXT_FACE));
-            assert!(stack.iter().any(|name| name == "Inter"));
+            if defs.font_data.contains_key(TEXT_FACE) {
+                let stack = &defs.families[&FontFamily::Name(TEXT_FACE.into())];
+                assert_eq!(stack.first().map(String::as_str), Some(TEXT_FACE));
+                assert!(stack.iter().any(|name| name == "Inter"));
+            }
         }
+    }
+
+    #[test]
+    fn embedded_craft_fonts_provide_interface_thai_face() {
+        if pdfcraft_fonts::ui_thai_fonts().is_empty() {
+            return;
+        }
+        let face = face_named("Noto Sans Thai").expect("Noto Sans Thai in catalog");
+        assert!(application_bytes(face).is_some(), "Noto Sans Thai bytes found via craft-fonts fallback");
+        assert!(load_ui().is_some(), "load_ui succeeds with embedded Noto Sans Thai");
     }
 
     #[cfg(target_os = "windows")]

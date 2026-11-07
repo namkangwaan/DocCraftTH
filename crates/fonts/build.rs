@@ -19,7 +19,15 @@ fn main() {
     println!("cargo::rerun-if-env-changed=CRAFT_FONTS_REQUIRED");
     let mut src = String::from("pub static CRAFT_FONTS: &[CraftFont] = &[\n");
     let required = std::env::var_os("CRAFT_FONTS_REQUIRED").is_some();
-    if let Some(dir) = std::env::var_os("CRAFT_FONTS_DIR").map(PathBuf::from) {
+    let dir = std::env::var_os("CRAFT_FONTS_DIR").map(PathBuf::from).or_else(|| {
+        let manifest_dir = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR")?);
+        let candidates = [
+            manifest_dir.join("../../craft-fonts"),
+            manifest_dir.join("../../../craft-fonts"),
+        ];
+        candidates.into_iter().find(|p| p.join("fonts/manifest.txt").is_file())
+    });
+    if let Some(dir) = dir {
         match craft_fonts(&dir, required) {
             Ok(entries) => src.push_str(&entries),
             Err(e) if required => println!("cargo::error=CRAFT_FONTS_DIR={}: {e}", dir.display()),

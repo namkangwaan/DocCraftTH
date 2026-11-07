@@ -9,6 +9,10 @@ license.workspace = true
 name = "dthframe-cli"
 path = "src/main.rs"
 
+[[bin]]
+name = "pdfcraft-cli"
+path = "src/main.rs"
+
 [lints]
 workspace = true
 
