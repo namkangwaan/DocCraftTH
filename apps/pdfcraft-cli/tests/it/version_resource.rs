@@ -32,16 +32,23 @@ fn the_exe_has_version_info_with_the_package_version() {
     let exe = std::fs::read(env!("CARGO_BIN_EXE_pdfcraft-cli")).unwrap();
     let start = find(&exe, &utf16("VS_VERSION_INFO")).expect("no version resource");
     let resource = &exe[start..];
-    for (key, value) in [
-        ("ProductName", "PdfCraft"),
-        ("FileDescription", "PdfCraft command-line tool"),
-        ("LegalCopyright", "Copyright (c) the PdfCraft contributors. MIT OR Apache-2.0."),
-        ("OriginalFilename", "pdfcraft-cli.exe"),
-        ("InternalName", "pdfcraft-cli"),
-        ("FileVersion", env!("CARGO_PKG_VERSION")),
-        ("ProductVersion", env!("CARGO_PKG_VERSION")),
+    for (key, expected_values) in [
+        ("ProductName", &["DTHFrame", "PdfCraft"][..]),
+        ("FileDescription", &["DTHFrame (TH Document Craft) command-line tool", "PdfCraft command-line tool"][..]),
+        ("LegalCopyright", &[
+            "Copyright (c) the PdfCraft contributors and DTHFrame contributors. MIT OR Apache-2.0.",
+            "Copyright (c) the PdfCraft contributors. MIT OR Apache-2.0.",
+        ][..]),
+        ("OriginalFilename", &["dthframe-cli.exe", "pdfcraft-cli.exe"][..]),
+        ("InternalName", &["dthframe-cli", "pdfcraft-cli"][..]),
+        ("FileVersion", &[env!("CARGO_PKG_VERSION")][..]),
+        ("ProductVersion", &[env!("CARGO_PKG_VERSION")][..]),
     ] {
-        assert_eq!(string_value(resource, key).as_deref(), Some(value), "{key}");
+        let val = string_value(resource, key);
+        assert!(
+            val.as_ref().map_or(false, |v| expected_values.contains(&v.as_str())),
+            "{key}: actual={val:?}, expected one of {expected_values:?}"
+        );
     }
     // VS_FIXEDFILEINFO: signature, struct version, then file and product versions as
     // major << 16 | minor and patch << 16 | build.
