@@ -1465,7 +1465,7 @@ fn dialog_recovery(ui: &mut egui::Ui, app: &mut PdfCraftApp) -> bool {
         ui.label(egui::RichText::new(tl!("Recover unsaved documents?")).font(theme::semibold(18.0)));
     });
     ui.add_space(6.0);
-    ui.label(tl!("PdfCraft didn't shut down normally. These documents had changes that were autosaved:"));
+    ui.label(tl!("DTHFrame didn't shut down normally. These documents had changes that were autosaved:"));
     ui.add_space(8.0);
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     egui::Grid::new("recoverable").num_columns(2).spacing([18.0, 6.0]).show(ui, |ui| {
@@ -1562,30 +1562,32 @@ fn dialog_about(ui: &mut egui::Ui, req: &mut Pending) -> bool {
         1 => crate::credits::contributors_ui(ui),
         2 => crate::credits::models_ui(ui),
         _ => {
-            ui.horizontal(|ui| {
-                widgets::artcraft_mark(ui, 40.0);
-                ui.vertical(|ui| {
-                    ui.label(egui::RichText::new("PdfCraft").font(theme::semibold(20.0)));
-                    ui.label(crate::i18n::fmt(tl!("Version {v}"), &[("v", &pdfcraft_engine::build_info::version())]));
-                });
+            ui.vertical(|ui| {
+                ui.label(egui::RichText::new("DTHFrame (TH Document Craft)").font(theme::semibold(20.0)));
+                ui.label(crate::i18n::fmt(tl!("Version {v}"), &[("v", &pdfcraft_engine::build_info::version())]));
             });
             ui.add_space(6.0);
             ui.label(tl!("A clean-room, open-source PDF application written in Rust. MIT OR Apache-2.0."));
             ui.label(
                 egui::RichText::new(
-                    "Rendering: hayro (bootstrap) · UI: egui · Icons: Lucide (ISC) · Fonts: Inter, JetBrains Mono, Dancing Script (OFL)",
+                    "Rendering: hayro (bootstrap) · UI: egui · Icons: Lucide (ISC) · Fonts: Sarabun, Inter, JetBrains Mono (OFL)",
                 )
                 .color(t.text_muted)
                 .small(),
             );
             ui.add_space(12.0);
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new(tl!("Part of")).color(t.text_muted));
-                widgets::artcraft_logo(ui, 16.0);
-            });
+            ui.label(
+                egui::RichText::new("DTHFrame (TH Document Craft) — Forked from PdfCraft by the ArtCraft team.")
+                    .color(t.text_muted),
+            );
+            ui.label(
+                egui::RichText::new("Independent fork with experimental Thai language support. Not affiliated with or endorsed by ArtCraft.")
+                    .color(t.text_faint)
+                    .small(),
+            );
             ui.add_space(6.0);
-            if let Some(cmd) = widgets::community_links(ui) {
-                req.link_command = Some(cmd);
+            if ui.button(tl!("DTHFrame on GitHub")).clicked() {
+                req.link_command = Some("help.github");
             }
         }
     }

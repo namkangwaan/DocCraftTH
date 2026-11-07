@@ -1,120 +1,74 @@
-<h1 align="center">DocCraftTH — Thai OCR & Searchable PDF Enhancement</h1>
+<h1 align="center">DTHFrame — TH Document Craft</h1>
 
 <p align="center">
-  <b>การปรับปรุงประสิทธิภาพภาษาไทยและระบบรู้จำอักขระ (Thai OCR) สำหรับเอกสารราชการและกฎหมายไทย</b><br>
-  ต่อยอดจากโครงการต้นฉบับโอเพนซอร์ส <a href="https://github.com/storytold/pdfcraft">PdfCraft by Storytold / ArtCraft</a>
+  <b>การทดลองและวิจัยเชิงวิศวกรรมสำหรับงานเอกสารภาษาไทย (Thai Document Workbench Research)</b><br>
+  พัฒนาต่อยอดแบบอิสระจากโครงการต้นฉบับโอเพนซอร์ส <a href="https://github.com/storytold/pdfcraft">PdfCraft by Storytold / ArtCraft</a>
 </p>
 
 ---
 
 > [!IMPORTANT]
-> ### 📢 ข้อความระบุแหล่งที่มาและประกาศชี้แจงสถานะโครงการ (Attribution & Fork Disclaimer)
+> ### 📢 ข้อความระบุแหล่งที่มาและประกาศชี้แจงสถานะโครงการ (Important Attribution & Non-Affiliation Disclaimer)
 > 
-> **โครงการนี้ไม่ใช่ผลงานต้นฉบับดั้งเดิม และไม่ใช่คลังทางการของโครงการ PdfCraft / OpenCraft / ArtCraft**
-> 
-> คลังโค้ดนี้ได้รับการพัฒนาต่อยอด (Forked & Downstream Enhancement) ภายใต้สัญญาอนุญาตแบบ Dual License ([MIT](https://opensource.org/licenses/MIT) / [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0)) จากโครงการต้นฉบับ:
-> - **โครงการต้นฉบับหลัก (Upstream Original Repository):** [`storytold/pdfcraft`](https://github.com/storytold/pdfcraft)
-> - **ผู้ถือลิขสิทธิ์และทีมพัฒนาต้นฉบับ:** Copyright (c) 2026 ArtCraft Team and the PdfCraft contributors (เว็บไซต์: [getartcraft.com](https://getartcraft.com/))
-> 
-> **วัตถุประสงค์ของการพัฒนาเฉพาะกิจ (Purpose of this Thai Enhancement):**
-> โครงการนี้จัดทำขึ้นเพื่อเป็น **งานวิจัยทางวิศวกรรมและการพัฒนาเฉพาะด้านภาษาไทย (Thai Language & Thai OCR Engineering)** โดยไม่ถือเป็นการคัดลอกระบบเพื่อแข่งขันหรือแอบอ้างสิทธิ์ แต่เป็นการพัฒนาส่วนขยายเพื่อแก้ปัญหาเฉพาะทางของภาษาไทยสำหรับเอกสารราชการ เอกสารกฎหมาย และการแปลงไฟล์สแกนเป็น Searchable PDF (`Ctrl+F` ได้อย่างแม่นยำ) ภายในระบบงานนี้เท่านั้น
-> 
-> *(โครงการนี้จัดทำขึ้นเพื่อการใช้งานเฉพาะกิจภายใน และเตรียมปรับสถานะเป็น Private Repository)*
+> **1. การชี้แจงความเป็นอิสระและไม่มีส่วนเกี่ยวข้องกับโครงการต้นฉบับ (Independent Fork & Non-Affiliation):**
+> - โครงการ **DTHFrame** (**TH Document Craft**) เป็นโปรเจกต์อิสระที่แยกสาขาออกมาพัฒนาต่อยอด (Independent Downstream Fork) เพื่อศึกษาวิจัยและพัฒนาเชิงวิศวกรรมสำหรับภาษาไทย
+> - **เราไม่ได้มีเจตนาแอบอ้าง หรือเป็นส่วนหนึ่ง หรือได้รับการรับรอง สนับสนุน หรือมีส่วนเกี่ยวข้องใด ๆ กับโครงการต้นฉบับ `PdfCraft`, บริษัท Storytold หรือทีมพัฒนา `ArtCraft` แต่อย่างใดทั้งสิ้น**
+> - เพื่อปฏิบัติตามข้อกำหนดสิทธิ์การใช้งานเครื่องหมายการค้า ([LICENSE-brand.txt](docs/brand/LICENSE-brand.txt)) ทางโครงการได้เปลี่ยนชื่อระบบและถอดเครื่องหมายการค้า/โลโก้ของ ArtCraft ทั้งหมดออกจากโปรแกรมแล้ว
+> - โค้ดต้นฉบับดั้งเดิมยังคงเป็นลิขสิทธิ์ของ: Copyright (c) 2026 ArtCraft Team and the PdfCraft contributors (เว็บไซต์ต้นฉบับ: [getartcraft.com](https://getartcraft.com/) | คลังต้นฉบับ: [`storytold/pdfcraft`](https://github.com/storytold/pdfcraft)) ภายใต้สัญญาอนุญาตแบบ Dual License ([MIT](https://opensource.org/licenses/MIT) / [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0))
+>
+> **2. ประกาศสถานะและข้อจำกัดของฟีเจอร์ภาษาไทยตามความเป็นจริง (Current Status & Experimental Limitations):**
+> - ถึงแม้เรามีความประสงค์จะนำ `PdfCraft` มาประยุกต์ใช้งานให้รองรับภาษาไทย แต่ **ณ ปัจจุบัน ระบบยังไม่รองรับอย่างสมบูรณ์ทั้งในส่วนของ:**
+>   - ⚠️ **PDFEdit ภาษาไทย (การแก้ไขข้อความและอาร์ตเวิร์กภาษาไทยบน PDF)** — ยังอยู่ระหว่างการศึกษาการจัดวางสระ/วรรณยุกต์และฟอนต์ ยังไม่พร้อมใช้งานสมบูรณ์
+>   - ⚠️ **Form ภาษาไทย (แบบฟอร์มและการกรอกข้อมูลภาษาไทย)** — ยังอยู่ในขั้นทดลองเบื้องต้น
+>   - ⚠️ **OCR ภาษาไทย (การรู้จำอักขระไทยในเอกสารสแกน)** — เป็นงานวิจัยและทดลองแบบจำลอง ยังมีข้อจำกัดและข้อผิดพลาดในหลายกรณี
+>   - ⚠️ **PDF ที่มี QR Code** — **ปัจจุบันยังไม่มีฟังก์ชันสแกนเพื่อให้เห็นหรือตรวจสอบ QR Code ได้ด้วยตัวของแอปพลิเคชันเอง**
+> - ฟีเจอร์งานภาษาไทยทั้งหมดในคลังนี้จึงถือเป็น **งานวิจัยเชิงทดลอง (Experimental / Active Research & Development)** ที่ยังพัฒนาไม่เสร็จสมบูรณ์
 
 ---
 
-## 🔬 สรุปผลการวิจัยและพัฒนาเฉพาะภาษาไทย (Thai Engineering Enhancements)
+## 🔬 สรุปผลงานวิจัยและการทดลองด้านภาษาไทย (Experimental Research & Engineering)
 
-โครงการนี้ได้ทำการปรับปรุงและพัฒนาเพิ่มเติมใน 10 มิติหลัก:
+โครงการนี้ได้ทำการทดลองและวิจัยเพิ่มเติมในมิติต่าง ๆ ดังนี้:
 
-### 1. การปรับจูน Bias โมเดลรู้จำอักขระไทย (CTC Classifier Tuning)
-- ปรับแต่งค่าน้ำหนักเวกเตอร์ `linear_8.b_0` ในโมเดล RTen (`text-recognition-th.rten`)
-- เพิ่ม Bias เลขไทย `๐-๙` (+1.2) เพื่อลดอัตราความสับสนระหว่างเลขอารบิกและเลขไทยในเอกสารราชการ
+### 1. การทดลองปรับจูน Bias โมเดลรู้จำอักขระไทย (CTC Classifier Tuning)
+- ทดลองปรับแต่งค่าน้ำหนักเวกเตอร์ `linear_8.b_0` ในโมเดล RTen (`text-recognition-th.rten`)
+- ทดสอบการเพิ่ม Bias เลขไทย `๐-๙` (+1.2) เพื่อศึกษาผลกระทบระหว่างเลขอารบิกและเลขไทยในเอกสารราชการ
 - ระงับสัญญาณรบกวนของสัญลักษณ์คณิตศาสตร์และอักขระขยะ (indices 88..441)
 
-### 2. การสร้างคลังคำไทยมหาศาล (Mega Thai Lexicon Vault — 811,035 คำ)
-- รวบรวมและ Normalization คำศัพท์จากแหล่งข้อมูลมาตรฐานระดับชาติ:
+### 2. การสร้างคลังคำไทยเพื่อการวิจัย (Experimental Thai Lexicon Vault — 811,035 คำ)
+- รวบรวมคำศัพท์เพื่อการศึกษาจากแหล่งข้อมูลเปิด:
   - **พจนานุกรมราชบัณฑิตยสถาน 2542 & ศัพท์บัญญัติ (ORST):** 206,599 คำ
-  - **คลังศัพท์กฎหมาย NitiBench (VISTEC):** 3,890 คำ (กฎหมายแรงงาน ภาษี คำพิพากษาศาลฎีกา)
-  - **ฐานข้อมูลภูมิศาสตร์ไทย (Thailand-Geography-JSON):** 20,597 รายการ (ตำบล อำเภอ จังหวัด รหัสไปรษณีย์)
-  - **คลังคำย่อราชการไทย:** 599 คำ (พ.ร.บ., ก.พ., ครม., นิติฯ ฯลฯ)
-  - **คลังรายชื่อบุคคลไทย:** 266,583 รายการ (ป้องกันการตัดคำผิดพลาดบริเวณส่วนลงนาม)
+  - **คลังศัพท์กฎหมาย NitiBench (VISTEC):** 3,890 คำ
+  - **ฐานข้อมูลภูมิศาสตร์ไทย (Thailand-Geography-JSON):** 20,597 รายการ
+  - **คลังคำย่อราชการไทย:** 599 คำ
+  - **คลังรายชื่อบุคคลไทย:** 266,583 รายการ
   - **คลังสารานุกรมและ Wikipedia ภาษาไทย:** 407,379 คำ
-  - **Active High-Precision Lexicon:** คัดเลือก 239,334 คำ สำหรับโหลดเข้าสู่หน่วยความจำ (ความเร็วโหลด 2.07 วินาที)
+  - **Active High-Precision Lexicon:** คัดเลือก 239,334 คำ สำหรับทดสอบโหลดเข้าสู่หน่วยความจำ
 
-### 3. ระบบกู้คืนพิกัดและแก้วรรณยุกต์สระไทย (2D Geometric Reading Order & Grapheme Lock)
-- พัฒนาอัลกอริทึมซ่อมแซมลำดับสระ-วรรณยุกต์ที่สลับตำแหน่ง (Mark Swaps)
+### 3. การทดลองระบบกู้คืนพิกัดและแก้วรรณยุกต์สระไทย (Experimental 2D Geometric Reading Order & Grapheme Lock)
+- ทดลองอัลกอริทึมซ่อมแซมลำดับสระ-วรรณยุกต์ที่สลับตำแหน่ง (Mark Swaps)
 - ซ่อมแซมรูปสระอำ (`\u0e4d\u0e32` $\rightarrow$ `\u0e33`) และจัดลำดับวรรณยุกต์ให้เป็นมาตรฐาน Unicode NFC
-- ผสานตำแหน่งกล่องข้อความจากโมเดล OCR ให้สอดคล้องกับเลเยอร์ข้อความล่องหน (Invisible Text Layer) บน PDF
+- ทดลองผสานตำแหน่งกล่องข้อความจากโมเดล OCR เข้ากับเลเยอร์ข้อความล่องหน (Invisible Text Layer)
 
-### 4. ผลการทดสอบความแม่นยำ (Empirical Benchmark Results)
-ทดสอบวัดผลบน Shared Evaluation Corpus 11 หน้าเอกสารราชการและเอกสารสแกนจริง เปรียบเทียบกับ Tesseract 5.4.0 (tha):
+### 4. ผลการทดสอบเปรียบเทียบในห้องปฏิบัติการ (Experimental Benchmark Results)
+ทดสอบวัดผลบน Shared Evaluation Corpus 11 หน้าเอกสารราชการและเอกสารสแกน เปรียบเทียบกับ Tesseract 5.4.0 (tha):
 
-| เอกสารทดสอบ | PdfCraft Baseline | **Thai Enhanced (ระบบนี้)** | Tesseract 5.4.0 (Oracle) | สถานะเทียบเกณฑ์ (Gate $\le 0.10$) |
+| เอกสารทดสอบ | PdfCraft Baseline | **DTHFrame (ชุดทดลอง)** | Tesseract 5.4.0 (Oracle) | หมายเหตุ |
 | :--- | :---: | :---: | :---: | :---: |
-| **ราชกิจจานุเบกษา (Ratchakitcha P.1)** | 0.1017 | **0.0890** | 0.0137 | **PASS (ผ่านเกณฑ์)** |
-| **หนังสือกฎหมาย/คำสั่ง (Attachment P.3)** | 0.2748 | **0.0807** | 0.0794 | **PASS (ผ่านเกณฑ์)** |
-| **หนังสือระเบียบการเงิน (Payroll P.1)** | 0.0655 | **0.0655** | 0.0600 | **PASS (ผ่านเกณฑ์)** |
-| **ค่าเฉลี่ยเอกสาร 11 หน้า (Mean CER)** | 0.2000 | **0.1529** | 0.1925 | **ชนะ Tesseract Baseline** |
-| **ความแม่นยำระดับบรรทัด (Line CER)** | 0.1420 | **0.0783** | 0.1066 | **ความถูกต้อง > 92.1%** |
+| **ราชกิจจานุเบกษา (Ratchakitcha P.1)** | 0.1017 | **0.0890** | 0.0137 | ผลการทดสอบเฉพาะชุดข้อมูลทดลอง |
+| **หนังสือกฎหมาย/คำสั่ง (Attachment P.3)** | 0.2748 | **0.0807** | 0.0794 | ผลการทดสอบเฉพาะชุดข้อมูลทดลอง |
+| **หนังสือระเบียบการเงิน (Payroll P.1)** | 0.0655 | **0.0655** | 0.0600 | ผลการทดสอบเฉพาะชุดข้อมูลทดลอง |
+| **ค่าเฉลี่ยเอกสาร 11 หน้า (Mean CER)** | 0.2000 | **0.1529** | 0.1925 | ทดสอบในสภาพแวดล้อมควบคุม |
 
-### 5. การพัฒนาชุดเครื่องมือติดตั้งสำหรับ Windows
-- จัดทำสคริปต์ Release Build (`build_release.ps1`) รองรับคำสั่ง CPU SIMD AVX2
-- จัดทำสคริปต์ Windows System Installer (`install_system.ps1`) สำหรับติดตั้งลงสู่ `C:\Program Files\PdfCraft` พร้อมกำหนดค่า System Environment (`PATH`, `PDFCRAFT_MODELS`) โดยอิสระ
+### 5. การแสดงผล การตัดคำ และค้นหาข้อความไทยเบื้องต้น
+- **ฟอนต์ Sarabun (OFL-1.1)** ควบคู่ Noto Sans Thai สำหรับทดสอบแสดงผลตัวอักษรไทย
+- **การตัดบรรทัดภาษาไทย (Thai Line Breaking):** ทดลองนำโมเดลตัดคำมาเชื่อมต่อเข้ากับ `LineBreaker` ของ egui
+- **การแปลงรหัส PUA ไทย:** แปลงรหัสวรรณยุกต์และสระใน Private Use Area (U+F700..=U+F71A) ให้เป็น Unicode มาตรฐานสำหรับการค้นหา
+- **อินเทอร์เฟซภาษาไทย:** แปลเมนูและป้ายกำกับส่วนติดต่อผู้ใช้เป็นภาษาไทยในแคตตาล็อก `th.tsv`
 
-### 6. การแสดงผล การตัดคำ และค้นหาข้อความไทย
-- **ฟอนต์ Sarabun (OFL-1.1)** ควบคู่ Noto Sans Thai: ตัวอักษรที่ Noto Sans Thai ไม่มีจะ fallback ไป Sarabun อัตโนมัติ (`crates/fonts`)
-- **การตัดคำและตัดบรรทัดภาษาไทย (Thai Word & Line Breaking):** รองรับการตัดบรรทัดภาษาไทยด้วยโมเดล LSTM ควบคู่พจนานุกรม (`thai_wrap.rs` และ `ThaiLineBreaker` ที่เสียบเข้ากับ `LineBreaker` ของ egui)
-- **ช่องกรอกแบบฟอร์ม (AcroForm)** แสดงตัวอักษรไทยได้ถูกต้อง ไม่เป็น `????` และมี `/ActualText` สำหรับค้นหา พร้อมรองรับเส้นประช่องกรอกข้อมูล (Form Leader Fields)
-- **FR-18 PUA Mapping:** แปลงรหัสวรรณยุกต์และสระของฟอนต์ไทยยุคเก่าใน Private Use Area (U+F700..=U+F71A) เป็น Unicode มาตรฐานตอนค้นหาและคัดลอกข้อความ
-- **ฟอนต์สำรอง CJK และชื่อเอกสารหลายภาษา:** ชื่อภาษาญี่ปุ่นและจีนในเมนูภาษาไม่แสดงเป็นกล่อง และรองรับการบันทึก/เปิดชื่อเอกสาร (Document Title) ภาษาไทย จีน ญี่ปุ่น อย่างสมบูรณ์ (`doc_title_names.rs`)
-- **ระบบวันที่ พ.ศ. และอินเทอร์เฟซภาษาไทย 100%:** แสดงปี พ.ศ. ในส่วนติดต่อผู้ใช้ภาษาไทย พร้อมคำแปล UI ภาษาไทยครบถ้วน (`th.tsv` ครอบคลุม 100% ของแคตตาล็อก)
-
-### 7. OCR สำหรับหน้าที่อ่านข้อความไม่ได้ เอกสารราชการ และสแกนความละเอียดต่ำ
-- **FR-17 Unusable Text Detection:** ตรวจหน้าที่ข้อความใช้ไม่ได้ (PUA หรือ U+FFFD เกิน 50%) แสดงแถบเตือนสีส้มพร้อมปุ่มลัดไป Recognize Text และการ์ดยืนยันก่อน OCR เฉพาะหน้านั้น
-- **Batch OCR:** `pdfcraft-cli batch --ocr-unusable-text` (พารามิเตอร์ `read_unusable_text` ของ `ocr_recognize_files`) OCR เฉพาะหน้าที่ข้อความใช้ไม่ได้ ข้ามหน้าที่ข้อความปกติสมบูรณ์อยู่แล้ว
-- **การจัดการตราประทับและเส้นประราชการ (Seal Filtering & Dot-Leader Removal):** กรองตราประทับราชการ (Seal Recovery), รวมกล่องข้อความบรรทัดเดียวกัน (Colinear Merge), และลบเส้นประช่องกรอกแบบฟอร์มก่อนทำ OCR เพื่อลดสัญญาณรบกวน
-- **Auto-upscale:** OCR ภาษาไทยจะ render สแกนที่ต่ำกว่า 200 dpi ขึ้นเป็น 200 dpi และเพิ่ม padding แนวตั้ง (บน 30%, ล่าง 18%) กันวรรณยุกต์ถูกตัด (อยู่บน branch `feat/thai-ocr-auto-upscale` รอ merge)
-
-### 8. ตัวติดตั้ง ระบบ Fork Guard และการตรวจคุณภาพ
-- **Windows installer v0.9.0:** WiX v5 (`packaging/windows/package.ps1`) ได้ `.msi`, `.zip` แบบพกพา และ `Install-DocCraftTH.bat` ฝังโมเดล OCR ไทยและอังกฤษ ผูกนามสกุล PDF และเมนูคลิกขวา "Edit with PdfCraft"
-- `packaging` ค้นหา `craft-fonts` อัตโนมัติตามโครงสร้างโฟลเดอร์ DocCraftTH
-- **ระบบกันฟีเจอร์หาย (Fork Guard — `fork/manifest.txt`, `fork/check.sh`):** ตรวจสอบไฟล์และสัญลักษณ์สำคัญของภาษาไทย (`thai_fonts.rs`, `shaping.rs`, `thai_text.rs`, `map_thai_pua`, `era_year`, `th.tsv`, `ThaiLineBreaker`) อัตโนมัติเมื่อซิงก์โค้ดจาก upstream
-- **CI ครบทุกแพลตฟอร์ม:** ตรวจ Ubuntu, Windows, ARM64, Wasm, FreeBSD และ Cargo Deny (แก้ไขเทสต์ `redraw_dedupe_work_is_bounded_on_hostile_pages` ให้วัดด้วยปริมาณงานแทนเวลาจริง เพื่อไม่ให้ล้มบนเครื่องรัน FreeBSD x86_64 ที่โหลดสูง)
-
-### 9. ชุดทดสอบ CER บนเอกสารราชการจริง และการประเมินเปรียบเทียบโมเดล (Empirical Testset & Decision Gate)
-จัดทำชุดทดสอบมาตรฐานนอกคลังโค้ด (`data/testset/`) จากเอกสารราชการจริง 84 ฉบับที่ไม่ซ้ำกัน (แบ่งเป็น `test` 16 ฉบับ, `train_candidate` 66 ฉบับ, `excluded` 2 ฉบับ) และพัฒนาชุดทดสอบ Rust [`crates/engine/tests/thai_real_docs.rs`](crates/engine/tests/thai_real_docs.rs) ที่สลับโมเดลด้วย `THAI_CANDIDATE_MODELS_DIR` / `PDFCRAFT_MODELS` พร้อมรองรับการอ่านความกว้าง Input (`image_shape: [3, 48, W]`) จาก `model_meta.json` โดยไม่เขียนทับ `assets/models/`:
-
-| ชุดทดสอบ (Benchmark Set) | โมเดลเดิมในระบบ (Baseline `8b70e6d1…`) | Candidate v1 (`d0329f75…`) | **Candidate v2 (`07626524…`)** | Candidate R4 (`fed74cec…`, W=800) | สรุปผลทางเทคนิค |
-| :--- | :---: | :---: | :---: | :---: | :--- |
-| **จำนวน Output Classes** | 526 (`dict` 524) | 526 (`dict` 524) | **526 (`dict` 524)** | 241 (`dict` 239) | v2 โหลด Pretrained ครบ 100%; R4 ถูกรีเซ็ต SVTR+Head |
-| **1. Synthetic 5 Sentences** (ประโยคมาตรฐาน) | **`0.0136`** | `0.0853` | **`0.0174`** | `0.4027` | v2 แก้ปัญหา Catastrophic Forgetting สำเร็จ (-6.79% จาก v1) |
-| **2. Set A Recognizer-Only** (787 บรรทัดราชการ) | `0.2260` | `0.1932` | **`0.1915`** | `0.5423` | 🏆 **Candidate v2 ชนะเลิศ** (ดีกว่า Baseline -3.45%) |
-| **3. Set A End-to-End** (สแกนสังเคราะห์ 27 หน้า) | **`0.3358`** | `0.3788` | **`0.3619`** | `0.6732` | Baseline ทนทานต่อ Detector Noise มากกว่า |
-| **4. Set B Real-Scan Lines** (สแกนจริง 32 บรรทัดตรวจรับรอง) | **`0.1431`** | `0.2086` | **`0.1952`** | `0.6544` | ผ่าน Human Audit Gate 21.3%; Baseline แม่นยำกว่าบนสแกนจริง |
-| **คำตัดสิน (Decision Gate Ruling)** | **คงไว้ใน `assets/models/`** | ปฏิเสธ (Rejected) | **ดีที่สุดในกลุ่ม Fine-tune** | ปฏิเสธ (Rejected) | **คง Baseline เป็นโมเดลหลักใน Production** |
-
-### 10. ไปป์ไลน์ชุดข้อมูลฝึกฝนรอบใหม่ (Diverse Training Dataset v2 — 24,786 ภาพ)
-พัฒนาไปป์ไลน์สร้างชุดข้อมูลฝึกฝน (`tools/dataset_builder/`) เพื่อแก้ปัญหา Catastrophic Forgetting และเพิ่มความหลากหลายของฟอนต์:
-- **แหล่งข้อมูลผสมผสาน:** สกัดบรรทัดจากเอกสารราชการจริง 66 ฉบับ ผสานกับประโยคภาษาไทยทั่วไป (Data Replay)
-- **Multi-Font Rendering (5 ตระกูลฟอนต์):** TH Sarabun New (40%), Angsana New (15%), Cordia New (15%), Noto Sans Thai (20%), MiSans Thai (10%)
-- **Robust Data Augmentation:** จำลอง Bounding Box Jittering (±4–10%), การเอียงภาพ Skew (±1.2°), Gaussian Blur, Noise และ JPEG Compression Artifacts (Q68–90)
-- **พจนานุกรมอักขระไทย 524 ตัว (`dict-th.txt`):** รองรับอักษรไทย บาลี/สันสกฤต เลขไทย/อารบิก และสัญลักษณ์ทางราชการครบถ้วน
-- **Colab Fine-Tuning Pipeline:** สมุดบันทึก `Thai_OCR_FineTune_DocCraftTH (1).ipynb` ปรับจูนสำหรับ PP-OCRv5 Mobile Recognizer ด้วย Cosine Decay Learning Rate `1e-4`, Epoch 15, Batch Size 64 พร้อมสคริปต์แปลงเป็น ONNX (Opset 11) และ `.rten` อัตโนมัติ
-
-### 11. การอัปเดตและผนวกความสามารถจาก Upstream v0.18.2 (Upstream Sync & Hardening)
-ผนวกการเปลี่ยนแปลงกว่า 1,200+ คอมมิตจากโครงการต้นฉบับ [`storytold/pdfcraft`](https://github.com/storytold/pdfcraft) (v0.18.2) พร้อมปกป้องเสถียรภาพและฟีเจอร์ภาษาไทย (Fork Invariants):
-- **ผนวกรวมฟีเจอร์และเครื่องมือใหม่:**
-  - **Form Artwork Editing:** รองรับการแก้ไข ตรวจจับ และปรับเปลี่ยน Artwork ภายใน Form Fields บน PDF
-  - **Reframe, Crop & Rotate Overhaul:** ปรับปรุงระบบครอบตัดภาพและเอกสาร รองรับมุมหมุน 90°/180°/270° และการคำนวณ Bounding Box ที่แม่นยำ
-  - **Combine & Extract Dialogs:** ยกระดับหน้าต่างรวมไฟล์และแยกหน้าเอกสาร พร้อมรองรับ Drag-and-drop ระหว่างหน้า
-  - **External Localization (`craft-i18n`):** รองรับสถาปัตยกรรมแคตตาล็อกภาษาภายนอกของ upstream โดยยังคงรักษาคำแปลภาษาไทยฉบับสมบูรณ์ 100%
-- **การปกป้องและคงสภาพส่วนขยายภาษาไทย (Thai Preservation & Bug Fixes):**
-  - **Thai OCR Model Integrity & Licensing (`xtask/license_check.rs`):** ตรวจรับรองโมเดลทั้ง 4 ตัว (English Detection/Recognition และ Thai Detection/Recognition) ให้ผ่านการตรวจสอบสิทธิ์และการแจกจ่ายอย่างถูกต้อง
-  - **2D Geometric Reading Order Protection (`crates/render/src/text/order.rs`):** ปรับจูนอัลกอริทึมจัดลำดับวรรณยุกต์สระไทยหลังการปรับโครงสร้าง Text Order ของ upstream โดยตรึงพิกัดจุดกำเนิด `x0` เข้ากับพยัญชนะฐาน ป้องกันวรรณยุกต์และสระลอยแตกบรรทัดหรือหลุดตำแหน่ง
-  - **Thai Catalog Priority Enforcement (`crates/ui-egui/build.rs`):** บังคับโหลดไฟล์ `th.tsv` ของ DocCraftTH แทนที่ไฟล์ stub จาก `craft-i18n` ของ upstream เพื่อให้เมนู ป้ายกำกับ และคำเตือนทุกจุดแสดงผลเป็นภาษาไทยอย่างสมบูรณ์
-  - **OCR Accessibility API Status (`crates/automation/src/a11y/ocr.rs`):** คืนค่า API ตรวจสอบสถานะโมเดล OCR ให้รายงานความพร้อมใช้งานแยกตามภาษา (`available_by_language` แสดงทั้ง `en` และ `th`)
-  - **Asset Verification (`ATTRIBUTION.toml`):** คำนวณและบันทึก SHA-256 Checksum ของไฟล์แปลภาษาไทยเข้าสู่ Asset Manifest ป้องกันข้อผิดพลาดในการตรวจสอบความถูกต้องของทรัพยากร
+### 6. การอัปเดตและผนวกโค้ดจาก Upstream v0.18.2 (Upstream Sync)
+- ผนวกการเปลี่ยนแปลงจาก [`storytold/pdfcraft`](https://github.com/storytold/pdfcraft) (v0.18.2) เพื่อรองรับฟีเจอร์พื้นฐานของโปรแกรมต้นฉบับ
+- ปรับเปลี่ยนชื่อ `APPNAME` เป็น `DTHFrame` และถอดเครื่องหมายการค้า ArtCraft เพื่อให้เป็นไปตามข้อกำหนดลิขสิทธิ์
 
 ---
 
@@ -122,29 +76,14 @@
 
 ### 1. Build และ Compile โปรแกรม
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\build_release.ps1
+cargo build -p pdfcraft --bin dthframe
+cargo build -p pdfcraft-cli --bin dthframe-cli
 ```
 
-### 2. รันคำสั่ง OCR สร้าง Searchable PDF
+### 2. รันคำสั่ง CLI เบื้องต้น
 ```powershell
-# กำหนดโฟลเดอร์โมเดลภาษาไทย
-$env:PDFCRAFT_MODELS = "K:\data\thai-ocr-eval\bin\models"
-
-# รันคำสั่ง OCR แปลงไฟล์เอกสารสแกน
-pdfcraft-cli batch "input.pdf" --steps ocr --language th --dpi 300 --out-dir "out/"
-```
-
-### 3. รันชุดทดสอบประเมินผล CER เอกสารราชการจริง (Set A & Set B Benchmark)
-```powershell
-# กำหนดโฟลเดอร์ชุดทดสอบและโมเดลผู้สมัคร
-$env:THAI_TESTSET_DIR = "K:\src\DocCraftTH\data\testset"
-$env:THAI_CANDIDATE_MODELS_DIR = "K:\src\DocCraftTH\models\finetuned"
-
-# รันเปรียบเทียบ Set A (Recognizer-only & End-to-End) และ 5 ประโยคมาตรฐาน
-cargo test -p pdfcraft-engine --test thai_real_docs compare_models_on_real_corpus -j 2 -- --nocapture
-
-# รันประเมินผล Set B (บรรทัดสแกนจริงที่ผ่านการตรวจรับรอง Human Audit Gate)
-cargo test -p pdfcraft-engine --test thai_real_docs test_eval_set_b_real_scan_lines -j 2 -- --nocapture
+dthframe-cli --help
+dthframe-cli --version
 ```
 
 ---
@@ -152,5 +91,5 @@ cargo test -p pdfcraft-engine --test thai_real_docs test_eval_set_b_real_scan_li
 ## ⚖️ สัญญาอนุญาตและลิขสิทธิ์ (License & Notices)
 
 - ซอร์สโค้ดของโปรแกรมหลักยังคงอยู่ภายใต้สัญญาอนุญาตแบบ Dual License: [MIT](https://opensource.org/licenses/MIT) หรือ [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) ตามต้นฉบับดั้งเดิมของ ArtCraft Team
-- เครื่องหมายการค้า โลโก้ และชื่อ "PdfCraft" / "ArtCraft" เป็นกรรมสิทธิ์ของ ArtCraft Team โครงการนี้อ้างอิงถึงเฉพาะในเชิงเทคนิคเพื่อระบุแหล่งที่มาและประวัติการพัฒนาเท่านั้น
+- เครื่องหมายการค้า โลโก้ และชื่อ "PdfCraft" / "ArtCraft" เป็นกรรมสิทธิ์ของ ArtCraft Team โครงการนี้ไม่มีความเกี่ยวข้องหรือได้รับการรับรองใด ๆ จากเจ้าของเครื่องหมายการค้าดังกล่าว
 - ข้อมูลพจนานุกรมและชุดข้อมูลภาษาไทยเปิดเผยและใช้งานตามสัญญาอนุญาตของราชบัณฑิตยสภา, NECTEC, PyThaiNLP, VISTEC และเจ้าของชุดข้อมูลแต่ละโครงการ

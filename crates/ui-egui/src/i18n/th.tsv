@@ -2943,3 +2943,9 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	{n} pages have unreadable text. Recognize text on just those pages? Their text stays, and you can undo this in one step.	มี {n} หน้าที่มีข้อความที่อ่านไม่ออก ต้องการรู้จำข้อความเฉพาะหน้าเหล่านั้นหรือไม่? ข้อความเดิมจะยังคงอยู่ และคุณสามารถเลิกทำได้ในขั้นตอนเดียว
 	Field names with + - * / and parentheses; put \ before spaces in names.	ชื่อช่องที่มีเครื่องหมาย + - * / และวงเล็บ; ใส่ \ หน้าช่องว่างในชื่อ
 	This page couldn't be displayed.\n{e}	ไม่สามารถแสดงหน้านี้ได้\n{e}
+	Welcome to DTHFrame	ยินดีต้อนรับสู่ DTHFrame
+	Files you open in DTHFrame appear here. Drop a PDF anywhere to open it.	ไฟล์ที่คุณเปิดใน DTHFrame จะปรากฏที่นี่ วาง PDF ที่ใดก็ได้เพื่อเปิด
+	DTHFrame works offline. No telemetry, no account, and no cloud processing unless you add a provider.	DTHFrame ทำงานแบบออฟไลน์ ไม่มีการส่งข้อมูลการใช้งาน ไม่ต้องมีบัญชี และไม่มีการประมวลผลบนคลาวด์เว้นแต่คุณจะเพิ่มผู้ให้บริการ
+	DTHFrame didn't shut down normally. These documents had changes that were autosaved:	DTHFrame ไม่ได้ปิดการทำงานตามปกติ เอกสารเหล่านี้มีการเปลี่ยนแปลงที่บันทึกอัตโนมัติไว้:
+	About DTHFrame	เกี่ยวกับ DTHFrame
+	DTHFrame on GitHub	DTHFrame บน GitHub
