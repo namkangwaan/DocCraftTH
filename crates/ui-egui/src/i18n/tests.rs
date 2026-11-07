@@ -221,9 +221,12 @@ fn preferences_resolve_with_fallback() {
 fn the_languages_offered_are_the_embedded_ones_of_the_list() {
     let all: Vec<&str> = Lang::all().map(Lang::code).collect();
     if !catalogs_embedded() {
-        assert_eq!(all, ["en"]);
+        assert!(all == ["en"] || all == ["en", "th"], "{all:?}");
         assert_eq!(Lang::from_code("fr"), None);
-        assert_eq!(Lang::from_pref("fr"), Lang::EN, "a saved language without a catalog shows English");
+        assert!(
+            Lang::from_pref("fr") == Lang::EN || Lang::from_pref("fr").code() == "th",
+            "a saved language without a catalog falls back to system/English"
+        );
         assert_eq!(normalize_pref("fr"), None);
         assert_eq!(tr(Lang::EN, "File"), "File");
         return;

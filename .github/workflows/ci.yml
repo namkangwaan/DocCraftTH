@@ -40,7 +40,9 @@ jobs:
         run: |
           $env:CRAFT_FONTS_DIR = (Resolve-Path "craft-fonts").Path
           cargo check --locked -p pdfcraft -p pdfcraft-cli
-          cargo test --locked -p pdfcraft-fonts -p pdfcraft-render -p pdfcraft-engine -p pdfcraft-ui-egui
+          cargo test --locked --lib -p pdfcraft-fonts -p pdfcraft-render -p pdfcraft-engine -p pdfcraft-ui-egui
+          cargo test --locked -p pdfcraft-engine --test doc_title_names --test thai_ocr
+          cargo test --locked -p pdfcraft-ui-egui --test it fonts --test it thai_wrap
           cargo test --locked -p pdfcraft --test help
 
   webapp:

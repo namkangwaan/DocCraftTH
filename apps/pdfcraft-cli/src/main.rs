@@ -95,7 +95,7 @@ dthframe-cli run    --script steps.json [--root DIR] [--report]
     "\
 dthframe-cli ui     --control FILE <method> [key=value …] [--out shot.png]
                                                            drive a running app started with --control FILE
-Source: https://github.com/menasri/pdfcraft"
+Source: https://github.com/storytold/pdfcraft"
 );
 
 fn main() -> ExitCode {
