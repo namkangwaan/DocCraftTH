@@ -27,7 +27,7 @@ jobs:
       - name: Checkout craft-fonts
         uses: actions/checkout@v4
         with:
-          repository: namkangwaan/craft-fonts
+          repository: storytold/craft-fonts
           path: craft-fonts
 
       - name: Set up Rust
@@ -52,7 +52,7 @@ jobs:
       - name: Checkout craft-fonts
         uses: actions/checkout@v4
         with:
-          repository: namkangwaan/craft-fonts
+          repository: storytold/craft-fonts
           path: craft-fonts
 
       - name: Set up Rust with WASM target
