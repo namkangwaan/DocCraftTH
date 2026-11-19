@@ -102,6 +102,7 @@ pub(crate) type GridFile = (String, Result<Vec<u8>, std::path::PathBuf>);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialog {
     WordCount,
+    QrScanner,
     CreateImages,
     Properties(PropsTab),
     About,

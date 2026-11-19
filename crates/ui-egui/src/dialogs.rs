@@ -19,6 +19,7 @@ mod prompts;
 pub(super) mod protect;
 pub(super) mod standards_ui;
 pub(super) mod word_count_ui;
+pub(crate) mod qr_scanner_ui;
 
 #[cfg(test)]
 mod tests;
@@ -94,6 +95,9 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
     if app.dialog != Some(Dialog::WordCount) {
         app.word_count_draft.cancel();
     }
+    if app.dialog != Some(Dialog::QrScanner) {
+        app.qr_scanner_draft.reset();
+    }
     if app.dialog != Some(Dialog::FieldTable) {
         app.field_table_draft = None;
     }
@@ -149,6 +153,9 @@ fn dialog_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, dialog: Dialog, req: &m
     match dialog {
         Dialog::WordCount => {
             req.close = crate::word_count_ui::body(ui, app);
+        }
+        Dialog::QrScanner => {
+            req.close = qr_scanner_ui::body(ui, app);
         }
         Dialog::CreateImages => {
             let (go, cancel) = crate::create_ui::image_import_body(ui, app);
