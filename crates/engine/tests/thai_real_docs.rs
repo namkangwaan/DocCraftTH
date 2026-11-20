@@ -82,11 +82,9 @@ fn line_matching_cer_is_invariant_to_line_order() {
     // Recognized in reversed order
     let recognized = vec![
         Line {
-            words: vec![Word {
-                text: "เรื่อง หลักเกณฑ์และวิธีการ".into(), rect: [82.0, 202.0, 398.0, 228.0]
-            }],
+            words: vec![Word::new("เรื่อง หลักเกณฑ์และวิธีการ", [82.0, 202.0, 398.0, 228.0], "ocrs")],
         },
-        Line { words: vec![Word { text: "ที่ ศธ ๐๒๐๖.๖/ว ๑๗".into(), rect: [81.0, 101.0, 299.0, 129.0] }] },
+        Line { words: vec![Word::new("ที่ ศธ ๐๒๐๖.๖/ว ๑๗", [81.0, 101.0, 299.0, 129.0], "ocrs")] },
     ];
     let rate = page_cer_by_line_matching(&expected, &recognized);
     assert!(rate < 1e-6, "expected 0.0 CER regardless of line order, got {rate}");
