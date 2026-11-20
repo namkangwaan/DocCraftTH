@@ -3112,3 +3112,76 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	{name}: {n} low-confidence word(s) on pages {pages}	{name}: คำที่ความเชื่อมั่นต่ำ {n} คำ ในหน้า {pages}
 	{n} pages hold more content than PdfCraft can read, page {page} first: parts of them aren't drawn, and only part of their text can be found or copied.	{n} หน้ามีเนื้อหามากเกินกว่าที่ DTHFrame จะอ่านได้ เริ่มจากหน้า {page}: บางส่วนไม่ได้ถูกวาด และค้นหาหรือคัดลอกข้อความได้เพียงบางส่วน
 	{n} word(s) to review	{n} คำที่ต้องตรวจทาน
+
+# Added with the upstream sync to v0.21.1 (printer marks, colour conversion, replace, page setup).
+	A script edited here can be at most 256 KiB long; that change wasn't made.	สคริปต์ที่แก้ไขตรงนี้ยาวได้ไม่เกิน 256 KiB จึงไม่ได้ทำการเปลี่ยนแปลงนั้น
+	Add a line filled in when the stamp is placed	เพิ่มบรรทัดที่จะกรอกเมื่อวางตรา
+	Add a paper size of your own to the list	เพิ่มขนาดกระดาษของคุณเองลงในรายการ
+	Add printer marks…	เพิ่มเครื่องหมายสำหรับงานพิมพ์…
+	All files	ไฟล์ทั้งหมด
+	All marks	เครื่องหมายทั้งหมด
+	Bleed marks	เครื่องหมายตัดตก
+	By the standard device formulas; profiles are not applied.	ใช้สูตรมาตรฐานของอุปกรณ์ ไม่ใช้โปรไฟล์สี
+	CMYK	CMYK
+	Colour bars	แถบสี
+	Comments and form fields	ความคิดเห็นและช่องแบบฟอร์ม
+	Convert colours	แปลงสี
+	Convert colours…	แปลงสี…
+	Convert to	แปลงเป็น
+	Creep:	ระยะเยื้อง (creep):
+	Custom calculation script:	สคริปต์คำนวณที่กำหนดเอง:
+	Custom…	กำหนดเอง…
+	Detecting paper…	กำลังตรวจหาขนาดกระดาษ…
+	Detecting…	กำลังตรวจหา…
+	Discard embedded search index	ละทิ้งดัชนีค้นหาที่ฝังไว้
+	Discard external cross-references	ละทิ้งการอ้างอิงข้ามภายนอก
+	Document: {name}	เอกสาร: {name}
+	Edit description	แก้ไขคำอธิบาย
+	Grayscale	ระดับสีเทา
+	Line weight	น้ำหนักเส้น
+	Lock into the page when saving	ล็อกเข้ากับหน้าเมื่อบันทึก
+	Lock now	ล็อกตอนนี้
+	Marks	เครื่องหมาย
+	Moves each sheet's pages toward the fold by this much more than the sheet outside it, so the margins match once the booklet is folded and trimmed.	ขยับหน้าของแต่ละแผ่นเข้าหาแนวพับมากกว่าแผ่นด้านนอกตามระยะนี้ เพื่อให้ขอบเท่ากันเมื่อพับและตัดเล่ม
+	No matches to replace	ไม่มีรายการที่ตรงกันให้แทนที่
+	Not replaced: {why}	ไม่ได้แทนที่: {why}
+	Nothing replaced	ไม่ได้แทนที่อะไร
+	Office documents	เอกสารออฟฟิศ
+	Otherwise, ask on the first save after a signature is placed	มิฉะนั้นให้ถามเมื่อบันทึกครั้งแรกหลังวางลายเซ็น
+	Page Setup…	ตั้งค่าหน้ากระดาษ…
+	Page information	ข้อมูลหน้า
+	Page setup dialog is not available on this system.	ระบบนี้ไม่มีกล่องโต้ตอบตั้งค่าหน้ากระดาษ
+	Pictures too	รวมถึงรูปภาพ
+	Preserve black	คงสีดำ
+	Print area…	พื้นที่พิมพ์…
+	RGB	RGB
+	Registration marks	เครื่องหมายทะเบียน
+	Remove printer marks	ลบเครื่องหมายสำหรับงานพิมพ์
+	Replace ({key})	แทนที่ ({key})
+	Replace all	แทนที่ทั้งหมด
+	Replace with	แทนที่ด้วย
+	Replaced {n} on {pages}	แทนที่แล้ว {n} รายการใน {pages}
+	Replace…	แทนที่…
+	Room on each side	ระยะเผื่อแต่ละด้าน
+	Save as image	บันทึกเป็นรูปภาพ
+	Save as image…	บันทึกเป็นรูปภาพ…
+	Selected area (page {page}, {size})	พื้นที่ที่เลือก (หน้า {page}, {size})
+	Selects paper size and orientation from the printer driver. For paper tray, print quality or other driver defaults, use Properties…	เลือกขนาดกระดาษและการวางแนวจากไดรเวอร์เครื่องพิมพ์ สำหรับถาดกระดาษ คุณภาพการพิมพ์ หรือค่าเริ่มต้นอื่นของไดรเวอร์ ให้ใช้คุณสมบัติ…
+	Show or hide toolbars and panels	แสดงหรือซ่อนแถบเครื่องมือและแผง
+	Signature added. Others can move it until it's locked.	เพิ่มลายเซ็นแล้ว ผู้อื่นย้ายได้จนกว่าจะถูกล็อก
+	Take this paper size off the list	เอาขนาดกระดาษนี้ออกจากรายการ
+	The creep moves the innermost sheet's pages too far for this many pages. Reduce Creep.	ระยะเยื้องขยับหน้าของแผ่นในสุดมากเกินไปสำหรับจำนวนหน้านี้ โปรดลดระยะเยื้อง
+	The document changed. Reopen Document Properties to edit the current version.	เอกสารมีการเปลี่ยนแปลง โปรดเปิดคุณสมบัติเอกสารอีกครั้งเพื่อแก้ไขเวอร์ชันปัจจุบัน
+	The trim box is kept where it is, so the printed page cuts the same.	กรอบตัดยังคงอยู่ที่เดิม หน้าที่พิมพ์จึงตัดได้เหมือนเดิม
+	This document's script is asking	สคริปต์ของเอกสารนี้ขอ
+	This request comes from the document, not PdfCraft. Only enter a password if you trust this document.	คำขอนี้มาจากเอกสาร ไม่ใช่ DTHFrame ใส่รหัสผ่านเฉพาะเมื่อคุณเชื่อถือเอกสารนี้
+	This script is too long to edit here ({kib} KiB); its start is shown. It is kept as it is.	สคริปต์นี้ยาวเกินกว่าจะแก้ไขที่นี่ ({kib} KiB) จึงแสดงเฉพาะส่วนต้น และเก็บไว้ตามเดิม
+	Trim marks	เครื่องหมายตัด
+	Widen the page to make room	ขยายหน้ากระดาษเพื่อเผื่อพื้นที่
+	printer marks	เครื่องหมายสำหรับงานพิมพ์
+	pure black stays 100% K or gray 0 instead of a mix	สีดำล้วนคงเป็น K 100% หรือเทา 0 แทนการผสมสี
+	re-encoded in the target space; JPEGs stay JPEG	เข้ารหัสใหม่ในปริภูมิสีปลายทาง JPEG ยังคงเป็น JPEG
+	their appearances as well as the page	รวมถึงลักษณะที่ปรากฏของสิ่งเหล่านั้นและหน้า
+	{k} skipped: {why}	ข้าม {k} รายการ: {why}
+	{name}, {date} and {time} become your name, the date and the time.	{name}, {date} และ {time} จะกลายเป็นชื่อของคุณ วันที่ และเวลา
+	{why} ({n})	{why} ({n})

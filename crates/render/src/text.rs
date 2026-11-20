@@ -129,6 +129,15 @@ pub fn unreadable(c: char) -> bool {
     matches!(c, '\u{E000}'..='\u{F8FF}' | '\u{F0000}'..='\u{FFFFD}' | '\u{100000}'..='\u{10FFFD}' | '\u{FFFD}')
 }
 
+/// Byte ranges in `text` where `needle` occurs, with the find bar's rules ([`PageText::find_opts`]):
+/// case folded unless `case_sensitive`, any run of whitespace matching one space, and with
+/// `whole_words` only where no letter or digit adjoins the match. At most `limit` ranges, in order
+/// and not overlapping. Find and replace matches a paragraph's text with it, so what the find bar
+/// highlights is what gets replaced.
+pub fn find_in_text(text: &str, needle: &str, case_sensitive: bool, whole_words: bool, limit: usize) -> Vec<std::ops::Range<usize>> {
+    search::find_in_text(text, needle, case_sensitive, whole_words, limit)
+}
+
 /// The text of one page, in content order, with line structure.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PageText {
@@ -187,7 +196,8 @@ impl PageText {
     /// Case-insensitive search. Returns glyph ranges of every match (words may span line breaks,
     /// which count as a single space, or as nothing where the line runs on between two Chinese or
     /// Japanese characters or ends in a soft hyphen: there a query with a space across the break
-    /// doesn't match, and one without does).
+    /// doesn't match, and one without does; a ligature matches its letters, and a word divided by a
+    /// hyphen at a line end matches whole as well as with the hyphen).
     pub fn find(&self, needle: &str) -> Vec<std::ops::Range<usize>> {
         self.find_opts(needle, false, false)
     }
