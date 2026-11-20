@@ -90,10 +90,8 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp) -> bool {
                         }
 
                         let is_url = item.content.starts_with("http://") || item.content.starts_with("https://");
-                        if is_url {
-                            if ui.button("🌐 เปิดลิงก์ (Open URL)").clicked() {
-                                ui.ctx().open_url(egui::OpenUrl::same_tab(&item.content));
-                            }
+                        if is_url && ui.button("🌐 เปิดลิงก์ (Open URL)").clicked() {
+                            ui.ctx().open_url(egui::OpenUrl::same_tab(&item.content));
                         }
                     });
                 });

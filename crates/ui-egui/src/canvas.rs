@@ -2005,16 +2005,16 @@ fn draw_pages(
                 Some(c) => c.2,
                 None => {
                     let mut found = None;
-                    if let Some(image) = hit {
-                        if let Ok((w, h, rgba)) = doc.page_image_rgba(page, image) {
-                            let list = pdfcraft_engine::qr::scan_qr_from_rgba(w as usize, h as usize, &rgba);
-                            found = list.into_iter().next().map(|q| q.content);
-                        }
+                    if let Some(image) = hit
+                        && let Ok((w, h, rgba)) = doc.page_image_rgba(page, image)
+                    {
+                        let list = pdfcraft_engine::qr::scan_qr_from_rgba(w as usize, h as usize, &rgba);
+                        found = list.into_iter().next().map(|q| q.content);
                     }
-                    if found.is_none() {
-                        if let Ok(list) = pdfcraft_engine::qr::scan_page_qr(doc.display.clone(), pdfcraft_render::RenderConfig::default(), page) {
-                            found = list.into_iter().next().map(|q| q.content);
-                        }
+                    if found.is_none()
+                        && let Ok(list) = pdfcraft_engine::qr::scan_page_qr(doc.display.clone(), pdfcraft_render::RenderConfig::default(), page)
+                    {
+                        found = list.into_iter().next().map(|q| q.content);
                     }
                     ui.data_mut(|d| d.insert_temp(qr_key, (page, at, found.clone())));
                     found
