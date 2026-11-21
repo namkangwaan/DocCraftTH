@@ -1989,6 +1989,93 @@ mod tests {
         (Recognizers { primary: fake.clone(), secondary: None }, fake)
     }
 
+    /// Thai CER under skew (acceptance: within +0.02 of the 0° baseline at 2° and 5°). Needs the
+    /// Thai models (`PDFCRAFT_MODELS`) and the craft-fonts Thai face, so it is opt-in:
+    /// `cargo test -p pdfcraft-engine --lib thai_cer_under_skew -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "needs the Thai OCR models (PDFCRAFT_MODELS) and CRAFT_FONTS_DIR"]
+    fn thai_cer_under_skew() {
+        const REFERENCE: &str = "สำนักงานคณะกรรมการกฤษฎีกา ได้รับหนังสือจากกระทรวงมหาดไทย เรื่อง ขอความอนุเคราะห์ข้อมูลการดำเนินงาน \
+            ตามที่ได้ประชุมหารือกันเมื่อวันที่สิบสองเดือนมิถุนายน จึงเรียนมาเพื่อโปรดพิจารณาและแจ้งผลให้ทราบต่อไป \
+            ผู้ที่เกี่ยวข้องควรเตรียมเอกสารประกอบให้ครบถ้วนก่อนวันนัดหมาย เพื่อความรวดเร็วในการตรวจสอบรายละเอียดทั้งหมด \
+            หากมีข้อสงสัยประการใดสามารถติดต่อสอบถามได้ที่เจ้าหน้าที่ผู้รับผิดชอบโครงการนี้ในเวลาราชการ";
+        let base = OcrSettings { language: "th".into(), force_ocr: true, deskew: false, dpi: 300.0, ..Default::default() };
+        let Ok(recognizers) = recognizers(&base) else {
+            eprintln!("skipped: the Thai OCR models are not installed (set PDFCRAFT_MODELS)");
+            return;
+        };
+        // The upright raster: Thai text typeset on a letter page and rendered at 300 dpi.
+        let mut s = Session::new();
+        let bytes = s.create_from_text("t", " ").unwrap();
+        let id = s.open("t.pdf", None, bytes, None).unwrap();
+        s.apply(
+            id,
+            Edit::AddText {
+                page: 0,
+                text: pdfcraft_edit::AddedText { rect: [50.0, 60.0, 562.0, 700.0], text: REFERENCE.into(), size: 14.0, ..Default::default() },
+            },
+        )
+        .unwrap();
+        let mut steps = s.ocr_job(id, &[0], base.clone()).unwrap().steps();
+        let shot = steps.next_page().unwrap().unwrap();
+        let upright = shot.image().unwrap().clone();
+        let (w, h) = (upright.width() as usize, upright.height() as usize);
+        let gray: Vec<f64> =
+            upright.rgba().as_chunks::<4>().0.iter().map(|p| 0.299 * f64::from(p[0]) + 0.587 * f64::from(p[1]) + 0.114 * f64::from(p[2])).collect();
+        let strip = |t: &str| t.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+        let reference = strip(REFERENCE);
+        let mut table = Vec::new();
+        for deg in [0.0f64, 2.0, 5.0] {
+            // Bilinear rotation about the centre (independent of the code under test), white fill.
+            let (sn, cs) = (-deg).to_radians().sin_cos();
+            let mut px = vec![255u8; w * h];
+            for y in 0..h {
+                for x in 0..w {
+                    let (dx, dy) = (x as f64 + 0.5 - w as f64 / 2.0, y as f64 + 0.5 - h as f64 / 2.0);
+                    let (sx, sy) = (w as f64 / 2.0 + cs * dx - sn * dy - 0.5, h as f64 / 2.0 + sn * dx + cs * dy - 0.5);
+                    let (x0, y0) = (sx.floor(), sy.floor());
+                    if x0 < 0.0 || y0 < 0.0 || x0 + 1.0 >= w as f64 || y0 + 1.0 >= h as f64 {
+                        continue;
+                    }
+                    let (fx, fy) = (sx - x0, sy - y0);
+                    let g = |xx: f64, yy: f64| gray[yy as usize * w + xx as usize];
+                    let v = g(x0, y0) * (1.0 - fx) * (1.0 - fy)
+                        + g(x0 + 1.0, y0) * fx * (1.0 - fy)
+                        + g(x0, y0 + 1.0) * (1.0 - fx) * fy
+                        + g(x0 + 1.0, y0 + 1.0) * fx * fy;
+                    px[y * w + x] = v.round().clamp(0.0, 255.0) as u8;
+                }
+            }
+            let mut png = Vec::new();
+            {
+                let mut enc = png::Encoder::new(&mut png, w as u32, h as u32);
+                enc.set_color(png::ColorType::Grayscale);
+                enc.write_header().unwrap().write_image_data(&px).unwrap();
+            }
+            let scan = s.create_from_images_with_resolution(&[("scan.png".into(), png)], pdfcraft_create::ImageResolution::Dpi(300.0)).unwrap();
+            let mut row = vec![deg];
+            for deskew in [false, true] {
+                let mut t = Session::new();
+                let tid = t.open("scan.pdf", None, scan.clone(), None).unwrap();
+                let settings = OcrSettings { deskew, ..base.clone() };
+                let pages = t.ocr_job(tid, &[], settings).unwrap().run(&recognizers, |_, _| true);
+                let got = strip(&pages[0].text());
+                let applied = pages[0].deskew.map(|d| d.applied_deg);
+                let c = pdfcraft_ocr::metrics::cer(&reference, &got);
+                eprintln!("skew {deg:>4}°  deskew {deskew:<5}  CER {c:.3}  applied {applied:?}\n    read: {got}");
+                row.push(c);
+            }
+            table.push(row);
+        }
+        eprintln!("CER table [deg, off, on]: {table:?}");
+        let baseline = table[0][1];
+        assert!(baseline < 0.6, "the 0° baseline reads too badly for the comparison to mean anything: {baseline}");
+        for row in &table[1..] {
+            assert!(row[2] <= baseline + 0.02, "{}° with deskew: CER {} vs 0° baseline {baseline}", row[0], row[2]);
+        }
+        assert!(table[0][2] <= baseline + 1e-9, "a straight page must read exactly as without deskew");
+    }
+
     /// Recognizer whose confidence is scripted per call: the first reading is poor, the second
     /// (the 180°-turned image) is good.
     struct Scripted {
