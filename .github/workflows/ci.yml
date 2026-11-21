@@ -22,10 +22,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout DocCraftTH
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout craft-fonts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: storytold/craft-fonts
           path: craft-fonts
@@ -50,10 +50,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout DocCraftTH
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Checkout craft-fonts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: storytold/craft-fonts
           path: craft-fonts
