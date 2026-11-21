@@ -45,12 +45,24 @@ fn eval_file(idx: usize, folder: &str, bytes: Vec<u8>, only: Option<&Vec<usize>>
     let id = match s.open("eval.pdf", None, Arc::new(bytes), None) {
         Ok(id) => id,
         Err(e) => {
-            let _ = writeln!(csv, "{idx},{folder},-1,0,0,0,open-error:{},,,,,,,,,,,,", e.to_string().replace([',', '\n'], " ").chars().take(60).collect::<String>());
+            let _ = writeln!(
+                csv,
+                "{idx},{folder},-1,0,0,0,open-error:{},,,,,,,,,,,,",
+                e.to_string().replace([',', '\n'], " ").chars().take(60).collect::<String>()
+            );
             return;
         }
     };
     let total = s.get(id).map_or(0, |d| d.info.pages.len());
-    let settings = OcrSettings { language: "th".into(), skip_text_pages: true, force_ocr: false, deskew: false, auto_rotate: false, dpi: 300.0, ..Default::default() };
+    let settings = OcrSettings {
+        language: "th".into(),
+        skip_text_pages: true,
+        force_ocr: false,
+        deskew: false,
+        auto_rotate: false,
+        dpi: 300.0,
+        ..Default::default()
+    };
     let Some(job) = s.ocr_job(id, &only.cloned().unwrap_or_else(|| spread(total, MAX_PAGES_PER_FILE)), settings) else { return };
     let mut steps = job.steps();
     let opts = DeskewOptions::default();
@@ -130,7 +142,11 @@ fn deskew_eval_folder() {
     eprintln!("{} PDFs under {}, starting at #{first}", files.len(), dir.display());
     let began = Instant::now();
     for (idx, path) in files.iter().enumerate().skip(first) {
-        let folder = path.strip_prefix(&dir).ok().and_then(|p| p.components().next()).map_or_else(String::new, |c| c.as_os_str().to_string_lossy().into_owned());
+        let folder = path
+            .strip_prefix(&dir)
+            .ok()
+            .and_then(|p| p.components().next())
+            .map_or_else(String::new, |c| c.as_os_str().to_string_lossy().into_owned());
         let pages = match &only {
             Some(m) => match m.get(&idx) {
                 Some(p) => Some(p),
@@ -193,7 +209,8 @@ fn deskew_eval_dump() {
         let Some(path) = files.get(f) else { continue };
         let mut s = Session::new();
         let id = s.open("d.pdf", None, Arc::new(std::fs::read(path).unwrap()), None).unwrap();
-        let settings = OcrSettings { language: "th".into(), skip_text_pages: true, deskew: false, auto_rotate: false, dpi: 300.0, ..Default::default() };
+        let settings =
+            OcrSettings { language: "th".into(), skip_text_pages: true, deskew: false, auto_rotate: false, dpi: 300.0, ..Default::default() };
         let mut steps = s.ocr_job(id, &[p], settings).unwrap().steps();
         let Some(Ok(shot)) = steps.next_page() else { continue };
         let img = shot.image().unwrap();
@@ -216,6 +233,90 @@ fn deskew_eval_dump() {
             enc.write_header().unwrap().write_image_data(&sheet).unwrap();
         }
         std::fs::write(out.join(format!("f{f}_p{p}.png")), png_bytes).unwrap();
-        eprintln!("f{f} p{p}: detected {:.2} applied {:.2} conf {:.2} turns {} oconf {:.2}", r.detected_deg, r.applied_deg, r.confidence, r.orientation_turns, r.orientation_confidence);
+        eprintln!(
+            "f{f} p{p}: detected {:.2} applied {:.2} conf {:.2} turns {} oconf {:.2}",
+            r.detected_deg, r.applied_deg, r.confidence, r.orientation_turns, r.orientation_confidence
+        );
     }
+}
+
+fn read_stats(rec: &dyn pdfcraft_ocr::Recognizer, img: &pdfcraft_ocr::OcrImage) -> (f32, usize, usize, f64) {
+    let t = Instant::now();
+    let lines = rec.recognize(img, &pdfcraft_ocr::RecognizeOptions { language: "th".into() }).unwrap_or_default();
+    let ms = t.elapsed().as_secs_f64() * 1000.0;
+    let words: usize = lines.iter().map(|l| l.words.len()).sum();
+    let chars: usize = lines.iter().flat_map(|l| &l.words).map(|w| w.text.chars().count()).sum();
+    (pdfcraft_ocr::mean_confidence(&lines).unwrap_or(0.0), words, chars, ms)
+}
+
+/// OCR confidence before and after deskew, and under each quarter turn, on the pages named in
+/// `DESKEW_EVAL_PAGES` (`file:page` lines): per page the mean word confidence, words and
+/// characters of the raw page, of the deskewed page, and of the deskewed page turned 90, 180
+/// and 270 degrees clockwise, plus the detector's own orientation cue. Needs the Thai models
+/// (`PDFCRAFT_MODELS`). Writes `DESKEW_EVAL_OUT`.
+#[test]
+#[ignore = "OCR over chosen pages of a folder of real PDFs (DESKEW_EVAL_DIR, DESKEW_EVAL_PAGES, DESKEW_EVAL_OUT, PDFCRAFT_MODELS)"]
+fn deskew_eval_ocr() {
+    let (Some(dir), Some(list), Some(out)) =
+        (std::env::var_os("DESKEW_EVAL_DIR"), std::env::var_os("DESKEW_EVAL_PAGES"), std::env::var_os("DESKEW_EVAL_OUT"))
+    else {
+        eprintln!("skipped: set DESKEW_EVAL_DIR, DESKEW_EVAL_PAGES and DESKEW_EVAL_OUT");
+        return;
+    };
+    let base = OcrSettings {
+        language: "th".into(),
+        skip_text_pages: true,
+        force_ocr: false,
+        deskew: false,
+        auto_rotate: false,
+        dpi: 300.0,
+        ..Default::default()
+    };
+    let Ok(recognizers) = recognizers(&base) else {
+        eprintln!("skipped: the Thai OCR models are not installed (set PDFCRAFT_MODELS)");
+        return;
+    };
+    let rec = recognizers.primary.clone();
+    let (dir, out) = (PathBuf::from(dir), PathBuf::from(out));
+    let mut files = Vec::new();
+    collect(&dir, &mut files);
+    let mut csv = std::fs::File::create(&out).unwrap();
+    let cols = ["conf", "words", "chars", "ms"];
+    let mut head = String::from("file,page,cue_turns,axis_ratio,applied,det_conf");
+    for tag in ["raw", "dsk", "t1", "t2", "t3"] {
+        for c in cols {
+            head.push_str(&format!(",{tag}_{c}"));
+        }
+    }
+    writeln!(csv, "{head}").unwrap();
+    let began = Instant::now();
+    let mut n = 0;
+    for line in std::fs::read_to_string(list).unwrap_or_default().lines() {
+        let Some((f, p)) = line.trim().split_once(':') else { continue };
+        let (Ok(f), Ok(p)) = (f.parse::<usize>(), p.parse::<usize>()) else { continue };
+        let Some(path) = files.get(f) else { continue };
+        let mut s = Session::new();
+        let Ok(id) = s.open("o.pdf", None, Arc::new(std::fs::read(path).unwrap()), None) else { continue };
+        let Some(job) = s.ocr_job(id, &[p], base.clone()) else { continue };
+        let mut steps = job.steps();
+        let Some(Ok(shot)) = steps.next_page() else { continue };
+        let Some(raw) = shot.image() else { continue };
+        let cue = analyze(raw, &DeskewOptions { detect_orientation: true, ..Default::default() });
+        let Ok(fixed) = straighten(raw, &DeskewOptions::default()) else { continue };
+        let mut row =
+            format!("{f},{p},{},{:.3},{:.3},{:.3}", cue.orientation_turns, cue.axis_ratio, fixed.report.applied_deg, fixed.report.confidence);
+        let mut push = |st: (f32, usize, usize, f64)| row.push_str(&format!(",{:.2},{},{},{:.0}", st.0, st.1, st.2, st.3));
+        push(read_stats(rec.as_ref(), raw));
+        push(read_stats(rec.as_ref(), &fixed.image));
+        for k in 1..=3u32 {
+            push(read_stats(rec.as_ref(), &pdfcraft_ocr::preprocess::turn_image(&fixed.image, k)));
+        }
+        writeln!(csv, "{row}").unwrap();
+        csv.flush().unwrap();
+        n += 1;
+        if n % 10 == 0 {
+            eprintln!("{n} pages, {:.0}s", began.elapsed().as_secs_f64());
+        }
+    }
+    eprintln!("finished {n} pages in {:.0}s", began.elapsed().as_secs_f64());
 }

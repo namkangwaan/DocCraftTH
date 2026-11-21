@@ -22,10 +22,10 @@ pub use pdfcraft_ocr::{
 
 use crate::{DocId, Edit, EditError, Session};
 
-pub mod dictionary;
-pub(crate) mod layer;
 #[cfg(test)]
 mod deskew_eval;
+pub mod dictionary;
+pub(crate) mod layer;
 
 /// Bound recognition/review inputs before cloning or planning glyphs.
 pub fn validate_ocr_words<'a>(words: impl IntoIterator<Item = &'a PlacedWord>) -> Result<usize, String> {
@@ -192,8 +192,8 @@ pub struct OcrSettings {
     pub engine: EngineChoice,
     /// How the engines' readings combine (see [`MergeStrategy`]).
     pub strategy: MergeStrategy,
-    /// Preprocessing, all off by default (a scan is passed through as rendered):
-    /// straighten pages scanned at 90°/180°/270°.
+    /// Verify the orientation by reading (on by default): a page that reads poorly upright is also
+    /// read turned 90°, 270° and 180°, and a clearly better reading wins (see [`OcrShot::read`]).
     pub auto_rotate: bool,
     /// Preprocessing: straighten skewed text lines (on by default; a confidence gate leaves
     /// straight, blank and textless pages untouched).
@@ -225,6 +225,10 @@ pub struct OcrSettings {
 
 /// How much better (mean confidence, 0–100) the 180° reading must be to replace the upright one.
 const FLIP_MARGIN: f32 = 15.0;
+
+/// A turned reading with fewer characters than this is noise and never wins (an empty or speckled
+/// page reads "confidently" in any orientation).
+const MIN_TURN_CHARS: usize = 20;
 
 /// A recognised word whose box is at least this much covered by the page's own text is that
 /// text read again, not a word in a picture.
@@ -278,7 +282,7 @@ impl Default for OcrSettings {
             force_ocr: false,
             engine: EngineChoice::default(),
             strategy: MergeStrategy::default(),
-            auto_rotate: false,
+            auto_rotate: true,
             deskew: true,
             deskew_mode: DeskewMode::default(),
             denoise: false,
@@ -940,7 +944,8 @@ impl OcrSteps {
             image,
             scale * 72.0,
             &pdfcraft_ocr::preprocess::PreprocessOptions {
-                auto_rotate: settings.auto_rotate,
+                // Orientation is verified by reading (see `OcrShot::read`), not guessed from ink here.
+                auto_rotate: false,
                 deskew: settings.deskew,
                 denoise: settings.denoise,
                 binarize: settings.binarize,
@@ -961,8 +966,7 @@ impl OcrSteps {
             digits: settings.digits,
             unusable_text,
             deskew: pre.deskew,
-            flip_check: (settings.auto_rotate && pre.deskew.is_some_and(|d| d.orientation_turns % 2 == 0))
-                .then_some(settings.low_confidence_threshold),
+            rotate_check: settings.auto_rotate.then_some(settings.low_confidence_threshold),
         })
     }
 }
@@ -992,7 +996,7 @@ pub struct OcrShot {
     deskew: Option<DeskewReport>,
     /// When set, an upright page read below this mean confidence is also read turned 180° and the
     /// better reading kept (the 0°/180° cue from ink alone is weak, and unreliable for Thai).
-    flip_check: Option<f32>,
+    rotate_check: Option<f32>,
 }
 
 impl OcrShot {
@@ -1008,28 +1012,49 @@ impl OcrShot {
     }
 
     /// Recognise the image with `recognizers` (per the job's strategy) and place the words.
-    /// An upright page that reads poorly (below the job's low-confidence bar) is also read
-    /// turned 180°, and the clearly better reading wins: the 0°/180° call from ink alone is a
-    /// weak cue, so the recogniser's own confidence decides. (The web build's workers read one
-    /// image only and keep the ink cue.)
+    ///
+    /// Orientation is verified by reading, because the ink alone cannot tell (on real scans it turned
+    /// upright numeric tables on their side): a page that reads poorly upright (mean confidence under
+    /// the job's low-confidence bar) is also read turned 90°, 270° and 180° (the detector's guess
+    /// first), and a turn that reads clearly better (by [`FLIP_MARGIN`], with real text) wins. A page
+    /// that reads well, or one whose engine reports no confidence, is read once. (The web build's
+    /// workers read one image only and so cannot verify.)
     pub fn read(&self, recognizers: &Recognizers) -> OcrPage {
         let Some(image) = &self.image else { return self.place(Err("the page's image was handed to another reader".into())) };
         let run = |img: &OcrImage| {
             pdfcraft_ocr::recognize_with_strategy(recognizers.primary.as_ref(), recognizers.secondary.as_deref(), self.strategy, img, &self.options)
         };
         let first = run(image);
-        if let (Some(bar), Ok(read)) = (self.flip_check, &first) {
-            let c0 = pdfcraft_ocr::mean_confidence(&read.lines).unwrap_or(0.0);
-            if c0 < bar {
-                let flipped = pdfcraft_ocr::preprocess::turn_image(image, 2);
-                if let Ok(other) = run(&flipped) {
-                    let c2 = pdfcraft_ocr::mean_confidence(&other.lines).unwrap_or(0.0);
-                    if c2 >= c0 + FLIP_MARGIN {
-                        let inverse = self.inverse.after_quarter_turns(2, image.width(), image.height());
-                        let report = self.deskew.map(|d| DeskewReport { orientation_turns: (d.orientation_turns + 2) % 4, ..d });
-                        return self.place_with(inverse, report, Ok(other));
-                    }
+        if let (Some(bar), Ok(read)) = (self.rotate_check, &first)
+            && let Some(c0) = pdfcraft_ocr::mean_confidence(&read.lines)
+            && c0 < bar
+        {
+            let guess = pdfcraft_ocr::deskew::analyze(image, &pdfcraft_ocr::deskew::DeskewOptions { detect_orientation: true, ..Default::default() })
+                .orientation_turns;
+            let mut order: Vec<u32> = if guess == 0 { Vec::new() } else { vec![guess] };
+            order.extend([1u32, 3, 2].into_iter().filter(|k| *k != guess));
+            let mut best: Option<(u32, f32, StrategyOutcome)> = None;
+            for k in order {
+                let Ok(other) = run(&pdfcraft_ocr::preprocess::turn_image(image, k)) else { continue };
+                let chars: usize = other.lines.iter().flat_map(|l| &l.words).map(|w| w.text.chars().count()).sum();
+                let c = pdfcraft_ocr::mean_confidence(&other.lines).unwrap_or(0.0);
+                if chars < MIN_TURN_CHARS {
+                    continue;
                 }
+                let clear = c >= c0 + FLIP_MARGIN;
+                if best.as_ref().is_none_or(|b| c > b.1) {
+                    best = Some((k, c, other));
+                }
+                if clear && c >= bar {
+                    break; // a good reading: no need to try the others
+                }
+            }
+            if let Some((k, c, other)) = best
+                && c >= c0 + FLIP_MARGIN
+            {
+                let inverse = self.inverse.after_quarter_turns(k, image.width(), image.height());
+                let report = Some(DeskewReport { orientation_turns: k, ..self.deskew.unwrap_or_default() });
+                return self.place_with(inverse, report, Ok(other));
             }
         }
         self.place(first.map_err(|e| e.to_string()))
@@ -1072,6 +1097,29 @@ impl OcrShot {
             let [u, v] = info.view_to_user((ox as f32 + offset[0]) / scale, (oy as f32 + offset[1]) / scale);
             [u as f64, v as f64]
         };
+        let thai_context = self.digits == Digits::AsRead && matches!(self.options.language.as_str(), "th" | "tha");
+        let is_thai_char = |c: char| matches!(c, '\u{0E01}'..='\u{0E4E}');
+        let has_latin = |s: &str| s.chars().any(|c| c.is_ascii_alphabetic());
+        let has_bare_latin = |s: &str| has_latin(s) && !s.chars().any(|c| c.is_ascii_digit());
+        let mut restore_thai_words: std::collections::HashSet<usize> = std::collections::HashSet::new();
+        if thai_context {
+            for line in &outcome.lines {
+                let line_has_thai = line.words.iter().any(|w| w.text.chars().any(is_thai_char));
+                let line_has_latin = line.words.iter().any(|w| has_latin(&w.text));
+                // Convert digits when the line has Thai context OR has no Latin/technical words at all
+                // (e.g. standalone table cells or page numbers in a Thai document).
+                if !line_has_thai && line_has_latin {
+                    continue;
+                }
+                for (idx, w) in line.words.iter().enumerate() {
+                    let prev_latin = idx.checked_sub(1).and_then(|p| line.words.get(p)).is_some_and(|pw| has_bare_latin(&pw.text));
+                    let next_latin = line.words.get(idx + 1).is_some_and(|nw| has_bare_latin(&nw.text));
+                    if !has_latin(&w.text) && !prev_latin && !next_latin {
+                        restore_thai_words.insert(std::ptr::from_ref(w) as usize);
+                    }
+                }
+            }
+        }
         // Validate recognition geometry and compare against existing text in view space,
         // undoing preprocessing and region offsets before testing overlap.
         let (fresh, already): (Vec<_>, Vec<_>) = outcome.lines.iter().flat_map(|l| &l.words).filter(|w| box_writable(w)).partition(|w| {
@@ -1095,7 +1143,11 @@ impl OcrShot {
             .into_iter()
             .map(|w| {
                 let mut placed = PlacedWord::place(w, to_user);
-                placed.text = self.digits.apply(&placed.text);
+                placed.text = if thai_context && restore_thai_words.contains(&(std::ptr::from_ref(w) as usize)) {
+                    Digits::Thai.apply(&placed.text)
+                } else {
+                    self.digits.apply(&placed.text)
+                };
                 placed
             })
             .collect::<Vec<_>>();
@@ -1651,7 +1703,8 @@ mod tests {
         assert_eq!(s.engine, EngineChoice::Ocrs);
         assert_eq!(s.strategy, MergeStrategy::PrimaryOnly);
         assert_eq!(s.output_mode, OutputMode::Searchable);
-        assert!(!s.auto_rotate && !s.denoise && !s.binarize);
+        assert!(s.auto_rotate, "orientation is verified by reading, on by default");
+        assert!(!s.denoise && !s.binarize);
         assert!(s.deskew, "deskew is automatic by default (a confidence gate leaves straight pages alone)");
         assert_eq!(s.deskew_mode, DeskewMode::Transient);
         assert_eq!(s.region, None);
@@ -2203,7 +2256,9 @@ mod tests {
         fn recognize(&self, _image: &pdfcraft_ocr::OcrImage, _options: &pdfcraft_ocr::RecognizeOptions) -> Result<Vec<pdfcraft_ocr::Line>, OcrError> {
             let n = self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             let c = self.confs.get(n).copied().unwrap_or(0.0);
-            Ok(vec![pdfcraft_ocr::Line { words: vec![pdfcraft_ocr::Word::new("word", [10.0, 10.0, 90.0, 30.0], "scripted").with_confidence(c)] }])
+            Ok(vec![pdfcraft_ocr::Line {
+                words: vec![pdfcraft_ocr::Word::new("a scripted word long enough to count", [10.0, 10.0, 90.0, 30.0], "scripted").with_confidence(c)],
+            }])
         }
     }
 
@@ -2226,9 +2281,9 @@ mod tests {
     #[test]
     fn a_poor_reading_is_retried_upside_down_and_the_better_one_wins() {
         let (page, calls, before) = read_scripted(&[20.0, 90.0]);
-        assert_eq!(calls, 2);
+        assert_eq!(calls, 2, "the first turn read well: the others are not tried");
         let (before, after) = (before.unwrap(), page.deskew.unwrap());
-        assert_eq!(after.orientation_turns, (before.orientation_turns + 2) % 4);
+        assert_ne!(after.orientation_turns, before.orientation_turns, "the page reports the turn it was read in");
         assert_eq!(page.words.len(), 1);
     }
 
@@ -2239,8 +2294,15 @@ mod tests {
         assert_eq!(calls, 1, "above the low-confidence bar: no retry");
         assert_eq!(page.deskew.unwrap().orientation_turns, before.unwrap().orientation_turns);
         let (page, calls, before) = read_scripted(&[20.0, 25.0]);
-        assert_eq!(calls, 2);
+        assert_eq!(calls, 4, "all three turns were tried");
         assert_eq!(page.deskew.unwrap().orientation_turns, before.unwrap().orientation_turns, "a marginal gain keeps the upright reading");
+    }
+
+    /// An engine that reports no confidence cannot arbitrate: the page is read once.
+    #[test]
+    fn an_engine_without_confidence_is_read_once() {
+        let (_, calls, _) = read_scripted(&[f32::NAN, 90.0]);
+        assert_eq!(calls, 1);
     }
 
     /// With deskew on, the page carries what was measured; with it off there is no report.
@@ -2920,5 +2982,27 @@ mod tests {
         }
         let errors = row[want.len()];
         assert!(errors * 100 <= want.len(), "{errors} word errors in {} words:\n{read}", want.len());
+    }
+
+    #[test]
+    fn thai_digits_are_restored_in_thai_context_while_preserving_tech_tokens() {
+        let mut s = Session::new();
+        let bytes = s.create_from_text("t", " ").unwrap();
+        let id = s.open("t.pdf", None, bytes, None).unwrap();
+        let settings = OcrSettings { language: "th".into(), force_ocr: true, deskew: false, ..Default::default() };
+        let mut steps = s.ocr_job(id, &[0], settings).unwrap().steps();
+        let shot = steps.next_page().unwrap().unwrap();
+        let w = |text: &str, x: f32| pdfcraft_ocr::Word::new(text, [x, 10.0, x + 20.0, 25.0], "ocrs");
+        let lines = vec![
+            pdfcraft_ocr::Line { words: vec![w("ที่", 10.0), w("ศธ", 40.0), w("0206.4/ว", 70.0), w("17", 100.0)] },
+            pdfcraft_ocr::Line {
+                words: vec![w("รองรับ", 10.0), w("ISO", 40.0), w("9001", 70.0), w("และ", 100.0), w("UTF-8", 130.0), w("300", 160.0), w("จุด", 190.0)],
+            },
+            pdfcraft_ocr::Line { words: vec![w("Windows", 10.0), w("10", 40.0), w("v2.1", 70.0)] },
+            pdfcraft_ocr::Line { words: vec![w("2569", 10.0)] },
+        ];
+        let page = shot.place(Ok(pdfcraft_ocr::StrategyOutcome { lines, ..Default::default() }));
+        let got: Vec<&str> = page.words.iter().map(|w| w.text.as_str()).collect();
+        assert_eq!(got, vec!["ที่", "ศธ", "๐๒๐๖.๔/ว", "๑๗", "รองรับ", "ISO", "9001", "และ", "UTF-8", "๓๐๐", "จุด", "Windows", "10", "v2.1", "๒๕๖๙"]);
     }
 }
