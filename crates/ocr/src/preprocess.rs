@@ -14,6 +14,7 @@
 //! The heuristics are deliberately conservative and panic-free: an image too small to judge,
 //! a blank page, or a score without a clear margin is a no-op, never a guess.
 
+use crate::deskew::{self, DeskewOptions, DeskewReport};
 use crate::{MAX_PIXELS, MAX_SIDE, OcrError, OcrImage};
 
 /// The four opt-in steps. All off by default: a scan is passed through as rendered.
@@ -47,6 +48,8 @@ pub struct Preprocessed {
     /// on), or the source's own
     /// when it already rendered at 300 or more.
     pub dpi: f32,
+    /// What the deskew step found and did; `None` when deskew was not requested.
+    pub deskew: Option<DeskewReport>,
 }
 
 /// Preprocess `image` (rendered at `source_dpi`) per `options`, in the fixed order. The image
@@ -74,14 +77,17 @@ pub fn preprocess(image: OcrImage, source_dpi: f32, options: &PreprocessOptions)
             inverse = compose(&inverse, &inverse_quarter_turns(turns, w, h));
         }
     }
-    // (c) Deskew: straighten skewed lines (opt-in; no-op under 64 px, blank, or without a
-    // clear margin or below 0.1°).
-    if options.deskew
-        && let Some(angle) = estimate_skew(&current)
-    {
-        let (straightened, back) = deskew_rotate(&current, angle);
-        current = straightened;
-        inverse = compose(&inverse, &back);
+    // (c) Deskew: straighten skewed lines (opt-in): the `deskew` module measures the skew (±20°)
+    // and a confidence gate leaves straight, blank or textless pages untouched. Quarter turns
+    // are step (b)'s job here, so the detector's own orientation search is off.
+    let mut deskew_report = None;
+    if options.deskew {
+        let straightened = deskew::straighten(&current, &DeskewOptions { detect_orientation: false, ..Default::default() })?;
+        if straightened.report.changes_page() {
+            current = straightened.image;
+            inverse = compose(&inverse, &straightened.inverse_transform);
+        }
+        deskew_report = Some(straightened.report);
     }
     // (d) Denoise: 3×3 median with edge clamping (opt-in; dimensions never change).
     if options.denoise {
@@ -92,7 +98,7 @@ pub fn preprocess(image: OcrImage, source_dpi: f32, options: &PreprocessOptions)
     if options.binarize {
         current = sauvola(&current);
     }
-    Ok(Preprocessed { image: current, inverse_transform: inverse, dpi })
+    Ok(Preprocessed { image: current, inverse_transform: inverse, dpi, deskew: deskew_report })
 }
 
 /// An affine map `(x, y) → (a·x + c·y + e, b·x + d·y + f)`, composed in f64 so mapping a
@@ -364,83 +370,6 @@ pub(crate) fn inverse_quarter_turns(k: QuarterTurns, old_w: u32, old_h: u32) -> 
     }
 }
 
-/// Estimate the skew of the text lines, in degrees (−5…5, positive: lines run downhill to the
-/// right). Method (documented, panic-free): for each candidate angle the ink is sheared into a
-/// row profile (`r = y − (x − cx)·tan φ`); the projection-profile score (Σ profile²) peaks
-/// where the shear realigns the lines. `None` — leave the page alone — when the image is under
-/// 64 px on a side, blank, the winner is under 0.1°, or the winner does not clearly beat
-/// leaving the page as is (score < 1.02 × the 0° score).
-fn estimate_skew(image: &OcrImage) -> Option<f64> {
-    if image.min_side() < 64 {
-        return None;
-    }
-    let gray = grayscale(image);
-    let (Some(lo), Some(hi)) = (gray.iter().min(), gray.iter().max()) else { return None };
-    let t = (*lo as u32 + *hi as u32) / 2;
-    let ink: Vec<bool> = gray.iter().map(|&g| (g as u32) < t).collect();
-    if !ink.iter().any(|i| *i) {
-        return None; // a blank page has no skew
-    }
-    let (w, h) = (image.width, image.height);
-    let cx = f64::from(w) / 2.0;
-    let max_shift = (f64::from(w) / 2.0 * 5f64.to_radians().tan()).ceil() as i64 + 2;
-    let score = |phi_deg: f64| -> f64 {
-        let slope = phi_deg.to_radians().tan();
-        let mut profile = vec![0u64; (h as i64 + 2 * max_shift + 1) as usize];
-        for (y, row) in ink.chunks_exact(w as usize).enumerate() {
-            for (x, on) in row.iter().enumerate() {
-                if !on {
-                    continue;
-                }
-                let r = y as f64 - (x as f64 - cx) * slope;
-                let idx = r.round() as i64 + max_shift;
-                if let Some(p) = profile.get_mut(idx as usize) {
-                    *p += 1;
-                }
-            }
-        }
-        profile.iter().map(|p| (*p as f64).powi(2)).sum()
-    };
-    let mut best = (0.0f64, score(0.0));
-    let mut phi = -5.0;
-    while phi <= 5.0 + 1e-9 {
-        let s = score(phi);
-        if s > best.1 {
-            best = (phi, s);
-        }
-        phi += 0.25;
-    }
-    let (angle, best_score) = best;
-    if angle.abs() < 0.1 || best_score < 1.02 * score(0.0) {
-        return None; // straight enough, or no clear winner: no-op
-    }
-    Some(angle)
-}
-
-/// Rotate the content by `−angle` about the centre (the deskew correction), nearest-neighbour
-/// with white fill; also returns the exact dest→src map (the correction's inverse).
-fn deskew_rotate(image: &OcrImage, angle_deg: f64) -> (OcrImage, InverseTransform) {
-    let phi = angle_deg.to_radians();
-    let (cos, sin) = (phi.cos(), phi.sin());
-    let (w, h) = (image.width, image.height);
-    let (cx, cy) = (f64::from(w) / 2.0, f64::from(h) / 2.0);
-    let back = InverseTransform { a: cos, b: sin, c: -sin, d: cos, e: cx - cos * cx + sin * cy, f: cy - sin * cx - cos * cy };
-    let mut out = vec![255u8; w as usize * h as usize * 4];
-    for (y, row) in out.chunks_exact_mut(w as usize * 4).enumerate() {
-        for (x, px) in row.as_chunks_mut::<4>().0.iter_mut().enumerate() {
-            let (sx, sy) = back.apply(x as f64, y as f64);
-            let (xi, yi) = (sx.round() as i64, sy.round() as i64);
-            if xi < 0 || yi < 0 || xi >= w as i64 || yi >= h as i64 {
-                continue; // outside the scan: white fill
-            }
-            if let Some(src) = image.rgba.get((yi as usize * w as usize + xi as usize) * 4..(yi as usize * w as usize + xi as usize) * 4 + 4) {
-                px.copy_from_slice(src);
-            }
-        }
-    }
-    (OcrImage::new(w, h, out).unwrap_or_else(|_| image.clone()), back)
-}
-
 /// 3×3 median filter on each colour channel, edges clamped (border pixels replicate);
 /// dimensions and alpha are unchanged.
 fn median3(image: &OcrImage) -> OcrImage {
@@ -651,19 +580,44 @@ mod tests {
         out
     }
 
-    /// A ruled fixture sheared by `degrees` (lines running downhill to the right for positive
-    /// angles): four 8-px bars across a 300 × 120 page.
+    /// A text-like page (600 × 800: lines of glyph blocks) whose lines run downhill to the right
+    /// by `degrees` (positive), built with an independent nearest-neighbour rotation.
     fn sheared(degrees: f64) -> OcrImage {
-        let (w, h) = (300u32, 120u32);
-        let mut img = white(w, h);
-        let slope = degrees.to_radians().tan();
-        for (base, height) in [(20u32, 8u32), (45, 8), (70, 8), (95, 8)] {
-            for x in 20..280u32 {
-                let y = (base as f64 + (x as f64 - 150.0) * slope).round().clamp(0.0, f64::from(h - height - 1)) as u32;
-                fill(&mut img, x, y, 1, height);
+        let (w, h) = (600u32, 800u32);
+        let mut upright = white(w, h);
+        let mut seed = 11u64;
+        let mut rnd = |n: u32| {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            ((seed >> 33) as u32) % n
+        };
+        let mut y = 90u32;
+        while y < h - 90 {
+            let mut x = 80u32;
+            while x < w - 90 {
+                for _ in 0..(2 + rnd(5)) {
+                    let gw = 6 + rnd(5);
+                    fill(&mut upright, x, y, gw, 10 + rnd(3));
+                    if rnd(4) == 0 {
+                        fill(&mut upright, x + 1, y - 6, 2, 6);
+                    }
+                    x += gw + 2;
+                }
+                x += 10;
+            }
+            y += 24;
+        }
+        let (s, c) = (-degrees).to_radians().sin_cos();
+        let mut out = white(w, h);
+        for yy in 0..h {
+            for xx in 0..w {
+                let (dx, dy) = (f64::from(xx) + 0.5 - f64::from(w) / 2.0, f64::from(yy) + 0.5 - f64::from(h) / 2.0);
+                let (sx, sy) = (f64::from(w) / 2.0 + c * dx - s * dy, f64::from(h) / 2.0 + s * dx + c * dy);
+                if sx >= 0.0 && sy >= 0.0 && sx < f64::from(w) && sy < f64::from(h) && upright.byte(sx, sy, 0) == 0 {
+                    fill(&mut out, xx, yy, 1, 1);
+                }
             }
         }
-        img
+        out
     }
 
     /// With the four opt-in flags off and a dpi at or above 300, the raster passes through
@@ -757,15 +711,16 @@ mod tests {
         assert_eq!(p.inverse_transform, InverseTransform::identity());
     }
 
-    /// The skew estimator sees a 3° shear (either direction) and leaves a straight page alone.
+    /// The detector sees a 3° skew (either direction) and leaves a straight page alone.
     #[test]
     fn skew_is_estimated_and_straight_pages_are_left_alone() {
+        let o = DeskewOptions::default();
         for degrees in [3.0, -3.0] {
-            let angle = estimate_skew(&sheared(degrees)).unwrap_or_else(|| panic!("{degrees}° should be found"));
-            assert!((angle - degrees).abs() <= 0.5, "{degrees}°: got {angle}");
+            let r = deskew::analyze(&sheared(degrees), &o);
+            assert!((r.applied_deg - degrees).abs() <= 0.5, "{degrees}°: got {r:?}");
         }
-        assert!(estimate_skew(&sheared(0.0)).is_none(), "a straight page is a no-op");
-        assert!(estimate_skew(&l_line()).is_none(), "glyph lines without a shear are a no-op");
+        assert!(!deskew::analyze(&sheared(0.0), &o).changes_page(), "a straight page is a no-op");
+        assert!(!deskew::analyze(&l_line(), &o).changes_page(), "glyph lines without a shear are a no-op");
     }
 
     /// Deskew straightens ±3° lines (the vertical span tightens) and the centre maps back to
@@ -953,25 +908,18 @@ mod tests {
     }
 
     /// The deskew inverse, checked at OFF-CENTRE points (the centre maps to itself under any
-    /// rotation, so it cannot catch a wrong sign): a point on a straightened line maps back
-    /// onto the sheared source line, uphill and downhill.
+    /// rotation, so it cannot catch a wrong sign): a horizontal run on the straightened page
+    /// maps back onto a line sloping by the skew, uphill and downhill, and the report says so.
     #[test]
     fn deskew_inverse_maps_off_centre_points_back_onto_the_source_line() {
-        for degrees in [3.0, -3.0] {
-            let src = sheared(degrees);
-            let p = preprocess(src, 300.0, &PreprocessOptions { deskew: true, ..Default::default() }).unwrap();
-            let slope = degrees.to_radians().tan();
-            // The corrected first line sits at y = 20 (the fixture's base); the same ink was
-            // at 20 + (x − 150)·slope in the source. Well off centre on purpose. The
-            // rotation moves x a little too (it mixes in y: at most sin(5°)·40 ≈ 3.5 px
-            // here), so the line is checked at the mapped x — a wrong sign still misses it
-            // by ±(x−150)·slope, 6+ px at these offsets.
-            for x in [30.0f64, 150.0, 270.0] {
-                let (sx, sy) = p.inverse_transform.apply(x, 20.0);
-                assert!((sx - x).abs() < 4.0, "{degrees}° x={x}: mapped to ({sx}, {sy})");
-                let expected = 20.0 + (sx - 150.0) * slope;
-                assert!((sy - expected).abs() < 2.0, "{degrees}° x={x}: ({sx}, {sy}), the source line is at {expected}");
-            }
+        for degrees in [3.0f64, -3.0] {
+            let p = preprocess(sheared(degrees), 300.0, &PreprocessOptions { deskew: true, ..Default::default() }).unwrap();
+            let report = p.deskew.expect("deskew was requested");
+            assert!((report.applied_deg - degrees).abs() <= 0.5, "{degrees}°: {report:?}");
+            let (x0, y0) = p.inverse_transform.apply(100.0, 200.0);
+            let (x1, y1) = p.inverse_transform.apply(500.0, 200.0);
+            let slope = ((y1 - y0) / (x1 - x0)).atan().to_degrees();
+            assert!((slope - report.applied_deg).abs() < 1e-6, "{degrees}°: mapped slope {slope}");
         }
     }
 }
