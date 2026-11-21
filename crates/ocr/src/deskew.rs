@@ -55,6 +55,11 @@ pub struct DeskewOptions {
     pub detect_orientation: bool,
     /// How much sharper the 90°-turned ink must score than the upright ink to call a page sideways.
     pub axis_ratio_min: f64,
+    /// Without searching orientation, still look at the 90°-turned ink and give no verdict at all
+    /// when the page looks like it lies on its side: a skew measured on sideways lines is
+    /// meaningless (it can be anything up to the search limit). The caller turns the page first and
+    /// measures again.
+    pub sideways_guard: bool,
     pub resample: Resample,
 }
 
@@ -66,6 +71,7 @@ impl Default for DeskewOptions {
             min_confidence: 0.2,
             detect_orientation: false,
             axis_ratio_min: 1.3,
+            sideways_guard: false,
             resample: Resample::Bilinear,
         }
     }
@@ -571,11 +577,14 @@ fn decide(a: &Analysis, o: &DeskewOptions) -> (DeskewReport, Option<[f32; 4]>) {
     let turned_points;
     let mut picked = upright;
     let mut axis_ratio = 0.0;
-    if o.detect_orientation {
+    if o.detect_orientation || o.sideways_guard {
         turned_points = turn_points(&a.points, 1);
         let sideways = coarse(&turned_points, max_deg);
         axis_ratio = sideways.best / picked.best.max(f64::MIN_POSITIVE);
         if axis_ratio > o.axis_ratio_min {
+            if !o.detect_orientation {
+                return (DeskewReport { axis_ratio, ..DeskewReport::default() }, None);
+            }
             chosen = &turned_points;
             k_axis = 1;
             picked = sideways;

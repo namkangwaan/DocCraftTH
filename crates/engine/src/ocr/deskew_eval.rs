@@ -343,7 +343,11 @@ fn deskew_eval_pipeline() {
     let mut files = Vec::new();
     collect(&dir, &mut files);
     let mut csv = std::fs::File::create(&out).unwrap();
-    writeln!(csv, "file,page,none_chars,none_conf,none_words,none_ms,dsk_chars,dsk_conf,dsk_words,dsk_ms,rot_chars,rot_conf,rot_words,rot_ms,rot_turns").unwrap();
+    writeln!(
+        csv,
+        "file,page,none_chars,none_conf,none_words,none_ms,dsk_chars,dsk_conf,dsk_words,dsk_ms,rot_chars,rot_conf,rot_words,rot_ms,rot_turns"
+    )
+    .unwrap();
     let began = Instant::now();
     let mut n = 0;
     for line in std::fs::read_to_string(list).unwrap_or_default().lines() {
@@ -356,11 +360,20 @@ fn deskew_eval_pipeline() {
         let mut ok = true;
         for (deskew, rotate) in [(false, false), (true, false), (true, true)] {
             let mut s = Session::new();
-            let Ok(id) = s.open("o.pdf", None, bytes.clone(), None) else { ok = false; break };
+            let Ok(id) = s.open("o.pdf", None, bytes.clone(), None) else {
+                ok = false;
+                break;
+            };
             let settings = OcrSettings { deskew, auto_rotate: rotate, ..base.clone() };
-            let Some(job) = s.ocr_job(id, &[p], settings) else { ok = false; break };
+            let Some(job) = s.ocr_job(id, &[p], settings) else {
+                ok = false;
+                break;
+            };
             let mut steps = job.steps();
-            let Some(Ok(shot)) = steps.next_page() else { ok = false; break };
+            let Some(Ok(shot)) = steps.next_page() else {
+                ok = false;
+                break;
+            };
             let t = Instant::now();
             let page = shot.read(&recognizers);
             let ms = t.elapsed().as_secs_f64() * 1000.0;

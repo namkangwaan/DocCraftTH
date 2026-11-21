@@ -24,6 +24,9 @@ pub struct PreprocessOptions {
     pub auto_rotate: bool,
     /// Straighten skewed text lines.
     pub deskew: bool,
+    /// With `deskew`: leave a page that looks like it lies on its side untouched (its skew cannot
+    /// be measured until it is turned upright); the report says so by its `axis_ratio`.
+    pub sideways_guard: bool,
     /// 3×3 median filter (salt-and-pepper noise).
     pub denoise: bool,
     /// Sauvola binarization (window 8, k 0.34).
@@ -85,7 +88,8 @@ pub fn preprocess(image: OcrImage, source_dpi: f32, options: &PreprocessOptions)
     // are step (b)'s job here, so the detector's own orientation search is off.
     let mut deskew_report = (options.auto_rotate || options.deskew).then(|| DeskewReport { orientation_turns: turned, ..DeskewReport::default() });
     if options.deskew {
-        let straightened = deskew::straighten(&current, &DeskewOptions { detect_orientation: false, ..Default::default() })?;
+        let straightened =
+            deskew::straighten(&current, &DeskewOptions { detect_orientation: false, sideways_guard: options.sideways_guard, ..Default::default() })?;
         if straightened.report.changes_page() {
             current = straightened.image;
             inverse = compose(&inverse, &straightened.inverse_transform);
@@ -149,6 +153,11 @@ impl InverseTransform {
     /// pixels back to the input raster.
     pub fn after_quarter_turns(&self, turns: u32, width: u32, height: u32) -> InverseTransform {
         compose(self, &inverse_quarter_turns(turns % 4, width, height))
+    }
+
+    /// This map applied after `inner`: `inner` takes a later step's pixels to this one's.
+    pub fn compose_with(&self, inner: &InverseTransform) -> InverseTransform {
+        compose(self, inner)
     }
 
     /// Map a point from the processed image back to the input raster.
@@ -722,7 +731,8 @@ mod tests {
     #[test]
     fn blank_pages_are_a_noop() {
         let src = white(200, 200);
-        let p = preprocess(src, 300.0, &PreprocessOptions { auto_rotate: true, deskew: true, denoise: true, binarize: true }).unwrap();
+        let p = preprocess(src, 300.0, &PreprocessOptions { auto_rotate: true, deskew: true, denoise: true, binarize: true, sideways_guard: false })
+            .unwrap();
         assert_eq!(p.inverse_transform, InverseTransform::identity());
     }
 
@@ -862,7 +872,7 @@ mod tests {
     #[test]
     fn hostile_inputs_never_panic() {
         let tiny = white(1, 1);
-        let all = PreprocessOptions { auto_rotate: true, deskew: true, denoise: true, binarize: true };
+        let all = PreprocessOptions { auto_rotate: true, deskew: true, denoise: true, binarize: true, sideways_guard: false };
         let p = preprocess(tiny, 300.0, &all).unwrap();
         assert_eq!((p.image.width, p.image.height), (1, 1));
         // All-black: no paper, nothing to judge.

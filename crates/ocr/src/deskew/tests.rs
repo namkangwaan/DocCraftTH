@@ -331,3 +331,15 @@ fn near_empty_pages_are_not_judged() {
     assert_eq!(r.confidence, 0.0, "no verdict at all");
     assert_eq!(straighten(&img(buf.clone()), &DeskewOptions::default()).unwrap().image.rgba(), &buf[..]);
 }
+
+/// With the guard on, a page lying on its side gets no verdict (its "skew" would be meaningless),
+/// while an upright page is measured as usual.
+#[test]
+fn the_sideways_guard_leaves_a_page_on_its_side_alone() {
+    let base = img(page(Kind::Thai, false));
+    let guard = DeskewOptions { sideways_guard: true, ..Default::default() };
+    let upright = analyze(&img(skew(&page(Kind::Thai, false), 2.0)), &guard);
+    assert!((upright.applied_deg - 2.0).abs() < 0.3, "{upright:?}");
+    let on_its_side = analyze(&rotate_quarter_turns(&base, 1), &guard);
+    assert!(!on_its_side.changes_page() && on_its_side.axis_ratio > 1.3, "{on_its_side:?}");
+}
