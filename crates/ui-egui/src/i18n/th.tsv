@@ -3185,3 +3185,32 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	{k} skipped: {why}	ข้าม {k} รายการ: {why}
 	{name}, {date} and {time} become your name, the date and the time.	{name}, {date} และ {time} จะกลายเป็นชื่อของคุณ วันที่ และเวลา
 	{why} ({n})	{why} ({n})
+	User guide	คู่มือการใช้งาน
+	Getting started	เริ่มต้นใช้งาน
+	Open a PDF with Open on the top bar, or drop a file onto the window. Each document opens in its own tab.	เปิดไฟล์ PDF ด้วยปุ่ม เปิด บนแถบด้านบน หรือลากไฟล์มาวางบนหน้าต่าง เอกสารแต่ละฉบับจะเปิดในแท็บของตัวเอง
+	DTHFrame works offline. Your files are processed on this device and are never uploaded.	DTHFrame ทำงานแบบออฟไลน์ ไฟล์ของคุณถูกประมวลผลบนอุปกรณ์เครื่องนี้และจะไม่ถูกอัปโหลดไปที่ใด
+	Finding a tool	ค้นหาเครื่องมือ
+	All tools on the left lists everything DTHFrame can do. The search box at the top finds a tool or a command by name.	เครื่องมือทั้งหมด ทางซ้ายแสดงทุกอย่างที่ DTHFrame ทำได้ ช่องค้นหาด้านบนใช้หาเครื่องมือหรือคำสั่งจากชื่อ
+	Reading a document	การอ่านเอกสาร
+	Use the zoom controls, or hold Ctrl (⌘ on a Mac) and scroll, to change the size. Move between pages with the arrow keys, Page Up and Page Down.	ปรับขนาดด้วยปุ่มซูม หรือกด Ctrl (⌘ บน Mac) ค้างไว้แล้วเลื่อนล้อเมาส์ เลื่อนไปมาระหว่างหน้าด้วยปุ่มลูกศร Page Up และ Page Down
+	Find searches the text of the open document.	ค้นหา จะหาข้อความในเอกสารที่เปิดอยู่
+	Working with pages	การจัดการหน้า
+	Organize pages rotates, deletes, reorders and inserts pages.	จัดระเบียบหน้า ใช้หมุน ลบ เรียงลำดับใหม่ และแทรกหน้า
+	Combine files merges several PDFs into one, and Split divides one PDF into several.	รวมไฟล์ ใช้รวม PDF หลายไฟล์เป็นไฟล์เดียว และ แบ่ง ใช้แบ่ง PDF ไฟล์เดียวออกเป็นหลายไฟล์
+	Editing and commenting	การแก้ไขและแสดงความคิดเห็น
+	Edit a PDF changes the text and images on a page.	แก้ไข PDF ใช้เปลี่ยนข้อความและรูปภาพบนหน้า
+	Add comments adds highlights, notes and drawings without changing the page itself.	เพิ่มความคิดเห็น ใช้เพิ่มไฮไลต์ โน้ต และภาพวาด โดยไม่เปลี่ยนเนื้อหาของหน้า
+	Forms and signatures	แบบฟอร์มและลายเซ็น
+	Prepare a form turns a document into a fillable form and finds the fields, including fields drawn as dotted lines.	เตรียมแบบฟอร์ม ใช้เปลี่ยนเอกสารให้เป็นแบบฟอร์มที่กรอกได้ และค้นหาช่องกรอก รวมถึงช่องที่เป็นเส้นจุดไข่ปลา
+	Fill & Sign completes a form and adds your signature or initials.	กรอกและเซ็น ใช้กรอกแบบฟอร์มและเพิ่มลายเซ็นหรืออักษรย่อของคุณ
+	Scanned documents	เอกสารสแกน
+	Scan & OCR makes scanned pages searchable. Open Recognize text…, choose the language (English or Thai) and start.	สแกนและ OCR ทำให้หน้าที่สแกนมาค้นหาได้ เปิด รู้จำข้อความ… เลือกภาษา (อังกฤษหรือไทย) แล้วเริ่มได้เลย
+	Each language needs its model. DTHFrame tells you when one is missing.	แต่ละภาษาต้องมีโมเดลของตัวเอง หากโมเดลหายไป DTHFrame จะแจ้งให้ทราบ
+	Protecting a document	การปกป้องเอกสาร
+	Protect a PDF sets a password.	ป้องกัน PDF ใช้ตั้งรหัสผ่าน
+	Redact a PDF permanently removes sensitive text and images. Check the result before you share the file.	ปิดทับข้อมูลใน PDF จะลบข้อความและรูปภาพที่ละเอียดอ่อนออกอย่างถาวร ตรวจผลลัพธ์ก่อนแชร์ไฟล์
+	Saving and exporting	การบันทึกและส่งออก
+	Save keeps your changes in the file, and Save as writes a copy.	บันทึก เก็บการเปลี่ยนแปลงไว้ในไฟล์ และ บันทึกเป็น สร้างสำเนาใหม่
+	Export a PDF saves pages as images, text or other formats, and Compress a PDF makes the file smaller.	ส่งออก PDF ใช้บันทึกหน้าเป็นรูปภาพ ข้อความ หรือรูปแบบอื่น และ บีบอัด PDF ทำให้ไฟล์เล็กลง
+	More help	ความช่วยเหลือเพิ่มเติม
+	Help ▸ Keyboard shortcuts lists every key. Help ▸ DTHFrame on GitHub opens the project page for questions and bug reports. Help ▸ About shows the version and credits.	วิธีใช้ ▸ แป้นพิมพ์ลัด แสดงปุ่มลัดทั้งหมด วิธีใช้ ▸ DTHFrame บน GitHub เปิดหน้าโครงการสำหรับถามคำถามและแจ้งข้อบกพร่อง วิธีใช้ ▸ เกี่ยวกับ DTHFrame แสดงเวอร์ชันและรายชื่อผู้มีส่วนร่วม
