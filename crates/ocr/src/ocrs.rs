@@ -286,7 +286,7 @@ impl Ocr {
         };
         match &self.engine {
             Engine::Ocrs(_) => Ok(None),
-            Engine::Ctc { model, dict, fixed_width, .. } => recognize_ctc_crop(&rgb, width, height, rect, model, dict, *fixed_width),
+            Engine::Ctc { model, dict, fixed_width, .. } => Ok(recognize_ctc_crop(&rgb, width, height, rect, model, dict, *fixed_width)?.map(|(text, _)| text)),
         }
     }
 }

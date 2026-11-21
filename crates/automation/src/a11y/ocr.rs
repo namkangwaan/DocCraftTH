@@ -46,6 +46,13 @@ impl Automation {
                 other => return Err(ToolError::InvalidArgs(format!("unsupported output mode {other:?} (searchable or editable)"))),
             };
         }
+        if let Some(m) = a.opt_str("deskew_mode")? {
+            settings.deskew_mode = match m.trim().to_ascii_lowercase().as_str() {
+                "transient" => pdfcraft_engine::ocr::DeskewMode::Transient,
+                "persistent" => pdfcraft_engine::ocr::DeskewMode::Persistent,
+                other => return Err(ToolError::InvalidArgs(format!("unsupported deskew_mode {other:?} (transient or persistent)"))),
+            };
+        }
         for (key, flag) in [
             ("auto_rotate", &mut settings.auto_rotate),
             ("deskew", &mut settings.deskew),
@@ -73,6 +80,31 @@ impl Automation {
                 .ok_or_else(|| ToolError::InvalidArgs(format!("unsupported digits {d:?}: use as_read, thai or arabic")))?;
         }
         Ok(settings)
+    }
+
+    /// Tools that cannot change the document refuse the persistent deskew mode rather than
+    /// quietly reading transiently.
+    fn refuse_persistent(settings: &pdfcraft_engine::ocr::OcrSettings, why: &str) -> Result<()> {
+        if settings.deskew_mode == pdfcraft_engine::ocr::DeskewMode::Persistent {
+            return Err(ToolError::InvalidArgs(format!("deskew_mode persistent changes the document, so {why}; use transient")));
+        }
+        Ok(())
+    }
+
+    /// What deskew measured on a page: the angle found, the angle applied (0 when the confidence
+    /// gate or the deadband left the page alone), the 0–1 confidence and the clockwise quarter
+    /// turns. `null` when deskew and auto_rotate were off.
+    pub(crate) fn deskew_json(report: Option<&pdfcraft_engine::ocr::DeskewReport>) -> Value {
+        let r2 = |v: f64| (v * 100.0).round() / 100.0;
+        match report {
+            Some(d) => json!({
+                "detected_deg": r2(d.detected_deg),
+                "applied_deg": r2(d.applied_deg),
+                "confidence": r2(d.confidence),
+                "orientation_turns": d.orientation_turns,
+            }),
+            None => Value::Null,
+        }
     }
 
     /// The optional `region` argument ([x0, y0, x1, y1] in points from the top-left of the
@@ -111,12 +143,14 @@ impl Automation {
             .map(|p| match &p.skipped {
                 Some(why) => json!({ "page": p.page + 1, "skipped": why }),
                 None => {
-                    let mut page = json!({ "page": p.page + 1, "words": p.words.len(), "already_on_page": p.already_on_page, "unusable_text": p.unusable_text });
+                    let mut page =
+                        json!({ "page": p.page + 1, "words": p.words.len(), "already_on_page": p.already_on_page, "unusable_text": p.unusable_text });
                     // The editable output's substitution warnings (characters no font could
                     // show) are part of the result: reported per page, never dropped.
                     if !p.notes.is_empty() {
                         page["notes"] = json!(p.notes);
                     }
+                    page["deskew"] = Self::deskew_json(p.deskew.as_ref());
                     if include_text {
                         page["text"] = json!(p.text());
                     }
@@ -128,6 +162,7 @@ impl Automation {
 
     pub(crate) fn ocr_recognize_files(&mut self, a: &Args) -> Result<Value> {
         let settings = self.ocr_settings(a)?;
+        Self::refuse_persistent(&settings, "batch files are written to a folder and the sources stay untouched")?;
         let folder = self.resolve(a.str("folder")?, true)?;
         // A path that leaves the read root refuses the whole call before any work starts;
         // a file that is merely missing stays a per-file error below.
@@ -252,6 +287,7 @@ impl Automation {
                 None
             }
             OutputMode::EditableText => {
+                Self::refuse_persistent(&settings, "the editable output is a new file and leaves the source untouched")?;
                 // The editable output writes the recognized text out of the document: a
                 // document that forbids copying refuses here, before anything runs.
                 self.doc_to_copy(a)?;
@@ -277,10 +313,22 @@ impl Automation {
         let recognizers = pdfcraft_engine::ocr::recognizers(&settings).map_err(failed)?;
         match out {
             None => {
+                // Persistent deskew straightens the scans in the document first (one undoable
+                // step); the read then sees the straightened pages.
+                let straightened = if settings.deskew_mode == pdfcraft_engine::ocr::DeskewMode::Persistent && settings.deskew {
+                    self.session.straighten_scans(id, &pages, &settings).map_err(failed)?
+                } else {
+                    Vec::new()
+                };
                 let (found, out) = self.session.with_own_js_output(id, |s| s.recognize_text(id, &pages, settings)).map_err(failed)?;
                 let warnings = out.errors;
                 let words = found.iter().map(|p| p.words.len()).sum::<usize>();
-                Ok(with_warnings(json!({ "words": words, "pages": Self::ocr_pages_json(&found, copy) }), warnings))
+                let mut result = json!({ "words": words, "pages": Self::ocr_pages_json(&found, copy) });
+                if !straightened.is_empty() {
+                    result["straightened"] =
+                        json!(straightened.iter().map(|(p, d)| json!({ "page": p + 1, "degrees": (d * 100.0).round() / 100.0 })).collect::<Vec<_>>());
+                }
+                Ok(with_warnings(result, warnings))
             }
             Some(out) => {
                 let job = self.session.ocr_job(id, &pages, settings).ok_or_else(|| failed("the document could not be read"))?;
@@ -305,6 +353,7 @@ impl Automation {
     /// Changes nothing; needs the engines (ocr_status).
     pub(crate) fn ocr_words(&mut self, a: &Args) -> Result<Value> {
         let mut settings = self.ocr_settings(a)?;
+        Self::refuse_persistent(&settings, "the read-only word list cannot apply it")?;
         let pages = if a.opt_ints("pages")?.is_some() { self.pages(a, "pages")? } else { Vec::new() };
         // The word list is the document's text, word by word: refused when the document
         // forbids copying it out.
@@ -375,6 +424,7 @@ impl Automation {
                     .collect();
                 let mut page =
                     json!({ "page": p.page + 1, "already_on_page": p.already_on_page, "words": words, "mean_confidence": p.mean_confidence().map(|c| (c * 10.0).round() / 10.0) });
+                page["deskew"] = Self::deskew_json(p.deskew.as_ref());
                 if let Some(why) = &p.skipped {
                     page["skipped"] = json!(why);
                 }

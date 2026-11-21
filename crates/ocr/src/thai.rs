@@ -393,7 +393,7 @@ pub(crate) fn recognize_ctc_crop(
     model: &rten::Model,
     dict: &[char],
     fixed_width: Option<usize>,
-) -> Result<Option<String>, OcrError> {
+) -> Result<Option<(String, f32)>, OcrError> {
     let crop_w = x1.saturating_sub(x0) as usize;
     let crop_h = y1.saturating_sub(y0) as usize;
     if crop_w == 0 || crop_h == 0 {
@@ -429,7 +429,7 @@ pub(crate) fn recognize_ctc_crop(
     let output = model.run_one(input.into(), None).map_err(|e| OcrError::Recognize(e.to_string()))?;
     let (shape, probs): ([usize; 3], Vec<f32>) = output.into_shape_vec().map_err(|e| OcrError::Recognize(e.to_string()))?;
     let classes = shape[2];
-    Ok(Some(crate::ctc::decode(&probs, classes, dict)))
+    Ok(Some(crate::ctc::decode_scored(&probs, classes, dict)))
 }
 
 /// The `[x0, y0, x1, y1]` crop of `rgb` (`width` × `height`, 3 or 1 channels) resized to
@@ -518,7 +518,7 @@ pub(crate) fn recognize_ctc(
         if x1 <= x0 || y1 <= y0 {
             continue;
         }
-        let Some(text) = recognize_ctc_crop(rgb, width, height, [x0, y0, x1, y1], model, dict, fixed_width)? else {
+        let Some((text, score)) = recognize_ctc_crop(rgb, width, height, [x0, y0, x1, y1], model, dict, fixed_width)? else {
             continue;
         };
         let trimmed = text.trim();
@@ -528,14 +528,14 @@ pub(crate) fn recognize_ctc(
         let parts: Vec<&str> = trimmed.split_whitespace().collect();
         let total_chars: usize = parts.iter().map(|p| p.chars().count().max(1)).sum();
         if parts.len() <= 1 || total_chars == 0 {
-            out.push(Line { words: vec![Word::new(trimmed.to_string(), [left, top, right, bottom], "ocrs")] });
+            out.push(Line { words: vec![Word::new(trimmed.to_string(), [left, top, right, bottom], "ocrs").with_confidence(score * 100.0)] });
         } else {
             let span = right - left;
             let mut cur = left;
             let mut words = Vec::new();
             for part in parts {
                 let w_span = span * (part.chars().count().max(1) as f32 / total_chars as f32);
-                words.push(Word::new(part.to_string(), [cur, top, cur + w_span, bottom], "ocrs"));
+                words.push(Word::new(part.to_string(), [cur, top, cur + w_span, bottom], "ocrs").with_confidence(score * 100.0));
                 cur += w_span;
             }
             out.push(Line { words });

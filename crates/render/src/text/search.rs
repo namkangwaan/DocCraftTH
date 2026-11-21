@@ -138,10 +138,12 @@ pub(super) fn find_in_text(text: &str, query: &str, sensitive: bool, whole_words
 /// is not a case distinction): NIKHAHIT + SARA AA (`ํา`, how Word exports `ำ`) is SARA AM (`ำ`).
 /// The composed entry keeps both glyphs, so a hit still covers the SARA AA glyph.
 /// A space between two Thai letters is dropped: Thai doesn't separate words with spaces, but OCR
-/// and legacy PDFs insert them, so `รายงานประจำปี` finds `รายงาน ประจำปี` and back. Digits
-/// and other scripts keep their spaces. A word boundary the dropped space (or a skipped zero
-/// width space) marked is kept as the flag of the next character. A lone NIKHAHIT or SARA AA no
-/// longer matches half of a decomposed `ํา`: it is one vowel now, as `ำ` always was.
+/// and legacy PDFs insert them, so `รายงานประจำปี` finds `รายงาน ประจำปี` and back. Thai digits
+/// (`๐–๙`) fold to ASCII (`0–9`), so an Arabic-digit query finds Thai digits in the document and
+/// vice versa, while keeping the original glyph span for highlighting. Other scripts keep their
+/// spaces. A word boundary the dropped space (or a skipped zero width space) marked is kept as
+/// the flag of the next character. A lone NIKHAHIT or SARA AA no longer matches half of a
+/// decomposed `ํา`: it is one vowel now, as `ำ` always was.
 fn normalise(chars: Vec<Entry>, boundary: &[bool]) -> (Vec<Entry>, Vec<bool>) {
     // Consonants, vowels, tone marks, ฯ and ๆ; not the baht sign (U+0E3F) or digits.
     let thai = |c: char| matches!(c, '\u{0E01}'..='\u{0E3A}' | '\u{0E40}'..='\u{0E4E}');
@@ -151,6 +153,12 @@ fn normalise(chars: Vec<Entry>, boundary: &[bool]) -> (Vec<Entry>, Vec<bool>) {
     let mut chars = chars.into_iter().enumerate().peekable();
     while let Some((i, e)) = chars.next() {
         let before = boundary.get(i).copied().unwrap_or(false);
+        let ch = if ('\u{0E50}'..='\u{0E59}').contains(&e.0) {
+            char::from_u32(u32::from(b'0') + (u32::from(e.0) - 0x0E50)).unwrap_or(e.0)
+        } else {
+            e.0
+        };
+        let e = (ch, e.1, e.2);
         if e.0 == ' ' && out.last().is_some_and(|l| thai(l.0)) && chars.peek().is_some_and(|(_, n)| thai(n.0)) {
             dropped = true;
             continue;

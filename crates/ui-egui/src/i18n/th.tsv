@@ -3214,3 +3214,11 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	Export a PDF saves pages as images, text or other formats, and Compress a PDF makes the file smaller.	ส่งออก PDF ใช้บันทึกหน้าเป็นรูปภาพ ข้อความ หรือรูปแบบอื่น และ บีบอัด PDF ทำให้ไฟล์เล็กลง
 	More help	ความช่วยเหลือเพิ่มเติม
 	Help ▸ Keyboard shortcuts lists every key. Help ▸ DTHFrame on GitHub opens the project page for questions and bug reports. Help ▸ About shows the version and credits.	วิธีใช้ ▸ แป้นพิมพ์ลัด แสดงปุ่มลัดทั้งหมด วิธีใช้ ▸ DTHFrame บน GitHub เปิดหน้าโครงการสำหรับถามคำถามและแจ้งข้อบกพร่อง วิธีใช้ ▸ เกี่ยวกับ DTHFrame แสดงเวอร์ชันและรายชื่อผู้มีส่วนร่วม
+
+# DocCraftTH: automatic deskew and orientation check before text recognition (AI-assisted, not separately native-reviewed).
+	Also straighten the page in the document	ปรับหน้าในเอกสารให้ตรงด้วย
+	The scan is turned on the page (one undo step) before it is read; otherwise only the image that is read is straightened	หมุนภาพสแกนบนหน้าให้ตรงก่อนอ่าน (ย้อนกลับได้ในขั้นเดียว) ถ้าไม่เลือก จะปรับเฉพาะภาพที่ใช้อ่านเท่านั้น
+	STRAIGHTENING	การปรับให้ตรง
+	Straight	ตรงอยู่แล้ว
+	turn	หมุน
+	skew	เอียง
