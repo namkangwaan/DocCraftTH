@@ -9544,7 +9544,8 @@ fn unusable_and_good_text_pages() -> Vec<u8> {
         })
         .collect();
     s.apply(id, Edit::AddOcrText { page: 0, words: pua }).unwrap();
-    let good = PlacedWord { text: "quick".into(), origin: [72.0, h - 100.0], across: [60.0, 0.0], up: [0.0, 14.0], confidence: None, source: "ocrs".into() };
+    let good =
+        PlacedWord { text: "quick".into(), origin: [72.0, h - 100.0], across: [60.0, 0.0], up: [0.0, 14.0], confidence: None, source: "ocrs".into() };
     s.apply(id, Edit::AddOcrText { page: 1, words: vec![good] }).unwrap();
     s.save_bytes(id).unwrap().as_ref().clone()
 }

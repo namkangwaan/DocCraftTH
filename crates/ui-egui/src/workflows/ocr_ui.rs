@@ -147,15 +147,13 @@ impl OcrDraft {
         if let Some(m) = v["output_mode"].as_str() {
             self.output_mode = OutputMode::parse(m);
         }
-        for (key, flag) in
-            [
+        for (key, flag) in [
             ("auto_rotate", &mut self.auto_rotate),
             ("deskew", &mut self.deskew),
             ("deskew_in_document", &mut self.deskew_in_document),
             ("denoise", &mut self.denoise),
             ("binarize", &mut self.binarize),
-        ]
-        {
+        ] {
             if let Some(on) = v[key].as_bool() {
                 *flag = on;
             }
@@ -453,8 +451,9 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
         ui.add_enabled(!d.text_pages, crate::widgets::checkbox(&mut d.read_unusable_text, tl!("Also recognize pages whose text is unusable")));
         ui.add(crate::widgets::checkbox(&mut d.auto_rotate, tl!("Straighten pages scanned sideways or upside down")));
         ui.add(crate::widgets::checkbox(&mut d.deskew, tl!("Straighten skewed text lines")));
-        ui.add_enabled(d.deskew, crate::widgets::checkbox(&mut d.deskew_in_document, tl!("Also straighten the page in the document")))
-            .on_hover_text(tl!("The scan is turned on the page (one undo step) before it is read; otherwise only the image that is read is straightened"));
+        ui.add_enabled(d.deskew, crate::widgets::checkbox(&mut d.deskew_in_document, tl!("Also straighten the page in the document"))).on_hover_text(
+            tl!("The scan is turned on the page (one undo step) before it is read; otherwise only the image that is read is straightened"),
+        );
         ui.add(crate::widgets::checkbox(&mut d.denoise, tl!("Remove scan speckle")));
         ui.add(crate::widgets::checkbox(&mut d.binarize, tl!("Black and white (binarize)")));
     });
@@ -1348,7 +1347,14 @@ mod tests {
         let words = if skipped.is_some() {
             Vec::new()
         } else {
-            vec![PlacedWord { text: "word".into(), origin: [72.0, 700.0], across: [40.0, 0.0], up: [0.0, 12.0], confidence: None, source: "ocrs".into() }]
+            vec![PlacedWord {
+                text: "word".into(),
+                origin: [72.0, 700.0],
+                across: [40.0, 0.0],
+                up: [0.0, 12.0],
+                confidence: None,
+                source: "ocrs".into(),
+            }]
         };
         OcrPage { page, words, already_on_page: 0, skipped: skipped.map(Into::into), unusable_text, notes: Vec::new(), deskew: None }
     }
@@ -1582,7 +1588,15 @@ mod tests {
         };
         let finished = |app: &PdfCraftApp, automatic: bool| {
             let generation = app.session.get(app.active_ids().unwrap().1).unwrap().edit_generation();
-            let page = pdfcraft_engine::ocr::OcrPage { page: 0, words: vec![word()], already_on_page: 0, skipped: None, unusable_text: false, notes: Vec::new(), deskew: None };
+            let page = pdfcraft_engine::ocr::OcrPage {
+                page: 0,
+                words: vec![word()],
+                already_on_page: 0,
+                skipped: None,
+                unusable_text: false,
+                notes: Vec::new(),
+                deskew: None,
+            };
             let progress = Arc::new(Mutex::new(OcrProgress { done: 1, total: 1, result: Some(Ok(vec![page])), cancel: false }));
             let guard = app.session.ocr_guard(app.active_ids().unwrap().1).unwrap();
             OcrRun {
@@ -1643,7 +1657,14 @@ mod tests {
         };
         let progress = Arc::new(Mutex::new(OcrProgress { done: 1, total: 1, result: Some(Ok(vec![page])), cancel: false }));
         let guard = app.session.ocr_guard(id).unwrap();
-        app.ocr_run = Some(OcrRun { doc: id, progress, guard, settings: OcrSettings::default(), automatic: Some(AutoOcr { page: 0, generation }), editable: false });
+        app.ocr_run = Some(OcrRun {
+            doc: id,
+            progress,
+            guard,
+            settings: OcrSettings::default(),
+            automatic: Some(AutoOcr { page: 0, generation }),
+            editable: false,
+        });
         app.views[0].auto_ocr_tried.insert(0);
         // The document changes while the run is out.
         let mut png = std::io::Cursor::new(Vec::new());
