@@ -6827,8 +6827,8 @@ milestone = "M10"
 status = "partial"
 commands = ["ocr.recognize"]
 tools = ["ocr_recognize"]
-evidence = ["crates/ocr/src/preprocess.rs::quarter_turns_are_detected_corrected_and_mapped_back", "crates/ocr/src/preprocess.rs::realistic_letter_pages_are_left_upright"]
-notes = "Opt-in preprocessing: 0/90/180/270 detected from projection-profile banding (conservative: under 32 px, blank, or without a clear margin it is a no-op); word boxes map back to the scanned raster through the exact inverse. Correction is proven at the preprocessing layer and the flag flows through the job (needs the models), but correction of a genuinely rotated page through the workflow is not yet covered by a cited end-to-end test."
+evidence = ["crates/engine/src/ocr.rs::a_poor_reading_is_retried_upside_down_and_the_better_one_wins", "crates/engine/src/ocr.rs::a_good_or_unimproved_reading_is_not_flipped", "crates/engine/src/ocr.rs::an_engine_without_confidence_is_read_once", "crates/ocr/src/ctc.rs::scored_decoding_reports_the_mean_winning_probability", "crates/ocr/src/preprocess.rs::quarter_turns_are_detected_corrected_and_mapped_back", "crates/ui-egui/src/workflows/ocr_verify.rs::the_info_strip_says_what_straightening_did"]
+notes = "On by default (auto_rotate): the orientation is verified by reading, because ink alone cannot tell (on real scans the ink cue turned upright numeric tables on their side and flipped upright pages). A page that reads poorly upright, with a mean confidence under the low-confidence bar (60), is also read turned 90, 270 and 180 degrees, the ink guess first, and a turn that reads at least 15 points better with at least 20 characters wins; word boxes map back through the exact inverse and the page reports the turn. A page that reads well, or an engine that reports no confidence (the English ocrs engine), is read once. The Thai reader reports a per-line confidence (mean winning probability of the characters it writes); it reported none before. On 150 real scans 22 pages (14.7 percent) were turned (18 by 90 and 4 by 270 degrees): they went from 105 to 22,871 characters and from 34 to 84 mean confidence, the other 128 read exactly as before, and the cost was 1.31 times the OCR time. Missing: the web build, whose worker reads one image and cannot verify the orientation; no upside-down (180 degree) page was in the sample, so that turn is only tested with a scripted reader; the confidence is the model's, not agreement with known text. The older ink-only detector remains in preprocess for direct callers (auto_rotate there) and its search in the deskew module is off by default."
 
 [[feature]]
 id = "ocr.deskew"
@@ -6836,11 +6836,23 @@ title = "Deskew"
 area = "I"
 tier = "P1"
 milestone = "M10"
-status = "partial"
+status = "shipped"
 commands = ["ocr.recognize"]
-tools = ["ocr_recognize"]
-evidence = ["crates/ocr/src/preprocess.rs::skew_is_estimated_and_straight_pages_are_left_alone", "crates/ocr/src/preprocess.rs::deskew_inverse_maps_off_centre_points_back_onto_the_source_line"]
-notes = "Opt-in: skew estimated over +/-5 degrees by a shear-scored projection profile; conservative no-ops (under 64 px, blank, below 0.1 degrees, no clear winner); boxes map back off-centre-exact through the composed inverse. Correction is proven at the preprocessing layer; a cited end-to-end test of a skewed page through the workflow is still owed."
+tools = ["ocr_recognize", "ocr_words", "page_enhance_scan"]
+evidence = ["crates/ocr/src/deskew/tests.rs::english_pages_are_measured", "crates/ocr/src/deskew/tests.rs::thai_pages_with_marks_are_measured", "crates/ocr/src/deskew/tests.rs::forms_with_dot_leaders_and_rules_are_measured", "crates/ocr/src/deskew/tests.rs::seals_do_not_fool_the_search", "crates/ocr/src/deskew/tests.rs::black_scanner_borders_do_not_fool_the_search", "crates/ocr/src/deskew/tests.rs::straight_pages_are_never_rotated", "crates/ocr/src/deskew/tests.rs::near_empty_pages_are_not_judged", "crates/ocr/src/deskew/tests.rs::angle_error_and_speed_meet_the_targets", "crates/ocr/src/preprocess.rs::deskew_inverse_maps_off_centre_points_back_onto_the_source_line", "crates/engine/src/ocr.rs::pages_carry_the_deskew_report", "crates/automation/tests/it/automation.rs::page_enhance_scan_straightens_a_skewed_scan_and_reports_the_angle", "crates/ui-egui/src/workflows/ocr_verify.rs::the_info_strip_says_what_straightening_did"]
+notes = "On by default before every OCR read (a confidence gate leaves straight, blank and text-less pages untouched; they are returned byte for byte). The page is reduced to about 1100 px, ink is taken with an adaptive threshold, and seals, frames, vertical rules and black scanner borders are suppressed while dot leaders and horizontal rules are kept (they run along the lines); a page needs at least 30 text-like marks to be judged. Skew up to 20 degrees is searched in three stages (1, 0.2 and 0.05 degrees, parabolic refinement) and the page is turned about its centre with bilinear resampling, paper-colour fill, the content shrunk only as far as needed to stay on the page, and an exact inverse so word boxes map back to the scan. Each page carries what was measured (detected and applied degrees, confidence), shown in OCR Verify's info strip and in the ocr_recognize and ocr_words page results. Measured on 7,075 real scanned pages (979 PDFs, sampled up to 100 pages per file): 54 percent were turned, mostly by under 1 degree; the skew left after straightening has a median of 0.03 degrees; analysis takes a median of 39 ms per A4 page at 300 dpi natively and 67 to 123 ms in WASM. On 150 of those pages the Thai reader found 7.7 percent more characters with it, and on synthetic Thai text skewed 2 and 5 degrees CER stayed within 0.005 of the straight page (opt-in tests; they need the models). Not covered: angle accuracy against known true angles on real scans (synthetic pages only), pages with very little text that still pass the gate, skew beyond 20 degrees."
+
+[[feature]]
+id = "ocr.deskew-in-document"
+title = "Straighten the scan in the document"
+area = "I"
+tier = "P2"
+milestone = "M10"
+status = "shipped"
+commands = ["ocr.recognize"]
+tools = ["ocr_recognize", "page_enhance_scan"]
+evidence = ["crates/engine/src/tests.rs::persistent_deskew_straightens_the_scan_in_the_document_and_undoes", "crates/automation/tests/it/automation.rs::page_enhance_scan_straightens_a_skewed_scan_and_reports_the_angle", "crates/automation/tests/it/automation.rs::ocr_deskew_mode_is_validated_and_persistent_is_refused_where_it_cannot_apply", "crates/ui-egui/src/workflows/ocr_ui.rs::straightening_choices_reach_the_engine_settings"]
+notes = "Opt-in (deskew_mode persistent in ocr_recognize, Recognize text's Also straighten the page in the document, or page_enhance_scan with straighten): before reading, the scan picture on each skewed page is turned about its centre by the measured skew and shrunk just enough to stay on the page, as one undoable step; the text layer is then read from the straightened page. Only a page with a picture covering at least 60 percent of it is changed. Not available with the editable output, ocr_words or ocr_recognize_files, which refuse it rather than read transiently; quarter turns are not written into the document; annotations on the page are not moved with the picture."
 
 [[feature]]
 id = "ocr.despeckle"
