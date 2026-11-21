@@ -107,6 +107,8 @@ pub enum Dialog {
     Properties(PropsTab),
     About,
     Shortcuts,
+    /// Help ▸ User guide.
+    UserGuide,
     Split,
     /// Pages ▸ Number pages… (page labels).
     NumberPages,

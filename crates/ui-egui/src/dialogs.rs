@@ -163,6 +163,7 @@ fn dialogs(app: &mut PdfCraftApp, ctx: &egui::Context) {
             Dialog::FieldProps | Dialog::BulkFieldProps => 600.0,
             Dialog::Preferences => 610.0,
             Dialog::About => 820.0,
+            Dialog::UserGuide => 640.0,
             Dialog::PinTool => 540.0,
             _ => 520.0,
         });
@@ -527,6 +528,11 @@ fn dialog_body(ui: &mut egui::Ui, app: &mut PdfCraftApp, dialog: Dialog, req: &m
         }
         Dialog::Shortcuts => {
             if !dialog_shortcuts(ui) {
+                return false;
+            }
+        }
+        Dialog::UserGuide => {
+            if !dialog_user_guide(ui) {
                 return false;
             }
         }
@@ -1652,6 +1658,100 @@ fn dialog_shortcuts(ui: &mut egui::Ui) -> bool {
                 ui.end_row();
             }
         });
+    });
+    true
+}
+
+/// `Dialog::UserGuide` content: a short guide to the tools, in the interface language. Returns
+/// `false` when it has its own buttons and no footer is wanted.
+fn dialog_user_guide(ui: &mut egui::Ui) -> bool {
+    let t = Tokens::get(ui.ctx());
+    ui.label(egui::RichText::new(tl!("User guide")).font(theme::semibold(18.0)));
+    ui.add_space(8.0);
+    let section = |ui: &mut egui::Ui, heading: &str, paragraphs: &[&str]| {
+        ui.add_space(6.0);
+        ui.label(egui::RichText::new(heading).font(theme::semibold(14.0)));
+        for paragraph in paragraphs {
+            ui.add(egui::Label::new(egui::RichText::new(*paragraph).color(t.text_muted)).wrap());
+        }
+    };
+    egui::ScrollArea::vertical().max_height(460.0).auto_shrink([false, true]).show(ui, |ui| {
+        section(
+            ui,
+            tl!("Getting started"),
+            &[
+                tl!("Open a PDF with Open on the top bar, or drop a file onto the window. Each document opens in its own tab."),
+                tl!("DTHFrame works offline. Your files are processed on this device and are never uploaded."),
+            ],
+        );
+        section(
+            ui,
+            tl!("Finding a tool"),
+            &[tl!("All tools on the left lists everything DTHFrame can do. The search box at the top finds a tool or a command by name.")],
+        );
+        section(
+            ui,
+            tl!("Reading a document"),
+            &[
+                tl!("Use the zoom controls, or hold Ctrl (⌘ on a Mac) and scroll, to change the size. Move between pages with the arrow keys, Page Up and Page Down."),
+                tl!("Find searches the text of the open document."),
+            ],
+        );
+        section(
+            ui,
+            tl!("Working with pages"),
+            &[
+                tl!("Organize pages rotates, deletes, reorders and inserts pages."),
+                tl!("Combine files merges several PDFs into one, and Split divides one PDF into several."),
+            ],
+        );
+        section(
+            ui,
+            tl!("Editing and commenting"),
+            &[
+                tl!("Edit a PDF changes the text and images on a page."),
+                tl!("Add comments adds highlights, notes and drawings without changing the page itself."),
+            ],
+        );
+        section(
+            ui,
+            tl!("Forms and signatures"),
+            &[
+                tl!("Prepare a form turns a document into a fillable form and finds the fields, including fields drawn as dotted lines."),
+                tl!("Fill & Sign completes a form and adds your signature or initials."),
+            ],
+        );
+        section(
+            ui,
+            tl!("Scanned documents"),
+            &[
+                tl!("Scan & OCR makes scanned pages searchable. Open Recognize text…, choose the language (English or Thai) and start."),
+                tl!("Each language needs its model. DTHFrame tells you when one is missing."),
+            ],
+        );
+        section(
+            ui,
+            tl!("Protecting a document"),
+            &[
+                tl!("Protect a PDF sets a password."),
+                tl!("Redact a PDF permanently removes sensitive text and images. Check the result before you share the file."),
+            ],
+        );
+        section(
+            ui,
+            tl!("Saving and exporting"),
+            &[
+                tl!("Save keeps your changes in the file, and Save as writes a copy."),
+                tl!("Export a PDF saves pages as images, text or other formats, and Compress a PDF makes the file smaller."),
+            ],
+        );
+        section(
+            ui,
+            tl!("More help"),
+            &[
+                tl!("Help ▸ Keyboard shortcuts lists every key. Help ▸ DTHFrame on GitHub opens the project page for questions and bug reports. Help ▸ About shows the version and credits."),
+            ],
+        );
     });
     true
 }

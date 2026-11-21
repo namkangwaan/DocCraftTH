@@ -427,6 +427,7 @@ pub const COMMANDS: &[CommandSpec] = &[
     c("prepress.convert_colors", "Convert colours…", None, None, Modification, "palette"),
     c("prepress.hairlines", "Fix hairlines…", None, None, Modification, "minus"),
     c("page.properties", "Page properties…", PAGES, None, Modification, "info"),
+    c("help.user_guide", "User guide", HELP, None, Nothing, "book-open"),
     c("help.shortcuts", "Keyboard shortcuts", HELP, None, Nothing, "circle-help"),
     c("help.discord", "Join the ArtCraft Discord", None, None, Nothing, "messages-square"),
     c("help.app_page", "PdfCraft web page", None, None, Nothing, "globe"),
