@@ -320,3 +320,65 @@ fn deskew_eval_ocr() {
     }
     eprintln!("finished {n} pages in {:.0}s", began.elapsed().as_secs_f64());
 }
+
+/// The product pipeline end to end on the pages named in `DESKEW_EVAL_PAGES`, in three
+/// configurations: nothing, deskew only, deskew plus the orientation check
+/// (`OcrShot::read`). Per page: characters, mean confidence, words and milliseconds of each, and
+/// the turn the last one chose. Needs the Thai models. Writes `DESKEW_EVAL_OUT`.
+#[test]
+#[ignore = "OCR over chosen pages of a folder of real PDFs (DESKEW_EVAL_DIR, DESKEW_EVAL_PAGES, DESKEW_EVAL_OUT, PDFCRAFT_MODELS)"]
+fn deskew_eval_pipeline() {
+    let (Some(dir), Some(list), Some(out)) =
+        (std::env::var_os("DESKEW_EVAL_DIR"), std::env::var_os("DESKEW_EVAL_PAGES"), std::env::var_os("DESKEW_EVAL_OUT"))
+    else {
+        eprintln!("skipped: set DESKEW_EVAL_DIR, DESKEW_EVAL_PAGES and DESKEW_EVAL_OUT");
+        return;
+    };
+    let base = OcrSettings { language: "th".into(), skip_text_pages: true, force_ocr: false, dpi: 300.0, ..Default::default() };
+    let Ok(recognizers) = recognizers(&base) else {
+        eprintln!("skipped: the Thai OCR models are not installed (set PDFCRAFT_MODELS)");
+        return;
+    };
+    let (dir, out) = (PathBuf::from(dir), PathBuf::from(out));
+    let mut files = Vec::new();
+    collect(&dir, &mut files);
+    let mut csv = std::fs::File::create(&out).unwrap();
+    writeln!(csv, "file,page,none_chars,none_conf,none_words,none_ms,dsk_chars,dsk_conf,dsk_words,dsk_ms,rot_chars,rot_conf,rot_words,rot_ms,rot_turns").unwrap();
+    let began = Instant::now();
+    let mut n = 0;
+    for line in std::fs::read_to_string(list).unwrap_or_default().lines() {
+        let Some((f, p)) = line.trim().split_once(':') else { continue };
+        let (Ok(f), Ok(p)) = (f.parse::<usize>(), p.parse::<usize>()) else { continue };
+        let Some(path) = files.get(f) else { continue };
+        let bytes = Arc::new(std::fs::read(path).unwrap());
+        let mut row = format!("{f},{p}");
+        let mut turns = 0;
+        let mut ok = true;
+        for (deskew, rotate) in [(false, false), (true, false), (true, true)] {
+            let mut s = Session::new();
+            let Ok(id) = s.open("o.pdf", None, bytes.clone(), None) else { ok = false; break };
+            let settings = OcrSettings { deskew, auto_rotate: rotate, ..base.clone() };
+            let Some(job) = s.ocr_job(id, &[p], settings) else { ok = false; break };
+            let mut steps = job.steps();
+            let Some(Ok(shot)) = steps.next_page() else { ok = false; break };
+            let t = Instant::now();
+            let page = shot.read(&recognizers);
+            let ms = t.elapsed().as_secs_f64() * 1000.0;
+            let chars: usize = page.words.iter().map(|w| w.text.chars().count()).sum();
+            row.push_str(&format!(",{chars},{:.2},{},{ms:.0}", page.mean_confidence().unwrap_or(f32::NAN), page.words.len()));
+            if rotate {
+                turns = page.deskew.map_or(0, |d| d.orientation_turns);
+            }
+        }
+        if !ok {
+            continue;
+        }
+        writeln!(csv, "{row},{turns}").unwrap();
+        csv.flush().unwrap();
+        n += 1;
+        if n % 10 == 0 {
+            eprintln!("{n} pages, {:.0}s", began.elapsed().as_secs_f64());
+        }
+    }
+    eprintln!("finished {n} pages in {:.0}s", began.elapsed().as_secs_f64());
+}

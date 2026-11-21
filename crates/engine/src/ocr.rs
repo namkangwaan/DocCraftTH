@@ -1148,6 +1148,9 @@ impl OcrShot {
                 } else {
                     self.digits.apply(&placed.text)
                 };
+                if matches!(self.options.language.as_str(), "th" | "tha") {
+                    placed.text = normalise_thai_mark_order(&placed.text);
+                }
                 placed
             })
             .collect::<Vec<_>>();
@@ -1162,6 +1165,44 @@ impl OcrShot {
         }
         OcrPage { page, words, already_on_page: already.len(), skipped: None, unusable_text: self.unusable_text, notes, deskew }
     }
+}
+
+/// Canonicalise Thai combining mark and Sara Am (`ำ`) order emitted by CTC/OCR models:
+/// - `ํ + า` → `ำ` (`U+0E33`), and `ํ + tone + า` → `tone + ำ`
+/// - `ำ + tone` → `tone + ำ` (e.g. `คำ่` → `ค่ำ`, `คลำ้` → `คล้ำ`)
+/// - `tone + above/below vowel` → `above/below vowel + tone` (e.g. `้ั` → `ั้`)
+fn normalise_thai_mark_order(text: &str) -> String {
+    let is_tone = |c: char| matches!(c, '\u{0E48}'..='\u{0E4B}' | '\u{0E4C}');
+    let is_vowel = |c: char| matches!(c, '\u{0E31}' | '\u{0E34}'..='\u{0E3A}');
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len());
+    let mut i = 0usize;
+    while let Some(&c) = chars.get(i) {
+        let next = chars.get(i + 1).copied();
+        let next2 = chars.get(i + 2).copied();
+        if c == '\u{0E4D}' && next == Some('\u{0E32}') {
+            out.push('\u{0E33}');
+            i += 2;
+        } else if c == '\u{0E4D}' && next.is_some_and(is_tone) && next2 == Some('\u{0E32}') {
+            if let Some(t) = next {
+                out.push(t);
+            }
+            out.push('\u{0E33}');
+            i += 3;
+        } else if c == '\u{0E33}' && let Some(t) = next.filter(|&n| is_tone(n)) {
+            out.push(t);
+            out.push('\u{0E33}');
+            i += 2;
+        } else if is_tone(c) && let Some(v) = next.filter(|&n| is_vowel(n)) {
+            out.push(v);
+            out.push(c);
+            i += 2;
+        } else {
+            out.push(c);
+            i += 1;
+        }
+    }
+    out
 }
 
 /// Whether a word's pixel box may reach the content stream: width and height (right − left,
@@ -3004,5 +3045,15 @@ mod tests {
         let page = shot.place(Ok(pdfcraft_ocr::StrategyOutcome { lines, ..Default::default() }));
         let got: Vec<&str> = page.words.iter().map(|w| w.text.as_str()).collect();
         assert_eq!(got, vec!["ที่", "ศธ", "๐๒๐๖.๔/ว", "๑๗", "รองรับ", "ISO", "9001", "และ", "UTF-8", "๓๐๐", "จุด", "Windows", "10", "v2.1", "๒๕๖๙"]);
+    }
+
+    #[test]
+    fn thai_mark_order_fixes_sara_am_and_swapped_tone_marks() {
+        assert_eq!(normalise_thai_mark_order("คำ่"), "ค่ำ");
+        assert_eq!(normalise_thai_mark_order("คลำ้"), "คล้ำ");
+        assert_eq!(normalise_thai_mark_order("ค\u{0E4D}\u{0E48}\u{0E32}"), "ค่ำ");
+        assert_eq!(normalise_thai_mark_order("ท\u{0E4D}\u{0E32}"), "ทำ");
+        assert_eq!(normalise_thai_mark_order("ต\u{0E49}\u{0E31}ง"), "ตั้ง");
+        assert_eq!(normalise_thai_mark_order("คล้ำ ค่ำ น้ำ"), "คล้ำ ค่ำ น้ำ");
     }
 }

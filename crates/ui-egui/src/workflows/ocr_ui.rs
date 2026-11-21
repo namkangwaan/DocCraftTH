@@ -43,7 +43,7 @@ pub struct OcrDraft {
     pub engine: EngineChoice,
     /// How two engines' readings combine.
     pub strategy: MergeStrategy,
-    /// Preprocessing flags, all off by default.
+    /// Preprocessing flags: orientation check and deskew are on by default (every OCR run checks them first).
     pub auto_rotate: bool,
     pub deskew: bool,
     pub denoise: bool,
@@ -72,8 +72,8 @@ impl Default for OcrDraft {
             text_pages: false,
             engine: EngineChoice::default(),
             strategy: MergeStrategy::default(),
-            auto_rotate: false,
-            deskew: false,
+            auto_rotate: true,
+            deskew: true,
             denoise: false,
             binarize: false,
             output_mode: OutputMode::default(),
