@@ -58,8 +58,11 @@ let layer = visible_text_layer(&placed, &plan);          // visible text: the ed
   normalization to 300 (only when one of the steps below is on, since they are calibrated for
   it; with all of them off the raster is read exactly as rendered, and a scan at or above 300
   is left alone), then the opt-in steps —
-  orientation (90°/180°/270° from projection-profile banding), deskew (± 5°, shear-scored,
-  below 0.1° is a no-op), denoise (3×3 median) and binarization (Sauvola, window 8, k 0.34).
+  orientation (90°/180°/270° from projection-profile banding; the engine no longer trusts it
+  alone and verifies the turn by reading, see below), deskew (the `deskew` module: ±20°,
+  three-stage projection search on a ~1100 px copy, seals / frames / black scanner borders
+  suppressed, confidence gate and a 0.2° dead band, bilinear warp), denoise (3×3 median) and
+  binarization (Sauvola, window 8, k 0.34).
   Every geometric step composes one exact affine `InverseTransform`, and callers map every
   word box back to the original raster before placing it. The heuristics are conservative and
   panic-free: too small to judge, blank, or no clear winner is a no-op, never a guess.

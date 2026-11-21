@@ -10848,7 +10848,14 @@ fn ocr_words_refresh_only_the_page_content_they_add() {
     take_full_refreshes();
     let word =
         PlacedWord { text: "HELLO".into(), origin: [40.0, 40.0], across: [60.0, 0.0], up: [0.0, 20.0], confidence: None, source: "ocrs".into() };
-    assert_eq!(s.apply_ocr(id, &[OcrPage { page: 1, words: vec![word], already_on_page: 0, skipped: None, unusable_text: false, notes: Vec::new() }]).unwrap(), 1);
+    assert_eq!(
+        s.apply_ocr(
+            id,
+            &[OcrPage { page: 1, words: vec![word], already_on_page: 0, skipped: None, unusable_text: false, notes: Vec::new(), deskew: None }]
+        )
+        .unwrap(),
+        1
+    );
     assert_eq!(take_full_refreshes(), 0, "applying OCR words doesn't re-inspect the document");
     let after = s.get(id).unwrap();
     assert_eq!(format!("{:?}", (&after.info.pages, &after.info.annotations, &after.info.fields, &after.links, after.marks())), view);
@@ -13491,8 +13498,14 @@ fn a_page_whose_text_maps_to_private_use_is_unusable() {
 
     let blank = s.create_blank(612.0, 792.0, 1).unwrap();
     let thai = s.open("thai.pdf", None, blank, None).unwrap();
-    let word =
-        ocr::PlacedWord { text: "รายงานประจำปี".into(), origin: [72.0, 700.0], across: [120.0, 0.0], up: [0.0, 16.0], confidence: None, source: "ocrs".into() };
+    let word = ocr::PlacedWord {
+        text: "รายงานประจำปี".into(),
+        origin: [72.0, 700.0],
+        across: [120.0, 0.0],
+        up: [0.0, 16.0],
+        confidence: None,
+        source: "ocrs".into(),
+    };
     s.apply(thai, Edit::AddOcrText { page: 0, words: vec![word] }).unwrap();
     let mut r = pdfcraft_render::PageRenderer::new(s.get(thai).unwrap().bytes.clone(), pdfcraft_render::RenderConfig::default());
     assert!(!r.render(RenderRequestFor::text(0)).text.expect("page has text").is_unusable(), "ordinary Thai text is usable");
@@ -13549,7 +13562,14 @@ fn reading_unusable_text_leaves_pages_with_good_text_alone() {
         (p.width as f64, p.height as f64)
     };
     s.apply(id, Edit::AddOcrText { page: 0, words: private_use_words(w, h) }).unwrap();
-    let good = ocr::PlacedWord { text: "quick".into(), origin: [72.0, h - 100.0], across: [60.0, 0.0], up: [0.0, 14.0], confidence: None, source: "ocrs".into() };
+    let good = ocr::PlacedWord {
+        text: "quick".into(),
+        origin: [72.0, h - 100.0],
+        across: [60.0, 0.0],
+        up: [0.0, 14.0],
+        confidence: None,
+        source: "ocrs".into(),
+    };
     s.apply(id, Edit::AddOcrText { page: 1, words: vec![good] }).unwrap();
 
     let found = s.recognize_text(id, &[], ocr::OcrSettings { read_unusable_text: true, ..Default::default() }).unwrap();
@@ -13569,11 +13589,19 @@ fn recognized_text_is_one_undo_step_and_an_incremental_save() {
     let original = s.get(id).unwrap().bytes.clone();
     let page = |page: usize, text: &str| ocr::OcrPage {
         page,
-        words: vec![ocr::PlacedWord { text: text.into(), origin: [72.0, 700.0], across: [120.0, 0.0], up: [0.0, 16.0], confidence: None, source: "ocrs".into() }],
+        words: vec![ocr::PlacedWord {
+            text: text.into(),
+            origin: [72.0, 700.0],
+            across: [120.0, 0.0],
+            up: [0.0, 16.0],
+            confidence: None,
+            source: "ocrs".into(),
+        }],
         already_on_page: 0,
         skipped: None,
         unusable_text: false,
         notes: Vec::new(),
+        deskew: None,
     };
     assert_eq!(s.apply_ocr(id, &[page(0, "รายงาน"), page(1, "ประจำปี")]).unwrap(), 2);
     assert_eq!(page_texts(&s, id), ["รายงาน", "ประจำปี"]);
@@ -13591,8 +13619,22 @@ fn thai_ocr_layer_is_searchable() {
     let blank = s.create_blank(612.0, 792.0, 1).unwrap();
     let id = s.open("thai-scan.pdf", None, blank, None).unwrap();
     let words = vec![
-        ocr::PlacedWord { text: "รายงานประจำปี".into(), origin: [72.0, 700.0], across: [120.0, 0.0], up: [0.0, 16.0], confidence: None, source: "ocrs".into() },
-        ocr::PlacedWord { text: "๒๕๖๙".into(), origin: [204.0, 700.0], across: [48.0, 0.0], up: [0.0, 16.0], confidence: None, source: "ocrs".into() },
+        ocr::PlacedWord {
+            text: "รายงานประจำปี".into(),
+            origin: [72.0, 700.0],
+            across: [120.0, 0.0],
+            up: [0.0, 16.0],
+            confidence: None,
+            source: "ocrs".into(),
+        },
+        ocr::PlacedWord {
+            text: "๒๕๖๙".into(),
+            origin: [204.0, 700.0],
+            across: [48.0, 0.0],
+            up: [0.0, 16.0],
+            confidence: None,
+            source: "ocrs".into(),
+        },
     ];
     s.apply(id, Edit::AddOcrText { page: 0, words }).unwrap();
     let saved = s.save_bytes(id).unwrap();
@@ -13613,8 +13655,22 @@ fn thai_ocr_marks_stay_in_their_word() {
         let blank = s.create_blank(612.0, 792.0, 1).unwrap();
         let id = s.open("thai-scan.pdf", None, blank, None).unwrap();
         let words = vec![
-            ocr::PlacedWord { text: "หลักเกณฑ์".into(), origin: [72.0, 700.0], across: [80.0, 0.0], up: [0.0, 16.0], confidence: None, source: "ocrs".into() },
-            ocr::PlacedWord { text: "วิธีการ".into(), origin: [152.0 + gap, 700.0], across: [56.0, 0.0], up: [0.0, 16.0], confidence: None, source: "ocrs".into() },
+            ocr::PlacedWord {
+                text: "หลักเกณฑ์".into(),
+                origin: [72.0, 700.0],
+                across: [80.0, 0.0],
+                up: [0.0, 16.0],
+                confidence: None,
+                source: "ocrs".into(),
+            },
+            ocr::PlacedWord {
+                text: "วิธีการ".into(),
+                origin: [152.0 + gap, 700.0],
+                across: [56.0, 0.0],
+                up: [0.0, 16.0],
+                confidence: None,
+                source: "ocrs".into(),
+            },
         ];
         s.apply(id, Edit::AddOcrText { page: 0, words }).unwrap();
         let saved = s.save_bytes(id).unwrap();
@@ -15744,4 +15800,77 @@ fn inline_conversions_refuse_office_documents_without_running_libreoffice() {
     }
     assert_eq!(s.convert_to_pdf_inline("notes.txt", &Arc::new(b"hello".to_vec())).unwrap().0, SourceKind::Text);
     assert!(s.as_pdf_inline("scan.jpg", &Arc::new(jpeg_bytes())).unwrap().starts_with(b"%PDF-"));
+}
+
+/// A 600 x 900 grey PNG of text-like lines (glyph blocks) skewed `deg` degrees downhill to the
+/// right, drawn with an independent nearest-neighbour rotation.
+fn skewed_scan_png(deg: f64) -> Vec<u8> {
+    let (w, h) = (600usize, 900usize);
+    let mut upright = vec![255u8; w * h];
+    let mut seed = 5u64;
+    let mut rnd = |n: u32| {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        ((seed >> 33) as u32) % n
+    };
+    let mut y = 100usize;
+    while y < h - 100 {
+        let mut x = 70usize;
+        while x < w - 80 {
+            for _ in 0..(2 + rnd(5)) {
+                let gw = 6 + rnd(5) as usize;
+                for yy in y..y + 10 + rnd(3) as usize {
+                    for xx in x..x + gw {
+                        upright[yy * w + xx] = 0;
+                    }
+                }
+                x += gw + 2;
+            }
+            x += 10;
+        }
+        y += 26;
+    }
+    let (s, c) = (-deg).to_radians().sin_cos();
+    let mut px = vec![255u8; w * h];
+    for yy in 0..h {
+        for xx in 0..w {
+            let (dx, dy) = (xx as f64 + 0.5 - w as f64 / 2.0, yy as f64 + 0.5 - h as f64 / 2.0);
+            let (sx, sy) = (w as f64 / 2.0 + c * dx - s * dy, h as f64 / 2.0 + s * dx + c * dy);
+            if sx >= 0.0 && sy >= 0.0 && (sx as usize) < w && (sy as usize) < h {
+                px[yy * w + xx] = upright[sy as usize * w + sx as usize];
+            }
+        }
+    }
+    let mut png = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut png, w as u32, h as u32);
+        enc.set_color(png::ColorType::Grayscale);
+        enc.write_header().unwrap().write_image_data(&px).unwrap();
+    }
+    png
+}
+
+/// Persistent deskew turns the scan image on the page (one undo step) so that a second
+/// measurement finds it straight, leaves a straight scan alone, and undo restores the page.
+#[test]
+fn persistent_deskew_straightens_the_scan_in_the_document_and_undoes() {
+    let (mut s, id) = session_with(1);
+    s.apply(id, Edit::AddImage { page: 0, rect: Some([0.0, 0.0, 200.0, 300.0]), name: "scan.png".into(), bytes: Arc::new(skewed_scan_png(3.5)) })
+        .unwrap();
+    let before = s.get(id).unwrap().page_images(0)[0].matrix;
+    let settings = crate::ocr::OcrSettings::default();
+    let done = s.straighten_scans(id, &[], &settings).unwrap();
+    assert_eq!(done.len(), 1, "{done:?}");
+    assert!((done[0].1 - 3.5).abs() < 0.5, "measured {done:?}");
+    let after = s.get(id).unwrap().page_images(0)[0].matrix;
+    assert_ne!(after, before, "the image placement changed");
+    // The straightened page now measures straight, so a second pass changes nothing.
+    assert!(s.straighten_scans(id, &[], &settings).unwrap().is_empty());
+    // One undo step puts the scan back; (the second pass was a no-op, so it added no step).
+    s.undo(id).unwrap();
+    assert_eq!(s.get(id).unwrap().page_images(0)[0].matrix, before);
+    // A straight scan is left alone.
+    let (mut s2, id2) = session_with(1);
+    s2.apply(id2, Edit::AddImage { page: 0, rect: Some([0.0, 0.0, 200.0, 300.0]), name: "scan.png".into(), bytes: Arc::new(skewed_scan_png(0.0)) })
+        .unwrap();
+    assert!(s2.straighten_scans(id2, &[], &settings).unwrap().is_empty());
 }

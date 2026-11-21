@@ -807,6 +807,20 @@ fn a_line_end_after_many_invisible_glyphs_still_joins() {
     assert_eq!(text.find("検知機構"), vec![0..44]);
 }
 
+/// Arabic-digit queries match Thai digits in the document and vice versa, preserving exact glyph spans.
+#[test]
+fn thai_and_arabic_digits_match_each_other() {
+    let thai_doc = page(&["ที่ ", "ศธ ", "๐๒๐๖.๔", "/ว ", "๑๗", " พ.ศ. ", "๒๕๖๙"]);
+    assert_eq!(thai_doc.find("0206.4"), vec![2..3]);
+    assert_eq!(thai_doc.find("ว 17"), vec![3..5]);
+    assert_eq!(thai_doc.find("2569"), vec![6..7]);
+    assert_eq!(thai_doc.find("๐๒๐๖.๔"), vec![2..3]);
+
+    let arabic_doc = page(&["ที่ ", "ศธ ", "0206.4", "/ว ", "17"]);
+    assert_eq!(arabic_doc.find("๐๒๐๖.๔"), vec![2..3]);
+    assert_eq!(arabic_doc.find("0206.4"), vec![2..3]);
+}
+
 /// The reference search and `find` agree on a soft hyphen followed, before the line end, by an
 /// empty glyph and an invisible one: both join the word.
 #[test]

@@ -9544,7 +9544,8 @@ fn unusable_and_good_text_pages() -> Vec<u8> {
         })
         .collect();
     s.apply(id, Edit::AddOcrText { page: 0, words: pua }).unwrap();
-    let good = PlacedWord { text: "quick".into(), origin: [72.0, h - 100.0], across: [60.0, 0.0], up: [0.0, 14.0], confidence: None, source: "ocrs".into() };
+    let good =
+        PlacedWord { text: "quick".into(), origin: [72.0, h - 100.0], across: [60.0, 0.0], up: [0.0, 14.0], confidence: None, source: "ocrs".into() };
     s.apply(id, Edit::AddOcrText { page: 1, words: vec![good] }).unwrap();
     s.save_bytes(id).unwrap().as_ref().clone()
 }
@@ -14881,4 +14882,79 @@ fn grouped_existing_thai_body_edits_saves_reopens_and_undo_restores_original_gly
     assert_eq!(a.call("page_render", &json!({"doc":reopened,"page":1,"dpi":72})).unwrap(), after);
     assert_eq!(page_text(&mut a, reopened), [new, old]);
     assert_eq!(ok(&mut a, "content_list", json!({"doc":reopened}))["count"], 0, "editing existing text must not create Add Text objects");
+}
+
+/// A 600 × 900 grey page of text-like lines (glyph blocks) skewed `deg` degrees downhill.
+fn skewed_text_scan(deg: f64) -> image::GrayImage {
+    let (w, h) = (600u32, 900u32);
+    let mut upright = image::GrayImage::from_pixel(w, h, image::Luma([255]));
+    let mut seed = 5u64;
+    let mut rnd = |n: u32| {
+        seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        ((seed >> 33) as u32) % n
+    };
+    let mut y = 100u32;
+    while y < h - 100 {
+        let mut x = 70u32;
+        while x < w - 80 {
+            for _ in 0..(2 + rnd(5)) {
+                let gw = 6 + rnd(5);
+                for yy in y..y + 10 + rnd(3) {
+                    for xx in x..x + gw {
+                        upright.put_pixel(xx, yy, image::Luma([0]));
+                    }
+                }
+                x += gw + 2;
+            }
+            x += 10;
+        }
+        y += 26;
+    }
+    let (s, c) = (-deg).to_radians().sin_cos();
+    image::GrayImage::from_fn(w, h, |xx, yy| {
+        let (dx, dy) = (f64::from(xx) + 0.5 - f64::from(w) / 2.0, f64::from(yy) + 0.5 - f64::from(h) / 2.0);
+        let (sx, sy) = (f64::from(w) / 2.0 + c * dx - s * dy, f64::from(h) / 2.0 + s * dx + c * dy);
+        if sx >= 0.0 && sy >= 0.0 && sx < f64::from(w) && sy < f64::from(h) { *upright.get_pixel(sx as u32, sy as u32) } else { image::Luma([255]) }
+    })
+}
+
+#[test]
+fn page_enhance_scan_straightens_a_skewed_scan_and_reports_the_angle() {
+    let dir = workdir("straighten-scan");
+    skewed_text_scan(3.5).save(dir.join("skew.png")).unwrap();
+    skewed_text_scan(0.0).save(dir.join("flat.png")).unwrap();
+    let mut a = auto(&dir);
+    let skew = ok(&mut a, "doc_create", json!({ "from": "images", "paths": ["skew.png"] }))["doc"].as_u64().unwrap();
+    let before = ok(&mut a, "page_images", json!({ "doc": skew, "page": 1 }))["images"][0]["rect"].clone();
+    // Off by default: nothing is straightened and the answer says so.
+    let r = ok(&mut a, "page_enhance_scan", json!({ "doc": skew, "level": 0, "despeckle": false, "edge_shadows": false }));
+    assert_eq!(r["straightened"], json!([]));
+    let r = ok(&mut a, "page_enhance_scan", json!({ "doc": skew, "straighten": true, "level": 0, "despeckle": false, "edge_shadows": false }));
+    let s = &r["straightened"];
+    assert_eq!(s[0]["page"], 1, "{r}");
+    assert!((s[0]["degrees"].as_f64().unwrap() - 3.5).abs() < 0.5, "{r}");
+    let after = ok(&mut a, "page_images", json!({ "doc": skew, "page": 1 }))["images"][0]["rect"].clone();
+    assert_ne!(before, after, "the scan was turned on the page");
+    // Straight now: a second pass has nothing to do. A straight scan is never touched.
+    let r = ok(&mut a, "page_enhance_scan", json!({ "doc": skew, "straighten": true, "level": 0, "despeckle": false, "edge_shadows": false }));
+    assert_eq!(r["straightened"], json!([]), "{r}");
+    let flat = ok(&mut a, "doc_create", json!({ "from": "images", "paths": ["flat.png"] }))["doc"].as_u64().unwrap();
+    let r = ok(&mut a, "page_enhance_scan", json!({ "doc": flat, "straighten": true, "level": 0, "despeckle": false, "edge_shadows": false }));
+    assert_eq!(r["straightened"], json!([]), "{r}");
+    assert!(matches!(a.call("page_enhance_scan", &json!({ "doc": flat, "straighten": "yes" })), Err(ToolError::InvalidArgs(_))));
+}
+
+#[test]
+fn ocr_deskew_mode_is_validated_and_persistent_is_refused_where_it_cannot_apply() {
+    let dir = workdir("deskew-mode");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
+    for tool in ["ocr_recognize", "ocr_words"] {
+        let e = a.call(tool, &json!({ "doc": doc, "deskew_mode": "sideways" }));
+        assert!(matches!(&e, Err(ToolError::InvalidArgs(m)) if m.contains("deskew_mode")), "{tool}: {e:?}");
+    }
+    let e = a.call("ocr_words", &json!({ "doc": doc, "deskew_mode": "persistent" }));
+    assert!(matches!(&e, Err(ToolError::InvalidArgs(m)) if m.contains("persistent")), "{e:?}");
+    let e = a.call("ocr_recognize", &json!({ "doc": doc, "deskew_mode": "persistent", "output_mode": "editable", "out": "x.pdf" }));
+    assert!(matches!(&e, Err(ToolError::InvalidArgs(m)) if m.contains("persistent")), "{e:?}");
 }
