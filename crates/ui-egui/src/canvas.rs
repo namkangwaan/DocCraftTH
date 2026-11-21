@@ -31,6 +31,7 @@ pub(super) mod page_cursor;
 mod page_input;
 pub(super) mod page_pointer;
 pub(super) mod page_router;
+mod qr_hover;
 pub mod scroll_speed;
 mod selection;
 pub(super) mod signature_drag;
@@ -616,6 +617,9 @@ pub struct DocView {
     /// It is held as the paragraph's text and box, not an index: the edit can regroup the page.
     pub(crate) pending_text_open: Option<(usize, pdfcraft_engine::BlockKey)>,
     pub(crate) text_background: crate::edit_text_ui::TextBackground,
+    /// QR codes found on each page, for the hover frame and the context menu.
+    #[expect(dead_code, reason = "the hover frame and the context menu read it (QR hover tasks 3 and 4)")]
+    pub(crate) qr_cache: qr_hover::QrCache,
     pub(crate) move_background: crate::content_ui::MoveBackground,
     /// Edit text & images: the images per page (by document generation), and the selected one.
     pub(crate) edit_images: HashMap<usize, (u64, Vec<pdfcraft_engine::PageImage>)>,
@@ -991,6 +995,7 @@ impl DocView {
             applied_editor: None,
             pending_text_open: None,
             text_background: Default::default(),
+            qr_cache: Default::default(),
             move_background: Default::default(),
             edit_images: HashMap::new(),
             objects: Default::default(),
