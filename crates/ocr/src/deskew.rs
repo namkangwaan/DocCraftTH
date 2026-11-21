@@ -474,7 +474,9 @@ fn score(points: &[Pt], half_extent: f32, deg: f64) -> f64 {
     hist.windows(2).map(|p| f64::from(p[1] - p[0]).powi(2)).sum()
 }
 
-struct Search {
+/// The coarse sweep (±`max_deg` at 1°): where the sharpest rows are, how sharp the "no structure"
+/// level is, and the score of the page as it is.
+struct Coarse {
     angle: f64,
     best: f64,
     /// Median of the coarse curve (the "no structure" level).
@@ -482,15 +484,35 @@ struct Search {
     at_zero: f64,
 }
 
-fn search(points: &[Pt], max_deg: f64) -> Search {
-    let half = points.iter().fold(0f32, |m, p| m.max(p.0.abs()).max(p.1.abs())) * std::f32::consts::SQRT_2 + 2.0;
-    let sc = |d: f64| score(points, half, d);
+struct Search {
+    angle: f64,
+    best: f64,
+    median: f64,
+    at_zero: f64,
+}
+
+fn half_extent(points: &[Pt]) -> f32 {
+    points.iter().fold(0f32, |m, p| m.max(p.0.abs()).max(p.1.abs())) * std::f32::consts::SQRT_2 + 2.0
+}
+
+fn coarse(points: &[Pt], max_deg: f64) -> Coarse {
+    let half = half_extent(points);
     let n = max_deg.floor() as i32;
-    let coarse: Vec<(f64, f64)> = (-n..=n).map(|i| (f64::from(i), sc(f64::from(i)))).collect();
-    let mut curve: Vec<f64> = coarse.iter().map(|c| c.1).collect();
-    curve.sort_by(|a, b| a.total_cmp(b));
-    let median = curve.get(curve.len() / 2).copied().unwrap_or(0.0);
-    let (mut angle, mut best) = coarse.iter().copied().fold((0.0, f64::MIN), |m, c| if c.1 > m.1 { c } else { m });
+    let curve: Vec<(f64, f64)> = (-n..=n).map(|i| (f64::from(i), score(points, half, f64::from(i)))).collect();
+    let mut sorted: Vec<f64> = curve.iter().map(|c| c.1).collect();
+    sorted.sort_by(|a, b| a.total_cmp(b));
+    let median = sorted.get(sorted.len() / 2).copied().unwrap_or(0.0);
+    let (angle, best) = curve.iter().copied().fold((0.0, f64::MIN), |m, c| if c.1 > m.1 { c } else { m });
+    let at_zero = curve.iter().find(|c| c.0 == 0.0).map_or_else(|| score(points, half, 0.0), |c| c.1);
+    Coarse { angle, best, median, at_zero }
+}
+
+/// The fine stages (±1.5° at 0.2°, ±0.3° at 0.05° with a parabolic refinement) around the coarse
+/// winner.
+fn refine(points: &[Pt], c: Coarse, max_deg: f64) -> Search {
+    let half = half_extent(points);
+    let sc = |d: f64| score(points, half, d);
+    let (mut angle, mut best) = (c.angle, c.best);
     for (half_range, step) in [(1.5f64, 0.2f64), (0.3, 0.05)] {
         let centre = angle;
         let steps = (half_range / step).round() as i32;
@@ -508,25 +530,27 @@ fn search(points: &[Pt], max_deg: f64) -> Search {
             }
         }
     }
-    let at_zero = sc(0.0);
-    Search { angle: angle.clamp(-max_deg, max_deg), best, median, at_zero }
+    Search { angle: angle.clamp(-max_deg, max_deg), best, median: c.median, at_zero: c.at_zero }
 }
 
 /// Decide the report for an analysis; also returns the ink box after the chosen turn.
 fn decide(a: &Analysis, o: &DeskewOptions) -> (DeskewReport, Option<[f32; 4]>) {
     let max_deg = o.max_angle_deg.clamp(1.0, 45.0);
-    let upright = search(&a.points, max_deg);
-    let (mut chosen, mut k_axis, mut found) = (&a.points, 0u32, upright);
+    // Both axes get the coarse sweep (to choose between them); only the winner is refined.
+    let upright = coarse(&a.points, max_deg);
+    let (mut chosen, mut k_axis) = (&a.points, 0u32);
     let turned_points;
+    let mut picked = upright;
     if o.detect_orientation {
         turned_points = turn_points(&a.points, 1);
-        let sideways = search(&turned_points, max_deg);
-        if sideways.best > 1.3 * found.best {
+        let sideways = coarse(&turned_points, max_deg);
+        if sideways.best > 1.3 * picked.best {
             chosen = &turned_points;
             k_axis = 1;
-            found = sideways;
+            picked = sideways;
         }
     }
+    let found = refine(chosen, picked, max_deg);
     let prominence = if found.best + found.median > 0.0 { ((found.best - found.median) / (found.best + found.median)).clamp(0.0, 1.0) } else { 0.0 };
     // Orientation within the axis: bottom-heaviness of the sheared line bands (weak for Thai).
     let (mut turns, mut orient_conf) = (k_axis, 0.0);
@@ -627,6 +651,21 @@ fn rotate_warp(image: &OcrImage, deg: f64, fit: f64, paper: [u8; 3], resample: R
             let (x0, y0) = (fx.floor(), fy.floor());
             let (tx, ty) = (fx - x0, fy - y0);
             let (xi, yi) = (x0 as i64, y0 as i64);
+            // Fast path: a bilinear sample with all four neighbours inside the raster.
+            if resample == Resample::Bilinear && xi >= 0 && yi >= 0 && (xi as usize) + 1 < w && (yi as usize) + 1 < h {
+                let o = (yi as usize * w + xi as usize) * 4;
+                if let (Some(r0), Some(r1)) = (src.get(o..o + 8), src.get(o + w * 4..o + w * 4 + 8))
+                    && let (Ok(r0), Ok(r1)) = (<&[u8; 8]>::try_from(r0), <&[u8; 8]>::try_from(r1))
+                {
+                    let (w00, w10, w01, w11) = ((1.0 - tx) * (1.0 - ty), tx * (1.0 - ty), (1.0 - tx) * ty, tx * ty);
+                    for ch in 0..3 {
+                        let v = f64::from(r0[ch]) * w00 + f64::from(r0[4 + ch]) * w10 + f64::from(r1[ch]) * w01 + f64::from(r1[4 + ch]) * w11;
+                        px[ch] = (v + 0.5) as u8;
+                    }
+                    px[3] = 255;
+                    continue;
+                }
+            }
             for (ch, o) in px.iter_mut().enumerate() {
                 let v = match resample {
                     Resample::Bilinear => {

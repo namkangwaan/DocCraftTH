@@ -289,10 +289,20 @@ fn angle_error_and_speed_meet_the_targets() {
         }
         OcrImage::new(bw as u32, bh as u32, v).unwrap()
     };
-    let t = std::time::Instant::now();
-    let r = analyze(&big, &DeskewOptions::default());
-    println!("analyze 2480x3508: {:?} -> {r:?}", t.elapsed());
+    let mut times: Vec<std::time::Duration> = Vec::new();
+    let mut r = DeskewReport::default();
+    for _ in 0..5 {
+        let t = std::time::Instant::now();
+        r = analyze(&big, &DeskewOptions::default());
+        times.push(t.elapsed());
+    }
+    times.sort();
+    println!("analyze 2480x3508 (5 runs): min {:?} median {:?} max {:?} -> {r:?}", times[0], times[2], times[4]);
     assert!((r.detected_deg - 2.0).abs() <= 0.25);
+    let t = std::time::Instant::now();
+    let out = straighten(&big, &DeskewOptions::default()).unwrap();
+    println!("straighten 2480x3508 (analysis + bilinear warp): {:?}", t.elapsed());
+    assert!(out.report.changes_page());
 }
 
 #[test]
