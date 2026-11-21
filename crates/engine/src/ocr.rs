@@ -1989,22 +1989,27 @@ mod tests {
         (Recognizers { primary: fake.clone(), secondary: None }, fake)
     }
 
-    /// Thai CER under skew (acceptance: within +0.02 of the 0° baseline at 2° and 5°). Needs the
-    /// Thai models (`PDFCRAFT_MODELS`) and the craft-fonts Thai face, so it is opt-in:
-    /// `cargo test -p pdfcraft-engine --lib thai_cer_under_skew -- --ignored --nocapture`.
-    #[test]
-    #[ignore = "needs the Thai OCR models (PDFCRAFT_MODELS) and CRAFT_FONTS_DIR"]
-    fn thai_cer_under_skew() {
-        const REFERENCE: &str = "สำนักงานคณะกรรมการกฤษฎีกา ได้รับหนังสือจากกระทรวงมหาดไทย เรื่อง ขอความอนุเคราะห์ข้อมูลการดำเนินงาน \
-            ตามที่ได้ประชุมหารือกันเมื่อวันที่สิบสองเดือนมิถุนายน จึงเรียนมาเพื่อโปรดพิจารณาและแจ้งผลให้ทราบต่อไป \
-            ผู้ที่เกี่ยวข้องควรเตรียมเอกสารประกอบให้ครบถ้วนก่อนวันนัดหมาย เพื่อความรวดเร็วในการตรวจสอบรายละเอียดทั้งหมด \
-            หากมีข้อสงสัยประการใดสามารถติดต่อสอบถามได้ที่เจ้าหน้าที่ผู้รับผิดชอบโครงการนี้ในเวลาราชการ";
+    const THAI_REFERENCE: &str = "สำนักงานคณะกรรมการกฤษฎีกา ได้รับหนังสือจากกระทรวงมหาดไทย เรื่อง ขอความอนุเคราะห์ข้อมูลการดำเนินงาน \
+        ตามที่ได้ประชุมหารือกันเมื่อวันที่สิบสองเดือนมิถุนายน จึงเรียนมาเพื่อโปรดพิจารณาและแจ้งผลให้ทราบต่อไป \
+        ผู้ที่เกี่ยวข้องควรเตรียมเอกสารประกอบให้ครบถ้วนก่อนวันนัดหมาย เพื่อความรวดเร็วในการตรวจสอบรายละเอียดทั้งหมด \
+        หากมีข้อสงสัยประการใดสามารถติดต่อสอบถามได้ที่เจ้าหน้าที่ผู้รับผิดชอบโครงการนี้ในเวลาราชการ";
+
+    /// The pieces the opt-in Thai tests share: the engines (`None` without the Thai models), the
+    /// settings, and the upright grey raster (Thai text typeset on a letter page, 300 dpi).
+    struct ThaiFixture {
+        recognizers: Recognizers,
+        base: OcrSettings,
+        gray: Vec<f64>,
+        w: usize,
+        h: usize,
+    }
+
+    fn thai_fixture() -> Option<ThaiFixture> {
         let base = OcrSettings { language: "th".into(), force_ocr: true, deskew: false, dpi: 300.0, ..Default::default() };
         let Ok(recognizers) = recognizers(&base) else {
             eprintln!("skipped: the Thai OCR models are not installed (set PDFCRAFT_MODELS)");
-            return;
+            return None;
         };
-        // The upright raster: Thai text typeset on a letter page and rendered at 300 dpi.
         let mut s = Session::new();
         let bytes = s.create_from_text("t", " ").unwrap();
         let id = s.open("t.pdf", None, bytes, None).unwrap();
@@ -2012,21 +2017,23 @@ mod tests {
             id,
             Edit::AddText {
                 page: 0,
-                text: pdfcraft_edit::AddedText { rect: [50.0, 60.0, 562.0, 700.0], text: REFERENCE.into(), size: 14.0, ..Default::default() },
+                text: pdfcraft_edit::AddedText { rect: [50.0, 60.0, 562.0, 700.0], text: THAI_REFERENCE.into(), size: 14.0, ..Default::default() },
             },
         )
         .unwrap();
         let mut steps = s.ocr_job(id, &[0], base.clone()).unwrap().steps();
         let shot = steps.next_page().unwrap().unwrap();
-        let upright = shot.image().unwrap().clone();
-        let (w, h) = (upright.width() as usize, upright.height() as usize);
-        let gray: Vec<f64> =
+        let upright = shot.image().unwrap();
+        let gray =
             upright.rgba().as_chunks::<4>().0.iter().map(|p| 0.299 * f64::from(p[0]) + 0.587 * f64::from(p[1]) + 0.114 * f64::from(p[2])).collect();
-        let strip = |t: &str| t.chars().filter(|c| !c.is_whitespace()).collect::<String>();
-        let reference = strip(REFERENCE);
-        let mut table = Vec::new();
-        for deg in [0.0f64, 2.0, 5.0] {
-            // Bilinear rotation about the centre (independent of the code under test), white fill.
+        Some(ThaiFixture { recognizers, base, gray, w: upright.width() as usize, h: upright.height() as usize })
+    }
+
+    impl ThaiFixture {
+        /// The raster turned so its lines slope `deg` downhill (bilinear, about the centre, white
+        /// fill; independent of the code under test), as grey pixels and as a scan PDF at 300 dpi.
+        fn skewed(&self, deg: f64) -> (Vec<u8>, Arc<Vec<u8>>) {
+            let (w, h) = (self.w, self.h);
             let (sn, cs) = (-deg).to_radians().sin_cos();
             let mut px = vec![255u8; w * h];
             for y in 0..h {
@@ -2038,7 +2045,7 @@ mod tests {
                         continue;
                     }
                     let (fx, fy) = (sx - x0, sy - y0);
-                    let g = |xx: f64, yy: f64| gray[yy as usize * w + xx as usize];
+                    let g = |xx: f64, yy: f64| self.gray[yy as usize * w + xx as usize];
                     let v = g(x0, y0) * (1.0 - fx) * (1.0 - fy)
                         + g(x0 + 1.0, y0) * fx * (1.0 - fy)
                         + g(x0, y0 + 1.0) * (1.0 - fx) * fy
@@ -2052,17 +2059,38 @@ mod tests {
                 enc.set_color(png::ColorType::Grayscale);
                 enc.write_header().unwrap().write_image_data(&px).unwrap();
             }
+            let s = Session::new();
             let scan = s.create_from_images_with_resolution(&[("scan.png".into(), png)], pdfcraft_create::ImageResolution::Dpi(300.0)).unwrap();
+            (px, scan)
+        }
+
+        /// Read a scan PDF page with deskew on or off.
+        fn read(&self, scan: &Arc<Vec<u8>>, deskew: bool) -> OcrPage {
+            let mut t = Session::new();
+            let id = t.open("scan.pdf", None, scan.clone(), None).unwrap();
+            let settings = OcrSettings { deskew, ..self.base.clone() };
+            t.ocr_job(id, &[], settings).unwrap().run(&self.recognizers, |_, _| true).remove(0)
+        }
+    }
+
+    /// Thai CER under skew (acceptance: within +0.02 of the 0° baseline at 2° and 5°). Needs the
+    /// Thai models (`PDFCRAFT_MODELS`) and the craft-fonts Thai face, so it is opt-in:
+    /// `cargo test -p pdfcraft-engine --lib thai_ -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "needs the Thai OCR models (PDFCRAFT_MODELS) and CRAFT_FONTS_DIR"]
+    fn thai_cer_under_skew() {
+        let Some(fx) = thai_fixture() else { return };
+        let strip = |t: &str| t.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+        let reference = strip(THAI_REFERENCE);
+        let mut table = Vec::new();
+        for deg in [0.0f64, 2.0, 5.0] {
+            let (_, scan) = fx.skewed(deg);
             let mut row = vec![deg];
             for deskew in [false, true] {
-                let mut t = Session::new();
-                let tid = t.open("scan.pdf", None, scan.clone(), None).unwrap();
-                let settings = OcrSettings { deskew, ..base.clone() };
-                let pages = t.ocr_job(tid, &[], settings).unwrap().run(&recognizers, |_, _| true);
-                let got = strip(&pages[0].text());
-                let applied = pages[0].deskew.map(|d| d.applied_deg);
+                let page = fx.read(&scan, deskew);
+                let got = strip(&page.text());
                 let c = pdfcraft_ocr::metrics::cer(&reference, &got);
-                eprintln!("skew {deg:>4}°  deskew {deskew:<5}  CER {c:.3}  applied {applied:?}\n    read: {got}");
+                eprintln!("skew {deg:>4}°  deskew {deskew:<5}  CER {c:.3}  applied {:?}\n    read: {got}", page.deskew.map(|d| d.applied_deg));
                 row.push(c);
             }
             table.push(row);
@@ -2074,6 +2102,83 @@ mod tests {
             assert!(row[2] <= baseline + 0.02, "{}° with deskew: CER {} vs 0° baseline {baseline}", row[0], row[2]);
         }
         assert!(table[0][2] <= baseline + 1e-9, "a straight page must read exactly as without deskew");
+    }
+
+    /// The word boxes of a deskewed read must land on the scanned raster as it was scanned. Two
+    /// independent checks at 2°, 5° and −5°: (1) the ink: nearly all dark pixels of the skewed raster
+    /// lie inside some word box; (2) the positions: a word the 0° read also found (same text) sits
+    /// where the 0° box, turned by the same known rotation, predicts. Centre errors are in pixels at
+    /// 300 dpi (target 1.5 px for the median).
+    #[test]
+    #[ignore = "needs the Thai OCR models (PDFCRAFT_MODELS) and CRAFT_FONTS_DIR"]
+    fn thai_word_boxes_round_trip_under_skew() {
+        let Some(fx) = thai_fixture() else { return };
+        let px_per_pt = 300.0 / 72.0;
+        let page_h = fx.h as f64 / px_per_pt;
+        // A word's four corners in raster pixels (top-left origin) from its user-space placement.
+        let corners = |w: &pdfcraft_ocr::PlacedWord| -> [(f64, f64); 4] {
+            let p = |dx: f64, dy: f64| ((w.origin[0] + dx) * px_per_pt, (page_h - (w.origin[1] + dy)) * px_per_pt);
+            [p(0.0, 0.0), p(w.across[0], w.across[1]), p(w.up[0], w.up[1]), p(w.across[0] + w.up[0], w.across[1] + w.up[1])]
+        };
+        let centre = |w: &pdfcraft_ocr::PlacedWord| {
+            let c = corners(w);
+            (c.iter().map(|p| p.0).sum::<f64>() / 4.0, c.iter().map(|p| p.1).sum::<f64>() / 4.0)
+        };
+        let (_, flat_scan) = fx.skewed(0.0);
+        let flat = fx.read(&flat_scan, true);
+        assert!(!flat.words.is_empty());
+        for deg in [2.0f64, 5.0, -5.0] {
+            let (px, scan) = fx.skewed(deg);
+            let page = fx.read(&scan, true);
+            let applied = page.deskew.map_or(0.0, |d| d.applied_deg);
+            assert!((applied - deg).abs() < 0.3, "{deg}°: applied {applied}");
+            // (1) ink coverage.
+            let mut inside = vec![false; fx.w * fx.h];
+            let mut box_area = 0.0;
+            for w in &page.words {
+                let c = corners(w);
+                let lo = |f: fn(&(f64, f64)) -> f64| c.iter().map(f).fold(f64::MAX, f64::min);
+                let hi = |f: fn(&(f64, f64)) -> f64| c.iter().map(f).fold(f64::MIN, f64::max);
+                let (x0, x1) = (lo(|p| p.0).floor().max(0.0), hi(|p| p.0).ceil().min(fx.w as f64));
+                let (y0, y1) = (lo(|p| p.1).floor().max(0.0), hi(|p| p.1).ceil().min(fx.h as f64));
+                box_area += (x1 - x0).max(0.0) * (y1 - y0).max(0.0);
+                for y in y0 as usize..y1 as usize {
+                    for x in x0 as usize..x1 as usize {
+                        inside[y * fx.w + x] = true;
+                    }
+                }
+            }
+            let ink: Vec<usize> = px.iter().enumerate().filter(|(_, v)| **v < 128).map(|(i, _)| i).collect();
+            let covered = ink.iter().filter(|&&i| inside[i]).count() as f64 / ink.len() as f64;
+            // (2) positions of words found by both reads.
+            let (sn, cs) = deg.to_radians().sin_cos();
+            let (cx, cy) = (fx.w as f64 / 2.0, fx.h as f64 / 2.0);
+            let mut errors = Vec::new();
+            for w in &page.words {
+                let mut same = flat.words.iter().filter(|f| f.text == w.text);
+                if let (Some(f), None) = (same.next(), same.next()) {
+                    let (fx0, fy0) = centre(f);
+                    let (dx, dy) = (fx0 - cx, fy0 - cy);
+                    let predicted = (cx + cs * dx - sn * dy, cy + sn * dx + cs * dy);
+                    let actual = centre(w);
+                    errors.push(((predicted.0 - actual.0).powi(2) + (predicted.1 - actual.1).powi(2)).sqrt());
+                }
+            }
+            errors.sort_by(|a, b| a.total_cmp(b));
+            let median = errors.get(errors.len() / 2).copied().unwrap_or(f64::NAN);
+            let p90 = errors.get(errors.len() * 9 / 10).copied().unwrap_or(f64::NAN);
+            eprintln!(
+                "skew {deg:>4}°: {} words, ink covered {:.1}%, box area / ink {:.1}, matched {} words, centre error median {median:.2} px p90 {p90:.2} px max {:.2} px",
+                page.words.len(),
+                covered * 100.0,
+                box_area / ink.len() as f64,
+                errors.len(),
+                errors.last().copied().unwrap_or(f64::NAN)
+            );
+            assert!(covered >= 0.97, "{deg}°: only {:.1}% of the ink is inside a word box", covered * 100.0);
+            assert!(errors.len() >= 3, "{deg}°: too few words matched the 0° read to compare positions");
+            assert!(median <= 1.5, "{deg}°: median centre error {median} px");
+        }
     }
 
     /// Recognizer whose confidence is scripted per call: the first reading is poor, the second
