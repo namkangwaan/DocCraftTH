@@ -70,8 +70,5 @@ jobs:
         shell: bash
         run: |
           export CRAFT_FONTS_DIR="$PWD/craft-fonts"
-          # Trunk.toml writes to ../../dist/web, which a fresh checkout does not have; trunk 0.19.1
-          # fails with "error creating final dist directory" when its parent is missing.
-          mkdir -p dist/web
           cd apps/pdfcraft-web
           trunk build --release
