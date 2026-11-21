@@ -1183,6 +1183,62 @@ impl Session {
         Ok(words)
     }
 
+    /// Persistent deskew ([`DeskewMode::Persistent`]): measure the skew of each page in `pages`
+    /// (all when empty) and turn its scan image about its centre by the opposite angle, shrunk
+    /// just enough to stay inside the page, as one undoable step. Returns `(page, degrees
+    /// corrected)` for the pages changed. A page without a scan image (one covering most of the
+    /// page) or whose skew is below the gate is left alone; quarter turns are not persisted here.
+    /// Run the normal OCR job afterwards: it reads the straightened pages.
+    pub fn straighten_scans(&mut self, id: DocId, pages: &[usize], settings: &OcrSettings) -> Result<Vec<(usize, f64)>, EditError> {
+        let probe =
+            OcrSettings { force_ocr: true, region: None, auto_rotate: false, deskew: true, deskew_mode: DeskewMode::Transient, ..settings.clone() };
+        let job = self.ocr_job(id, pages, probe).ok_or(EditError::NoDocument)?;
+        let mut steps = job.steps();
+        let mut measured = Vec::new();
+        while let Some(next) = steps.next_page() {
+            if let Ok(shot) = next
+                && let Some(report) = shot.deskew
+                && report.applied_deg != 0.0
+            {
+                measured.push((shot.page, report.applied_deg));
+            }
+        }
+        let doc = self.get(id).ok_or(EditError::NoDocument)?;
+        let mut edits = Vec::new();
+        let mut done = Vec::new();
+        for (page, degrees) in measured {
+            let Some(info) = doc.info.pages.get(page) else { continue };
+            let page_area = f64::from(info.width) * f64::from(info.height);
+            let images = doc.page_images(page);
+            let Some((index, image)) =
+                images.iter().enumerate().filter(|(_, i)| (i.rect[2] - i.rect[0]).abs() * (i.rect[3] - i.rect[1]).abs() >= 0.6 * page_area).max_by(
+                    |a, b| {
+                        let area = |i: &pdfcraft_edit::PageImage| (i.rect[2] - i.rect[0]).abs() * (i.rect[3] - i.rect[1]).abs();
+                        area(a.1).total_cmp(&area(b.1))
+                    },
+                )
+            else {
+                continue;
+            };
+            let rect = image.visible_rect.unwrap_or(image.rect);
+            // The scan's lines slope `degrees` downhill (clockwise as seen); turn it back.
+            let Some([a, b, c, d, e, f]) = pdfcraft_edit::turn_by_degrees(rect, -degrees) else { continue };
+            let (w, h) = ((rect[2] - rect[0]).abs(), (rect[3] - rect[1]).abs());
+            let (sin, cos) = degrees.to_radians().sin_cos();
+            let (sin, cos) = (sin.abs(), cos.abs());
+            let fit =
+                (f64::from(info.width) / (w * cos + h * sin).max(1e-9)).min(f64::from(info.height) / (w * sin + h * cos).max(1e-9)).clamp(0.5, 1.0);
+            let (cx, cy) = ((rect[0] + rect[2]) / 2.0, (rect[1] + rect[3]) / 2.0);
+            let matrix = [a * fit, b * fit, c * fit, d * fit, cx + fit * (e - cx), cy + fit * (f - cy)];
+            edits.push(Edit::EditPageImage { page, index, change: crate::ImageEdit::Transform(matrix) });
+            done.push((page, degrees));
+        }
+        if !edits.is_empty() {
+            self.apply(id, Edit::Batch { label: "Straighten scanned pages".into(), edits })?;
+        }
+        Ok(done)
+    }
+
     /// Why a job's result may not be applied to this session any more: the document was closed,
     /// edited, re-saved, or its pages changed since the job started. `None` means it is safe.
     pub fn stale_reason(&self, guard: &OcrGuard) -> Option<String> {

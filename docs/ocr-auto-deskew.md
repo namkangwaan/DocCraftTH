@@ -38,7 +38,7 @@
 |---|---|---|---|
 | 1 | `crates/ocr` | `deskew.rs` (+ test สังเคราะห์, proptest) | ทำแล้ว |
 | 2 | `crates/ocr` | ต่อเข้า `preprocess()` แทน `estimate_skew` (คง API เดิม), CER 0°/2°/5° ด้วย `thai.rs` จริง | ยังไม่ทำ |
-| 3 | `crates/ocr` + `engine` | tie-break 180° ด้วยคะแนน Thai CTC; `OcrPage.deskew: DeskewReport`; โหมด transient/persistent ใน `engine/src/ocr.rs` (undo ด้วย page-op เดิม); ตั้งค่า default เป็น auto | ยังไม่ทำ |
+| 3 | `crates/ocr` + `engine` | `OcrPage.deskew`; ค่าเริ่มต้น deskew เปิด (gate) และไม่บังคับ upscale 300 dpi; อ่านซ้ำที่ 180° เมื่อความมั่นใจ < เกณฑ์ (ต้องดีกว่า ≥15 คะแนน); `DeskewMode` + `Session::straighten_scans` (โหมด persistent: หมุนภาพสแกนในหน้า ย่อให้พอดีหน้า undo ได้ 1 ขั้น) | ทำแล้ว (ยังไม่เชื่อม UI/CLI; ยังไม่ persist การหมุน 90/180/270) |
 | 4 | `ui-egui` | `ocr_ui.rs` ตัวเลือก Auto/ปิด + โหมด; `ocr_verify.rs` แสดงมุมต่อหน้า; สตริงไทยใน `th.tsv` (clean-room) + sha256 ใน `ATTRIBUTION.toml` + `cargo xtask assets --write` | ยังไม่ทำ (รอ session User guide merge) |
 | 5 | `automation` | JSON `deskew` ใน `ocr_recognize`, `ocr_words`, `page_enhance_scan` + e2e test + `parity/acrobat-features.toml` | ยังไม่ทำ |
 
