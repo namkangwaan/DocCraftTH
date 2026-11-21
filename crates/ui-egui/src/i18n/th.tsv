@@ -2687,6 +2687,12 @@ key	Space	Space
 @id	file.word_count	นับจำนวนคำ…
 @id	file.qr_scanner	สแกน QR Code…
 	Scan QR Code…	สแกน QR Code…
+	QR Code link: {url}	ลิงก์ QR Code: {url}
+	QR Code text: {text}	ข้อความ QR Code: {text}
+	Right-click to open in a browser or copy	คลิกขวาเพื่อเปิดในเบราว์เซอร์หรือคัดลอก
+	Right-click to copy or check	คลิกขวาเพื่อคัดลอกหรือตรวจสอบ
+	QR Code highlight colour	สีกรอบเน้น QR Code
+	Frames a QR Code on the page while the pointer is over it.	แสดงกรอบรอบ QR Code บนหน้าเมื่อชี้เมาส์อยู่เหนือ QR Code นั้น
 	Open in Browser	เปิดในเบราว์เซอร์
 	Copy Link	คัดลอกลิงก์
 	Standard	มาตรฐาน

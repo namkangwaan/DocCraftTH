@@ -31,7 +31,7 @@ pub(super) mod page_cursor;
 mod page_input;
 pub(super) mod page_pointer;
 pub(super) mod page_router;
-mod qr_hover;
+pub(crate) mod qr_hover;
 pub mod scroll_speed;
 mod selection;
 pub(super) mod signature_drag;
@@ -618,7 +618,6 @@ pub struct DocView {
     pub(crate) pending_text_open: Option<(usize, pdfcraft_engine::BlockKey)>,
     pub(crate) text_background: crate::edit_text_ui::TextBackground,
     /// QR codes found on each page, for the hover frame and the context menu.
-    #[expect(dead_code, reason = "the hover frame and the context menu read it (QR hover tasks 3 and 4)")]
     pub(crate) qr_cache: qr_hover::QrCache,
     pub(crate) move_background: crate::content_ui::MoveBackground,
     /// Edit text & images: the images per page (by document generation), and the selected one.
@@ -1544,44 +1543,18 @@ fn draw_page(ui: &mut egui::Ui, view: &mut DocView, frame: &mut PageFrame<'_>, i
         painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(0.5, t.border.gamma_multiply(0.8)), egui::StrokeKind::Outside);
     }
 
-    // QR Code hover detection and highlight
-    if let Some(p) = pointer.filter(|p| r.contains(*p)) {
+    // The QR code under the pointer (image or vector, from the page's scan): its frame and tip.
+    if let Some(p) = pointer.filter(|p| r.contains(*p))
+        && let Some(page) = info.pages.get(i)
+    {
         let (vx, vy) = xf.screen_to_view(p);
-        let u_pt = info.pages[i].view_to_user(vx, vy);
-        let at = [u_pt[0] as f64, u_pt[1] as f64];
-        if let Some(img_idx) = doc.page_image_at(i, at) {
-            let qr_cache_id = egui::Id::unique("qr_hover_image").with((i, img_idx));
-            let qr_cached: Option<Option<String>> = ui.data(|d| d.get_temp(qr_cache_id));
-            let qr_text = match qr_cached {
-                Some(cached) => cached,
-                None => {
-                    let decoded = match doc.page_image_rgba(i, img_idx) {
-                        Ok((w, h, rgba)) => {
-                            let list = pdfcraft_engine::qr::scan_qr_from_rgba(w as usize, h as usize, &rgba);
-                            list.into_iter().next().map(|q| q.content)
-                        }
-                        Err(_) => None,
-                    };
-                    ui.data_mut(|d| d.insert_temp(qr_cache_id, decoded.clone()));
-                    decoded
-                }
-            };
-            if let Some(ref text) = qr_text {
-                let is_url = pdfcraft_engine::qr::is_url(text);
-                let preview = if text.len() > 64 { format!("{}…", &text[..61]) } else { text.clone() };
-                let tip = if is_url {
-                    format!("📷 QR Code Link: {}\n(คลิกขวาเพื่อเปิดในเบราว์เซอร์หรือคัดลอก)", preview)
-                } else {
-                    format!("📷 QR Code: {}\n(คลิกขวาเพื่อคัดลอกหรือตรวจสอบ)", preview)
-                };
-                view.cursor.claim_with_tip(crate::page_cursor::Layer::Link, egui::CursorIcon::PointingHand, Some(tip));
-                let images = cached_edit_images(view, doc, i);
-                if let Some(img) = images.get(img_idx) {
-                    let img_rect = xf.user_rect_f64(info, i, img.rect);
-                    painter.rect_stroke(img_rect.expand(2.0), CornerRadius::same(4), Stroke::new(2.5, Color32::from_rgb(0, 160, 255)), egui::StrokeKind::Outside);
-                    painter.rect_filled(img_rect.expand(2.0), CornerRadius::same(4), Color32::from_rgba_unmultiplied(0, 160, 255, 30));
-                }
-            }
+        let [ux, uy] = page.view_to_user(vx, vy);
+        let regions = view.qr_cache.regions(doc, info, i, ui.ctx());
+        let hit = qr_hover::region_at(regions, [f64::from(ux), f64::from(uy)]).map(|q| (q.rect_user, qr_hover::tip_for(&q.content)));
+        if let Some((rect, tip)) = hit {
+            let [cr, cg, cb] = prefs.qr_highlight_color;
+            qr_hover::paint_frame(painter, xf.user_rect_f64(info, i, rect), Color32::from_rgb(cr, cg, cb));
+            view.cursor.claim_with_tip(crate::page_cursor::Layer::Link, egui::CursorIcon::PointingHand, Some(tip));
         }
     }
 
