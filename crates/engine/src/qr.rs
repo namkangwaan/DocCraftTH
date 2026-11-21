@@ -177,6 +177,22 @@ pub fn truncate_chars(text: &str, max_chars: usize) -> String {
     }
 }
 
+/// `text` as one line to show: line breaks, tabs and other whitespace become spaces, and
+/// characters that hide or reorder text (controls, zero-width and bidi marks, the ones
+/// [`crate::links::document_url`] refuses) are dropped; then at most `max_chars` characters, as
+/// [`truncate_chars`] cuts them. For previews of untrusted payloads.
+pub fn preview_text(text: &str, max_chars: usize) -> String {
+    let flat: String = text
+        .chars()
+        .filter_map(|c| match c {
+            c if c.is_whitespace() => Some(' '),
+            c if crate::links::hides_text(c) => None,
+            c => Some(c),
+        })
+        .collect();
+    truncate_chars(&flat, max_chars)
+}
+
 /// Determine if a string looks like a web URL (http://, https://, or www.).
 pub fn is_url(text: &str) -> bool {
     let t = text.trim();
@@ -271,4 +287,16 @@ mod tests {
         assert_eq!(truncate_chars("short", 10), "short");
         assert_eq!(truncate_chars("", 0), "");
     }
+
+    #[test]
+    fn preview_text_is_one_visible_line() {
+        let p = preview_text("https://good.example\u{202E}gpj.exe\nline two\u{200B}\ttab", 64);
+        assert!(!p.contains('\u{202E}') && !p.contains('\u{200B}') && !p.contains('\n') && !p.contains('\t'), "{p:?}");
+        assert_eq!(p, "https://good.examplegpj.exe line two tab");
+        assert_eq!(preview_text(&"ทดสอบ".repeat(30), 10).chars().count(), 11);
+        assert_eq!(preview_text("", 5), "");
+    }
 }
+
+#[cfg(test)]
+mod encode_tests;

@@ -48,7 +48,7 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp) -> bool {
     match &draft.results {
         None => {
             ui.spinner();
-            ui.label(tl!("Scanning page for QR codes..."));
+            ui.label(tl!("Scanning page for QR codes…"));
         }
         Some(Err(err)) => {
             ui.colored_label(egui::Color32::RED, format!("Scan error: {err}"));

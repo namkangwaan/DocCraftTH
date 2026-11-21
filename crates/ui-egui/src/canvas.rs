@@ -792,6 +792,8 @@ pub(crate) enum PageMenuAction {
     DocProperties,
     FlattenComments,
     QrScanner,
+    /// Open a QR code's web address, after the user allows it (`request_document_url`).
+    OpenQrUrl(String),
 }
 
 pub(crate) struct PageMenuPerms {
@@ -1981,18 +1983,19 @@ fn draw_pages(
             if let Some(qr_text) = qr_content {
                 let menu = qr_hover::menu_for(&qr_text);
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("📷 QR Code:").strong());
+                    ui.label(egui::RichText::new(format!("📷 {}", tl!("QR Code:"))).strong());
                     if matches!(menu, qr_hover::QrMenu::Link(_)) {
-                        ui.label(egui::RichText::new("Link").small().color(ui.visuals().hyperlink_color));
+                        ui.label(egui::RichText::new(tl!("Link")).small().color(ui.visuals().hyperlink_color));
                     }
                 });
-                ui.label(egui::RichText::new(pdfcraft_engine::qr::truncate_chars(&qr_text, 64)).italics());
+                ui.label(egui::RichText::new(pdfcraft_engine::qr::preview_text(&qr_text, 64)).italics());
                 ui.add_space(2.0);
 
                 match menu {
                     qr_hover::QrMenu::Link(url) => {
                         if ui.button(egui::RichText::new(format!("🌐 {}", tl!("Open in Browser"))).color(ui.visuals().hyperlink_color)).clicked() {
-                            ui.ctx().open_url(egui::OpenUrl::new_tab(&url));
+                            // A document's address: the user is asked first, as for a link.
+                            page_action = Some(PageMenuAction::OpenQrUrl(url.clone()));
                             ui.close();
                         }
                         if ui.button(tl!("Copy Link")).clicked() {
@@ -3449,6 +3452,9 @@ fn apply_frame_requests(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, 
         }
         Some(PageMenuAction::QrScanner) => {
             app.dialog = Some(crate::Dialog::QrScanner);
+        }
+        Some(PageMenuAction::OpenQrUrl(url)) => {
+            app.request_document_url(&url, crate::LinkOrigin::QrCode);
         }
         None => {}
     }

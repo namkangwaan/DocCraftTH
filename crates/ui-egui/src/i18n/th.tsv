@@ -2697,7 +2697,9 @@ key	Space	Space
 	Copy Link	คัดลอกลิงก์
 	QR Code Scanner	ตัวสแกน QR Code
 	No active document	ไม่มีเอกสารที่เปิดอยู่
-	Scanning page for QR codes...	กำลังสแกนหา QR Code ในหน้านี้
+	QR Code:	รหัส QR:
+	A QR code	QR Code
+	Scanning page for QR codes…	กำลังสแกนหา QR Code ในหน้านี้…
 	Standard	มาตรฐาน
 	Mobile	อุปกรณ์พกพา
 	Merge image fragments	รวมชิ้นส่วนรูปภาพ

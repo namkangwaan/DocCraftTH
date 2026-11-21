@@ -294,6 +294,12 @@ impl Document {
         self.generation
     }
 
+    /// How the document's pages are drawn: its password and view settings (layer visibility,
+    /// hidden comments, reading colours). Without installed fonts, so fit for recognition.
+    pub fn render_config(&self) -> &RenderConfig {
+        &self.config
+    }
+
     /// The styles the document's text is set in, the largest first, for bookmarks from text
     /// styles (#1693).
     /// Empty when the document doesn't allow copying: the samples are its text.
