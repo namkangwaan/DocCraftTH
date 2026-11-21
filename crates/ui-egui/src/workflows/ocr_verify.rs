@@ -1645,6 +1645,7 @@ fn info_strip(app: &PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
         (tl!("AVG CONFIDENCE"), avg.map_or_else(|| "—".into(), |c| format!("{c:.0}%"))),
         (tl!("LOW-CONFIDENCE WORDS"), v.suspect_count().to_string()),
         (tl!("VERIFIED %"), format!("{}%", (v.verified_fraction() * 100.0).round() as i64)),
+        (tl!("STRAIGHTENING"), straightening_text(v.page(v.current).and_then(|p| p.deskew.as_ref()))),
         (
             tl!("ENGINE · STRATEGY"),
             if read == 0 { "—".into() } else { format!("{} · {}", engine_label(app.ocr_draft.engine), strategy_label(app.ocr_draft.strategy)) },
@@ -1657,6 +1658,20 @@ fn info_strip(app: &PdfCraftApp, ui: &mut egui::Ui, t: &Tokens) {
             ui.separator();
         }
     });
+}
+
+/// What straightening did to a page, in facts: the quarter turn it was read in and the skew it
+/// removed, or that it was straight, or nothing when no page is selected / the step was off.
+pub(crate) fn straightening_text(d: Option<&pdfcraft_engine::ocr::DeskewReport>) -> String {
+    let Some(d) = d else { return "—".into() };
+    let mut parts = Vec::new();
+    if d.orientation_turns % 4 != 0 {
+        parts.push(format!("{} {}°", tl!("turn"), (d.orientation_turns % 4) * 90));
+    }
+    if d.applied_deg != 0.0 {
+        parts.push(format!("{} {:+.1}°", tl!("skew"), d.applied_deg));
+    }
+    if parts.is_empty() { tl!("Straight").to_string() } else { parts.join(" · ") }
 }
 
 /// The page list: one row per read page, with its live word count and a flag for the words
@@ -2313,7 +2328,15 @@ mod tests {
         let text = session.create_from_text("t", "Recognize these scanned words").expect("fixture");
         let id = session.open("t.pdf", None, text, None).expect("fixture");
         let job = session.ocr_job(id, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: confs.iter().map(|c| word("w", *c)).collect(), skipped: None, notes: Vec::new(), deskew: None };
+        let page = OcrPage {
+            unusable_text: false,
+            already_on_page: 0,
+            page: 0,
+            words: confs.iter().map(|c| word("w", *c)).collect(),
+            skipped: None,
+            notes: Vec::new(),
+            deskew: None,
+        };
         let mut v = OcrVerify::default();
         v.load(id, job.guard.clone(), vec![page]);
         (id, v)
@@ -2324,7 +2347,10 @@ mod tests {
     #[test]
     fn finished_states_keep_the_spec_wording() {
         let mut v = OcrVerify::default();
-        v.finished(vec![OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: vec![], skipped: None, notes: Vec::new(), deskew: None }], false);
+        v.finished(
+            vec![OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: vec![], skipped: None, notes: Vec::new(), deskew: None }],
+            false,
+        );
         assert_eq!(v.phase, Phase::ReviewReady);
         assert_eq!(v.message, "OCR complete — no text recognized on this page.");
         v.finished(
@@ -2438,7 +2464,15 @@ mod tests {
         v2.load(
             id,
             job.guard.clone(),
-            vec![OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None }],
+            vec![OcrPage {
+                unusable_text: false,
+                already_on_page: 0,
+                page: 0,
+                words: vec![word("w", Some(95.0))],
+                skipped: None,
+                notes: Vec::new(),
+                deskew: None,
+            }],
         );
         v2.set_removed((0, 0), true);
         assert!(v2.accept(&mut s).is_err());
@@ -2835,7 +2869,15 @@ mod tests {
         app.ocr_verify.load(
             id,
             job.guard.clone(),
-            vec![OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None }],
+            vec![OcrPage {
+                unusable_text: false,
+                already_on_page: 0,
+                page: 0,
+                words: vec![word("w", Some(95.0))],
+                skipped: None,
+                notes: Vec::new(),
+                deskew: None,
+            }],
         );
         assert!(app.ocr_verify.correct((0, 0), "Edited"), "the correction commits");
         app.ocr_draft.output_mode = OutputMode::EditableText;
@@ -3121,7 +3163,15 @@ mod tests {
         assert!(preview.texture.is_some(), "and drawn");
         // A review with a correction in it, put away by another mode, comes back as it was.
         let job = h.state_mut().session.ocr_job(id, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None };
+        let page = OcrPage {
+            unusable_text: false,
+            already_on_page: 0,
+            page: 0,
+            words: vec![word("w", Some(95.0))],
+            skipped: None,
+            notes: Vec::new(),
+            deskew: None,
+        };
         h.state_mut().ocr_verify.load(id, job.guard.clone(), vec![page]);
         assert!(h.state_mut().ocr_verify.correct((0, 0), "Edited"));
         h.run_steps(2);
@@ -3140,8 +3190,24 @@ mod tests {
     /// it already has text is passed over, unless every page was skipped.
     #[test]
     fn a_finished_run_shows_a_read_page_over_a_skipped_one() {
-        let skipped = |page| OcrPage { unusable_text: false, already_on_page: 0, page, words: Vec::new(), skipped: Some("has text".into()), notes: Vec::new(), deskew: None };
-        let read = |page| OcrPage { unusable_text: false, already_on_page: 0, page, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None };
+        let skipped = |page| OcrPage {
+            unusable_text: false,
+            already_on_page: 0,
+            page,
+            words: Vec::new(),
+            skipped: Some("has text".into()),
+            notes: Vec::new(),
+            deskew: None,
+        };
+        let read = |page| OcrPage {
+            unusable_text: false,
+            already_on_page: 0,
+            page,
+            words: vec![word("w", Some(95.0))],
+            skipped: None,
+            notes: Vec::new(),
+            deskew: None,
+        };
         let mut v = OcrVerify { current: 0, ..Default::default() };
         v.finished(vec![skipped(0), read(1), read(2)], false);
         assert_eq!(v.current, 1, "the first page read");
@@ -3171,7 +3237,18 @@ mod tests {
     fn page_indicator_numbers_pages_in_the_document() {
         let mut v = OcrVerify::default();
         assert_eq!(v.page_indicator(Some(5)), "—", "no reading yet");
-        v.finished(vec![OcrPage { unusable_text: false, already_on_page: 0, page: 2, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None }], false);
+        v.finished(
+            vec![OcrPage {
+                unusable_text: false,
+                already_on_page: 0,
+                page: 2,
+                words: vec![word("w", Some(95.0))],
+                skipped: None,
+                notes: Vec::new(),
+                deskew: None,
+            }],
+            false,
+        );
         assert_eq!(v.page_indicator(Some(5)), "3 / 5");
         assert_eq!(v.page_indicator(None), "3", "no count when the document is gone");
         assert_eq!(v.page_indicator(Some(0)), "3");
@@ -3207,7 +3284,15 @@ mod tests {
         }
         let a = app.views.first().expect("a is open").id;
         let job = app.session.ocr_job(a, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None };
+        let page = OcrPage {
+            unusable_text: false,
+            already_on_page: 0,
+            page: 0,
+            words: vec![word("w", Some(95.0))],
+            skipped: None,
+            notes: Vec::new(),
+            deskew: None,
+        };
         app.ocr_verify.load(a, job.guard.clone(), vec![page]);
         assert!(app.ocr_verify.correct((0, 0), "Edited"));
         app.active = Some(2);
@@ -3239,7 +3324,15 @@ mod tests {
         }
         let a = app.views.first().expect("a is open").id;
         let job = app.session.ocr_job(a, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None };
+        let page = OcrPage {
+            unusable_text: false,
+            already_on_page: 0,
+            page: 0,
+            words: vec![word("w", Some(95.0))],
+            skipped: None,
+            notes: Vec::new(),
+            deskew: None,
+        };
         app.ocr_verify.load(a, job.guard.clone(), vec![page]);
         assert!(app.ocr_verify.correct((0, 0), "Edited"));
         (app, a)
@@ -3302,7 +3395,15 @@ mod tests {
     #[test]
     fn a_finished_run_shows_a_page_it_read() {
         let mut v = OcrVerify { current: 0, ..Default::default() };
-        let page = OcrPage { unusable_text: false, already_on_page: 0, page: 2, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None };
+        let page = OcrPage {
+            unusable_text: false,
+            already_on_page: 0,
+            page: 2,
+            words: vec![word("w", Some(95.0))],
+            skipped: None,
+            notes: Vec::new(),
+            deskew: None,
+        };
         v.finished(vec![page], false);
         assert_eq!(v.current, 2);
         assert!(v.page(v.current).is_some());
@@ -3329,7 +3430,15 @@ mod tests {
         assert_eq!(app.views.len(), 1, "the document closes");
         // A review on the screen: a run that cannot start leaves it as it was.
         let job = app.session.ocr_job(a, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None };
+        let page = OcrPage {
+            unusable_text: false,
+            already_on_page: 0,
+            page: 0,
+            words: vec![word("w", Some(95.0))],
+            skipped: None,
+            notes: Vec::new(),
+            deskew: None,
+        };
         app.ocr_verify.load(a, job.guard.clone(), vec![page]);
         assert!(app.ocr_verify.correct((0, 0), "Edited"));
         with_state(&mut app, |v, app| v.start_run(app));
@@ -3376,7 +3485,15 @@ mod tests {
         app.guard_quit(&ctx);
         assert!(!app.unsaved_flag.load(Ordering::Relaxed), "nothing to lose yet");
         let job = app.session.ocr_job(a, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None };
+        let page = OcrPage {
+            unusable_text: false,
+            already_on_page: 0,
+            page: 0,
+            words: vec![word("w", Some(95.0))],
+            skipped: None,
+            notes: Vec::new(),
+            deskew: None,
+        };
         app.ocr_verify.load(a, job.guard.clone(), vec![page]);
         assert!(app.first_dirty().is_none(), "nothing is unsaved");
         app.guard_quit(&ctx);
@@ -3398,7 +3515,15 @@ mod tests {
         }
         let a = app.views[0].id;
         let job = app.session.ocr_job(a, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { unusable_text: false, already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new(), deskew: None };
+        let page = OcrPage {
+            unusable_text: false,
+            already_on_page: 0,
+            page: 0,
+            words: vec![word("w", Some(95.0))],
+            skipped: None,
+            notes: Vec::new(),
+            deskew: None,
+        };
         app.ocr_verify.load(a, job.guard.clone(), vec![page]);
         assert!(app.first_dirty().is_none(), "nothing is unsaved");
         app.active = Some(1);
@@ -3455,5 +3580,23 @@ mod tests {
         ensure_preview(&mut app, 0);
         assert!(app.ocr_verify.preview.is_some());
         assert!(app.ocr_verify.preview_failed.is_none());
+    }
+}
+
+#[cfg(test)]
+mod straightening_tests {
+    use super::straightening_text;
+    use pdfcraft_engine::ocr::DeskewReport;
+
+    #[test]
+    fn the_info_strip_says_what_straightening_did() {
+        assert_eq!(straightening_text(None), "—");
+        let straight = DeskewReport::default();
+        assert_eq!(straightening_text(Some(&straight)), crate::i18n::t("Straight").to_string());
+        let turned = DeskewReport { orientation_turns: 3, ..Default::default() };
+        assert!(straightening_text(Some(&turned)).contains("270°"));
+        let both = DeskewReport { orientation_turns: 1, applied_deg: -1.234, ..Default::default() };
+        let text = straightening_text(Some(&both));
+        assert!(text.contains("90°") && text.contains("-1.2°") && text.contains(" · "), "{text}");
     }
 }

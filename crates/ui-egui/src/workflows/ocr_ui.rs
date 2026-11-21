@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use egui::{Align, Layout};
 use pdfcraft_engine::DocId;
-use pdfcraft_engine::ocr::{Digits, EngineChoice, LANGUAGES, MergeStrategy, OcrError, OcrPage, OcrSettings, OutputMode};
+use pdfcraft_engine::ocr::{DeskewMode, Digits, EngineChoice, LANGUAGES, MergeStrategy, OcrError, OcrPage, OcrSettings, OutputMode};
 
 use crate::theme::{self, Tokens};
 use crate::{PdfCraftApp, widgets};
@@ -46,6 +46,9 @@ pub struct OcrDraft {
     /// Preprocessing flags: orientation check and deskew are on by default (every OCR run checks them first).
     pub auto_rotate: bool,
     pub deskew: bool,
+    /// Also turn the scan on the page in the document (one undo step) before reading, instead of
+    /// straightening only the image that is read.
+    pub deskew_in_document: bool,
     pub denoise: bool,
     pub binarize: bool,
     /// What Accept produces.
@@ -74,6 +77,7 @@ impl Default for OcrDraft {
             strategy: MergeStrategy::default(),
             auto_rotate: true,
             deskew: true,
+            deskew_in_document: false,
             denoise: false,
             binarize: false,
             output_mode: OutputMode::default(),
@@ -108,6 +112,7 @@ impl OcrDraft {
             strategy: self.strategy,
             auto_rotate: self.auto_rotate,
             deskew: self.deskew,
+            deskew_mode: if self.deskew_in_document { DeskewMode::Persistent } else { DeskewMode::Transient },
             denoise: self.denoise,
             binarize: self.binarize,
             output_mode: self.output_mode,
@@ -143,7 +148,13 @@ impl OcrDraft {
             self.output_mode = OutputMode::parse(m);
         }
         for (key, flag) in
-            [("auto_rotate", &mut self.auto_rotate), ("deskew", &mut self.deskew), ("denoise", &mut self.denoise), ("binarize", &mut self.binarize)]
+            [
+            ("auto_rotate", &mut self.auto_rotate),
+            ("deskew", &mut self.deskew),
+            ("deskew_in_document", &mut self.deskew_in_document),
+            ("denoise", &mut self.denoise),
+            ("binarize", &mut self.binarize),
+        ]
         {
             if let Some(on) = v[key].as_bool() {
                 *flag = on;
@@ -174,6 +185,7 @@ impl OcrDraft {
             "output_mode": self.output_mode.name(),
             "auto_rotate": self.auto_rotate,
             "deskew": self.deskew,
+            "deskew_in_document": self.deskew_in_document,
             "denoise": self.denoise,
             "binarize": self.binarize,
             "skip_text_files": self.skip_text_files,
@@ -441,6 +453,8 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
         ui.add_enabled(!d.text_pages, crate::widgets::checkbox(&mut d.read_unusable_text, tl!("Also recognize pages whose text is unusable")));
         ui.add(crate::widgets::checkbox(&mut d.auto_rotate, tl!("Straighten pages scanned sideways or upside down")));
         ui.add(crate::widgets::checkbox(&mut d.deskew, tl!("Straighten skewed text lines")));
+        ui.add_enabled(d.deskew, crate::widgets::checkbox(&mut d.deskew_in_document, tl!("Also straighten the page in the document")))
+            .on_hover_text(tl!("The scan is turned on the page (one undo step) before it is read; otherwise only the image that is read is straightened"));
         ui.add(crate::widgets::checkbox(&mut d.denoise, tl!("Remove scan speckle")));
         ui.add(crate::widgets::checkbox(&mut d.binarize, tl!("Black and white (binarize)")));
     });
@@ -677,6 +691,18 @@ impl PdfCraftApp {
         }
         // A new run replaces an offer still showing.
         self.ocr_offer = None;
+        // Persistent deskew turns the scans in the document first (one undo step); the job, and the
+        // guard that says the document has not changed since it started, come after.
+        if settings.deskew
+            && settings.deskew_mode == DeskewMode::Persistent
+            && settings.output_mode == OutputMode::Searchable
+            && let Err(e) = self.session.straighten_scans(id, pages, &settings)
+        {
+            if !automatic {
+                self.notify(e.to_string());
+            }
+            return;
+        }
         let Some(job) = self.session.ocr_job(id, pages, settings.clone()) else { return };
         let guard = job.guard.clone();
         let editable = settings.output_mode == OutputMode::EditableText;
@@ -1939,5 +1965,33 @@ mod tests {
         assert_eq!(app.session.get(id).unwrap().can_undo(), None, "no invisible layer was written");
         assert!(app.ocr_verify.open, "the review opens, to accept as an editable document");
         assert_eq!(app.ocr_verify.phase, crate::workflows::ocr_verify::Phase::ReviewReady);
+    }
+}
+
+#[cfg(test)]
+mod deskew_choice_tests {
+    use super::*;
+
+    /// Straightening and the orientation check are on by default; correcting the document itself is
+    /// a separate, off-by-default choice that reaches the engine as the persistent mode.
+    #[test]
+    fn straightening_choices_reach_the_engine_settings() {
+        let mut d = OcrDraft::default();
+        let s = d.settings();
+        assert!(s.deskew && s.auto_rotate, "every OCR run checks the page first");
+        assert_eq!(s.deskew_mode, DeskewMode::Transient);
+        d.deskew_in_document = true;
+        assert_eq!(d.settings().deskew_mode, DeskewMode::Persistent);
+    }
+
+    /// The choice is remembered with the other OCR preferences.
+    #[test]
+    fn the_document_choice_is_a_preference() {
+        let d = OcrDraft { deskew_in_document: true, ..Default::default() };
+        let pref = d.to_pref();
+        assert_eq!(pref["deskew_in_document"], true);
+        let mut back = OcrDraft::default();
+        back.apply_pref(&pref);
+        assert!(back.deskew_in_document);
     }
 }
