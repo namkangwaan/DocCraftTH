@@ -196,7 +196,7 @@ fn blank_and_tiny_pages_are_untouched() {
 fn quarter_turn_axis_is_found() {
     let base = img(page(Kind::English, false));
     for k in [1u32, 3] {
-        let r = analyze(&rotate_quarter_turns(&base, k), &DeskewOptions::default());
+        let r = analyze(&rotate_quarter_turns(&base, k), &DeskewOptions { detect_orientation: true, ..Default::default() });
         assert_eq!(r.orientation_turns % 2, 1, "k={k}: {r:?}");
     }
 }
@@ -312,4 +312,22 @@ fn tiny_jitter_on_straight_pages_is_left_alone() {
         let r = analyze(&img(skew(&base, a)), &DeskewOptions::default());
         assert!(r.applied_deg.abs() < 0.2 || (r.applied_deg - a).abs() <= 0.1, "jitter {a}: applied {}", r.applied_deg);
     }
+}
+
+/// A near-empty page (a few marks: punch holes, a stamp, a page number) has no lines to measure.
+/// On real scans such pages were "measured" at several degrees with high confidence.
+#[test]
+fn near_empty_pages_are_not_judged() {
+    let mut buf = vec![255u8; W * H * 4];
+    // Twelve small marks scattered along a 5° line, and a short rule.
+    for i in 0..12i64 {
+        let x = 200 + i * 80;
+        let y = 400 + ((i * 80) as f64 * 5f64.to_radians().tan()) as i64;
+        fill(&mut buf, x, y, 14, 14, 0);
+    }
+    fill(&mut buf, 300, 1500, 200, 3, 0);
+    let r = analyze(&img(buf.clone()), &DeskewOptions::default());
+    assert!(!r.changes_page(), "{r:?}");
+    assert_eq!(r.confidence, 0.0, "no verdict at all");
+    assert_eq!(straighten(&img(buf.clone()), &DeskewOptions::default()).unwrap().image.rgba(), &buf[..]);
 }

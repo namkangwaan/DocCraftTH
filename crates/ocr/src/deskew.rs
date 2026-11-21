@@ -20,6 +20,12 @@ use crate::{OcrError, OcrImage};
 /// Long side, in pixels, of the raster the skew search runs on.
 pub const ANALYSIS_SIDE: f64 = 1100.0;
 
+/// Fewest text-like connected components (after blob suppression) a page needs to be judged.
+const MIN_COMPONENTS: usize = 30;
+
+/// Fewest ink points in the scoring area a page needs to be judged.
+const MIN_POINTS: usize = 300;
+
 /// Cap on the ink points the search scores (more are strided away).
 const MAX_POINTS: usize = 160_000;
 
@@ -42,14 +48,26 @@ pub struct DeskewOptions {
     pub deadband_deg: f64,
     /// Smallest confidence (0–1) at which a detected angle is applied.
     pub min_confidence: f64,
-    /// Also look for 90°/180°/270° pages.
+    /// Also look for 90°/180°/270° pages. Off by default: on 7,000 real scans the ink-only cue
+    /// turned upright numeric tables and wide forms on their side (3 of 8 mid-range cases checked by
+    /// eye; no ratio threshold separated them) and flipped upright pages upside down, so a turn is
+    /// only a candidate until a recogniser confirms it (as the 180° retry in the engine does).
     pub detect_orientation: bool,
+    /// How much sharper the 90°-turned ink must score than the upright ink to call a page sideways.
+    pub axis_ratio_min: f64,
     pub resample: Resample,
 }
 
 impl Default for DeskewOptions {
     fn default() -> Self {
-        DeskewOptions { max_angle_deg: 20.0, deadband_deg: 0.2, min_confidence: 0.2, detect_orientation: true, resample: Resample::Bilinear }
+        DeskewOptions {
+            max_angle_deg: 20.0,
+            deadband_deg: 0.2,
+            min_confidence: 0.2,
+            detect_orientation: false,
+            axis_ratio_min: 1.3,
+            resample: Resample::Bilinear,
+        }
     }
 }
 
@@ -70,6 +88,9 @@ pub struct DeskewReport {
     /// (a Latin assumption that Thai does not share), so it only fires on a wide margin; a caller
     /// with a recogniser should verify it by comparing recognition scores.
     pub orientation_confidence: f64,
+    /// Score of the 90°-turned ink over that of the upright ink (0 when orientation was not
+    /// searched): above [`DeskewOptions::axis_ratio_min`] the page is judged to lie on its side.
+    pub axis_ratio: f64,
 }
 
 impl DeskewReport {
@@ -177,7 +198,13 @@ fn build_analysis(image: &OcrImage) -> Option<Analysis> {
         return None;
     }
     let zone = edge_zone(&gray, w, h);
-    suppress_blobs(&mut ink, &zone, w, h);
+    let components = suppress_blobs(&mut ink, &zone, w, h);
+    // A page needs enough text-like marks to have lines at all: a punch hole, a rubber stamp or a page
+    // number on an otherwise empty sheet is not evidence (on real scans such pages were "measured" at
+    // several degrees with high confidence).
+    if components < MIN_COMPONENTS {
+        return None;
+    }
     let (cx, cy) = (w as f32 / 2.0, h as f32 / 2.0);
     let mut all = Vec::new();
     let mut bbox: Option<[f32; 4]> = None;
@@ -196,7 +223,7 @@ fn build_analysis(image: &OcrImage) -> Option<Analysis> {
             }
         }
     }
-    if all.len() < 40 {
+    if all.len() < MIN_POINTS {
         return None;
     }
     let stride = all.len().div_ceil(MAX_POINTS);
@@ -309,7 +336,7 @@ struct Comp {
 /// Remove ink that is not text: connected blobs (8-connectivity) that are large in both
 /// directions (seals, frames), very tall ones (vertical rules), and large ones touching the edge
 /// zone (scanner-border edges).
-fn suppress_blobs(ink: &mut [bool], zone: &[bool], w: usize, h: usize) {
+fn suppress_blobs(ink: &mut [bool], zone: &[bool], w: usize, h: usize) -> usize {
     // parent[0] is unused so label 0 means background.
     let mut parent: Vec<u32> = vec![0];
     let mut labels = vec![0u32; w * h];
@@ -405,6 +432,8 @@ fn suppress_blobs(ink: &mut [bool], zone: &[bool], w: usize, h: usize) {
             }
         }
     }
+    // The text-like components that remain.
+    comps.iter().zip(&doomed).filter(|(c, d)| c.is_some() && !**d).count()
 }
 
 /// Paper colour: the per-channel median of the brightest tenth of (strided) pixels.
@@ -541,10 +570,12 @@ fn decide(a: &Analysis, o: &DeskewOptions) -> (DeskewReport, Option<[f32; 4]>) {
     let (mut chosen, mut k_axis) = (&a.points, 0u32);
     let turned_points;
     let mut picked = upright;
+    let mut axis_ratio = 0.0;
     if o.detect_orientation {
         turned_points = turn_points(&a.points, 1);
         let sideways = coarse(&turned_points, max_deg);
-        if sideways.best > 1.3 * picked.best {
+        axis_ratio = sideways.best / picked.best.max(f64::MIN_POSITIVE);
+        if axis_ratio > o.axis_ratio_min {
             chosen = &turned_points;
             k_axis = 1;
             picked = sideways;
@@ -574,6 +605,7 @@ fn decide(a: &Analysis, o: &DeskewOptions) -> (DeskewReport, Option<[f32; 4]>) {
         confidence: prominence,
         orientation_turns: if prominence >= o.min_confidence { turns } else { 0 },
         orientation_confidence: orient_conf,
+        axis_ratio,
     };
     let report = if report.orientation_turns == 2 && orient_conf < 0.08 { DeskewReport { orientation_turns: 0, ..report } } else { report };
     (report, turn_bbox(a.ink_bbox, report.orientation_turns))

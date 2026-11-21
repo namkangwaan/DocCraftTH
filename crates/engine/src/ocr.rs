@@ -24,6 +24,8 @@ use crate::{DocId, Edit, EditError, Session};
 
 pub mod dictionary;
 pub(crate) mod layer;
+#[cfg(test)]
+mod deskew_eval;
 
 /// Bound recognition/review inputs before cloning or planning glyphs.
 pub fn validate_ocr_words<'a>(words: impl IntoIterator<Item = &'a PlacedWord>) -> Result<usize, String> {
