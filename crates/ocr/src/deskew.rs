@@ -54,7 +54,7 @@ impl Default for DeskewOptions {
 }
 
 /// What the detector found, and what it decided to do about it.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct DeskewReport {
     /// The measured skew in degrees (positive: lines run downhill to the right), after any
     /// quarter turn. `0.0` when nothing could be measured.
@@ -73,10 +73,6 @@ pub struct DeskewReport {
 }
 
 impl DeskewReport {
-    fn none() -> DeskewReport {
-        DeskewReport { detected_deg: 0.0, applied_deg: 0.0, confidence: 0.0, orientation_turns: 0, orientation_confidence: 0.0 }
-    }
-
     /// Whether applying this report changes the raster at all.
     pub fn changes_page(&self) -> bool {
         self.applied_deg != 0.0 || self.orientation_turns != 0
@@ -109,7 +105,7 @@ struct Analysis {
 pub fn analyze(image: &OcrImage, options: &DeskewOptions) -> DeskewReport {
     match build_analysis(image) {
         Some(a) => decide(&a, options).0,
-        None => DeskewReport::none(),
+        None => DeskewReport::default(),
     }
 }
 
@@ -118,7 +114,7 @@ pub fn analyze(image: &OcrImage, options: &DeskewOptions) -> DeskewReport {
 /// as an identical copy with the identity transform.
 pub fn straighten(image: &OcrImage, options: &DeskewOptions) -> Result<Straightened, OcrError> {
     let Some(analysis) = build_analysis(image) else {
-        return Ok(Straightened { image: image.clone(), inverse_transform: InverseTransform::identity(), report: DeskewReport::none() });
+        return Ok(Straightened { image: image.clone(), inverse_transform: InverseTransform::identity(), report: DeskewReport::default() });
     };
     let (report, turned_bbox) = decide(&analysis, options);
     apply(image, &analysis, report, turned_bbox, options.resample)

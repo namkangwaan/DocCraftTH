@@ -1324,7 +1324,7 @@ mod tests {
         } else {
             vec![PlacedWord { text: "word".into(), origin: [72.0, 700.0], across: [40.0, 0.0], up: [0.0, 12.0], confidence: None, source: "ocrs".into() }]
         };
-        OcrPage { page, words, already_on_page: 0, skipped: skipped.map(Into::into), unusable_text, notes: Vec::new() }
+        OcrPage { page, words, already_on_page: 0, skipped: skipped.map(Into::into), unusable_text, notes: Vec::new(), deskew: None }
     }
 
     /// A blank three-page document with `progress` as its running recognition.
@@ -1556,7 +1556,7 @@ mod tests {
         };
         let finished = |app: &PdfCraftApp, automatic: bool| {
             let generation = app.session.get(app.active_ids().unwrap().1).unwrap().edit_generation();
-            let page = pdfcraft_engine::ocr::OcrPage { page: 0, words: vec![word()], already_on_page: 0, skipped: None, unusable_text: false, notes: Vec::new() };
+            let page = pdfcraft_engine::ocr::OcrPage { page: 0, words: vec![word()], already_on_page: 0, skipped: None, unusable_text: false, notes: Vec::new(), deskew: None };
             let progress = Arc::new(Mutex::new(OcrProgress { done: 1, total: 1, result: Some(Ok(vec![page])), cancel: false }));
             let guard = app.session.ocr_guard(app.active_ids().unwrap().1).unwrap();
             OcrRun {
@@ -1613,6 +1613,7 @@ mod tests {
             skipped: None,
             unusable_text: false,
             notes: Vec::new(),
+            deskew: None,
         };
         let progress = Arc::new(Mutex::new(OcrProgress { done: 1, total: 1, result: Some(Ok(vec![page])), cancel: false }));
         let guard = app.session.ocr_guard(id).unwrap();
@@ -1865,7 +1866,7 @@ mod tests {
             confidence: Some(95.0),
             source: "fake".into(),
         };
-        let page = OcrPage { unusable_text: false, page: 0, words: vec![word], already_on_page: 0, skipped: None, notes: Vec::new() };
+        let page = OcrPage { unusable_text: false, page: 0, words: vec![word], already_on_page: 0, skipped: None, notes: Vec::new(), deskew: None };
         let progress = Arc::new(Mutex::new(OcrProgress { total: 1, done: 1, result: Some(Ok(vec![page])), cancel: false }));
         app.ocr_run = Some(OcrRun { settings: OcrSettings::default(), doc: id, progress, guard, automatic: None, editable: false });
         app.poll_ocr();
@@ -1901,6 +1902,7 @@ mod tests {
             skipped: None,
             unusable_text: false,
             notes: vec!["3 characters had no font that could show them and appear as ? in the output".into()],
+            deskew: None,
         };
         let guard = app.session.ocr_guard(id).unwrap();
         let progress = Arc::new(Mutex::new(OcrProgress { total: 1, done: 1, result: Some(Ok(vec![page])), cancel: false }));
@@ -1927,7 +1929,7 @@ mod tests {
             confidence: Some(95.0),
             source: "ocrs".into(),
         };
-        let page = OcrPage { unusable_text: false, page: 0, words: vec![word], already_on_page: 0, skipped: None, notes: Vec::new() };
+        let page = OcrPage { unusable_text: false, page: 0, words: vec![word], already_on_page: 0, skipped: None, notes: Vec::new(), deskew: None };
         let guard = app.session.ocr_guard(id).unwrap();
         let progress = Arc::new(Mutex::new(OcrProgress { total: 1, done: 1, result: Some(Ok(vec![page])), cancel: false }));
         app.ocr_draft.output_mode = pdfcraft_engine::ocr::OutputMode::EditableText;

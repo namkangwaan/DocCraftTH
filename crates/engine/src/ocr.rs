@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 use pdfcraft_render::text::{TextFilter, unreadable};
 use pdfcraft_render::{PageInfo, PageRenderer, RenderConfig, RenderRequest, RequestKind};
 
+pub use pdfcraft_ocr::deskew::DeskewReport;
 pub use pdfcraft_ocr::{
     ConfidenceBand, DETECTION_MODEL, LANGUAGES, Line, MergeStrategy, Models, Ocr, OcrError, OcrImage, PlacedWord, RECOGNITION_MODEL, Recognizer,
     StrategyOutcome, Word, band_for, is_suspect, lines_from_json, low_confidence,
@@ -147,6 +148,16 @@ impl Digits {
     }
 }
 
+/// How a detected skew is corrected (see [`OcrSettings::deskew_mode`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DeskewMode {
+    /// Only the raster the engines read is straightened; the PDF is unchanged.
+    #[default]
+    Transient,
+    /// The page is straightened in the document too (one undo step), then read.
+    Persistent,
+}
+
 /// Recognize Text settings.
 #[derive(Clone, Debug, PartialEq)]
 pub struct OcrSettings {
@@ -182,8 +193,13 @@ pub struct OcrSettings {
     /// Preprocessing, all off by default (a scan is passed through as rendered):
     /// straighten pages scanned at 90°/180°/270°.
     pub auto_rotate: bool,
-    /// Preprocessing: straighten skewed text lines.
+    /// Preprocessing: straighten skewed text lines (on by default; a confidence gate leaves
+    /// straight, blank and textless pages untouched).
     pub deskew: bool,
+    /// Whether deskew only changes the image the engines read (`Transient`, the default: the
+    /// PDF is untouched and word boxes are mapped back) or the page is also straightened in the
+    /// document, undoably (`Persistent`).
+    pub deskew_mode: DeskewMode,
     /// Preprocessing: 3×3 median filter.
     pub denoise: bool,
     /// Preprocessing: Sauvola binarization.
@@ -204,6 +220,9 @@ pub struct OcrSettings {
     /// searching the PATH. `None` means the PATH search decides.
     pub tesseract_path: Option<String>,
 }
+
+/// How much better (mean confidence, 0–100) the 180° reading must be to replace the upright one.
+const FLIP_MARGIN: f32 = 15.0;
 
 /// A recognised word whose box is at least this much covered by the page's own text is that
 /// text read again, not a word in a picture.
@@ -258,7 +277,8 @@ impl Default for OcrSettings {
             engine: EngineChoice::default(),
             strategy: MergeStrategy::default(),
             auto_rotate: false,
-            deskew: false,
+            deskew: true,
+            deskew_mode: DeskewMode::default(),
             denoise: false,
             binarize: false,
             output_mode: OutputMode::default(),
@@ -283,6 +303,9 @@ pub struct OcrPage {
     /// Notes about a partial reading: the words stand, but something on the way did not (an
     /// ensemble partner failed and the page keeps the primary engine's reading alone).
     pub notes: Vec<String>,
+    /// What deskew measured and did on this page (`None`: deskew/auto-rotate were off, or the
+    /// page was not read).
+    pub deskew: Option<DeskewReport>,
 }
 
 impl OcrPage {
@@ -856,12 +879,22 @@ impl OcrSteps {
         }
     }
 
+    // The skipped page is the error and carries its reason and report; it is returned once per page.
+    #[allow(clippy::result_large_err)]
     fn prepare(&mut self, page: usize, info: PageInfo) -> Result<OcrShot, OcrPage> {
         let settings = &self.job.settings;
         let r = &mut self.renderer;
         let own = r.render(RenderRequest { page, kind: RequestKind::Text, scale: 1.0, ..Default::default() }).text;
         let unusable_text = own.as_ref().is_some_and(|t| t.is_unusable());
-        let skip = |why: &str| OcrPage { page, words: Vec::new(), already_on_page: 0, skipped: Some(why.into()), unusable_text, notes: Vec::new() };
+        let skip = |why: &str| OcrPage {
+            page,
+            words: Vec::new(),
+            already_on_page: 0,
+            skipped: Some(why.into()),
+            unusable_text,
+            notes: Vec::new(),
+            deskew: None,
+        };
         // The boxes of all readable text on the page, in view space: an earlier OCR layer's, and
         // words only /ActualText names, so neither is read again. Unreadable glyphs don't count:
         // their boxes would hide the words read over them.
@@ -925,6 +958,9 @@ impl OcrSteps {
             output_mode: settings.output_mode,
             digits: settings.digits,
             unusable_text,
+            deskew: pre.deskew,
+            flip_check: (settings.auto_rotate && pre.deskew.is_some_and(|d| d.orientation_turns % 2 == 0))
+                .then_some(settings.low_confidence_threshold),
         })
     }
 }
@@ -951,6 +987,10 @@ pub struct OcrShot {
     digits: Digits,
     /// The page's own text is unusable (see [`OcrPage::unusable_text`]).
     unusable_text: bool,
+    deskew: Option<DeskewReport>,
+    /// When set, an upright page read below this mean confidence is also read turned 180° and the
+    /// better reading kept (the 0°/180° cue from ink alone is weak, and unreliable for Thai).
+    flip_check: Option<f32>,
 }
 
 impl OcrShot {
@@ -966,16 +1006,31 @@ impl OcrShot {
     }
 
     /// Recognise the image with `recognizers` (per the job's strategy) and place the words.
+    /// An upright page that reads poorly (below the job's low-confidence bar) is also read
+    /// turned 180°, and the clearly better reading wins: the 0°/180° call from ink alone is a
+    /// weak cue, so the recogniser's own confidence decides. (The web build's workers read one
+    /// image only and keep the ink cue.)
     pub fn read(&self, recognizers: &Recognizers) -> OcrPage {
         let Some(image) = &self.image else { return self.place(Err("the page's image was handed to another reader".into())) };
-        let outcome = pdfcraft_ocr::recognize_with_strategy(
-            recognizers.primary.as_ref(),
-            recognizers.secondary.as_deref(),
-            self.strategy,
-            image,
-            &self.options,
-        );
-        self.place(outcome.map_err(|e| e.to_string()))
+        let run = |img: &OcrImage| {
+            pdfcraft_ocr::recognize_with_strategy(recognizers.primary.as_ref(), recognizers.secondary.as_deref(), self.strategy, img, &self.options)
+        };
+        let first = run(image);
+        if let (Some(bar), Ok(read)) = (self.flip_check, &first) {
+            let c0 = pdfcraft_ocr::mean_confidence(&read.lines).unwrap_or(0.0);
+            if c0 < bar {
+                let flipped = pdfcraft_ocr::preprocess::turn_image(image, 2);
+                if let Ok(other) = run(&flipped) {
+                    let c2 = pdfcraft_ocr::mean_confidence(&other.lines).unwrap_or(0.0);
+                    if c2 >= c0 + FLIP_MARGIN {
+                        let inverse = self.inverse.after_quarter_turns(2, image.width(), image.height());
+                        let report = self.deskew.map(|d| DeskewReport { orientation_turns: (d.orientation_turns + 2) % 4, ..d });
+                        return self.place_with(inverse, report, Ok(other));
+                    }
+                }
+            }
+        }
+        self.place(first.map_err(|e| e.to_string()))
     }
 
     /// Put the lines recognised in [`Self::image`] on the page (or skip the page with the
@@ -983,12 +1038,31 @@ impl OcrShot {
     /// `StrategyOutcome { lines, ..Default::default() }`: every strategy reads that way when
     /// there is no second engine.
     pub fn place(&self, outcome: Result<StrategyOutcome, String>) -> OcrPage {
+        self.place_with(self.inverse, self.deskew, outcome)
+    }
+
+    fn place_with(
+        &self,
+        inverse: pdfcraft_ocr::preprocess::InverseTransform,
+        deskew: Option<DeskewReport>,
+        outcome: Result<StrategyOutcome, String>,
+    ) -> OcrPage {
         let page = self.page;
         let outcome = match outcome {
             Ok(o) => o,
-            Err(e) => return OcrPage { page, words: Vec::new(), already_on_page: 0, skipped: Some(e), unusable_text: self.unusable_text, notes: Vec::new() },
+            Err(e) => {
+                return OcrPage {
+                    page,
+                    words: Vec::new(),
+                    already_on_page: 0,
+                    skipped: Some(e),
+                    unusable_text: self.unusable_text,
+                    notes: Vec::new(),
+                    deskew,
+                };
+            }
         };
-        let (info, inverse, offset, scale) = (&self.info, self.inverse, self.offset, self.pixels_per_point);
+        let (info, offset, scale) = (&self.info, self.offset, self.pixels_per_point);
         let to_user = |x: f32, y: f32| {
             // processed pixels → original raster pixels (the exact inverse) → past the
             // region crop → page view space.
@@ -1032,7 +1106,7 @@ impl OcrShot {
                 notes.push(format!("{missing} characters had no font that could show them and appear as ? in the output"));
             }
         }
-        OcrPage { page, words, already_on_page: already.len(), skipped: None, unusable_text: self.unusable_text, notes }
+        OcrPage { page, words, already_on_page: already.len(), skipped: None, unusable_text: self.unusable_text, notes, deskew }
     }
 }
 
@@ -1355,6 +1429,7 @@ impl FileJob {
                     words: Vec::new(),
                     skipped: Some("the file already contains text".into()),
                     notes: Vec::new(),
+                    deskew: None,
                 })
                 .collect();
             return Ok(Opened::Skipped(FileResult { bytes, pages, file_skipped: Some("the file already contains text".into()) }));
@@ -1518,7 +1593,9 @@ mod tests {
         assert_eq!(s.engine, EngineChoice::Ocrs);
         assert_eq!(s.strategy, MergeStrategy::PrimaryOnly);
         assert_eq!(s.output_mode, OutputMode::Searchable);
-        assert!(!s.auto_rotate && !s.deskew && !s.denoise && !s.binarize);
+        assert!(!s.auto_rotate && !s.denoise && !s.binarize);
+        assert!(s.deskew, "deskew is automatic by default (a confidence gate leaves straight pages alone)");
+        assert_eq!(s.deskew_mode, DeskewMode::Transient);
         assert_eq!(s.region, None);
         assert_eq!(s.low_confidence_threshold, 60.0);
         assert_eq!(s.tesseract_path, None, "no configured tesseract path by default: the PATH decides");
@@ -1640,6 +1717,7 @@ mod tests {
             words: vec![word("a", Some(95.0)), word("b", Some(50.0)), word("c", None), word("d", Some(69.0))],
             skipped: None,
             notes: Vec::new(),
+            deskew: None,
         };
         assert_eq!(page.suspects(), vec![1, 3]);
         let mean = page.mean_confidence().unwrap_or_default();
@@ -1855,6 +1933,79 @@ mod tests {
         (Recognizers { primary: fake.clone(), secondary: None }, fake)
     }
 
+    /// Recognizer whose confidence is scripted per call: the first reading is poor, the second
+    /// (the 180°-turned image) is good.
+    struct Scripted {
+        confs: Vec<f32>,
+        calls: std::sync::atomic::AtomicUsize,
+    }
+
+    impl Recognizer for Scripted {
+        fn id(&self) -> &'static str {
+            "scripted"
+        }
+        fn available(&self) -> bool {
+            true
+        }
+        fn languages(&self) -> Vec<(String, String)> {
+            vec![("en".into(), "English".into())]
+        }
+        fn recognize(&self, _image: &pdfcraft_ocr::OcrImage, _options: &pdfcraft_ocr::RecognizeOptions) -> Result<Vec<pdfcraft_ocr::Line>, OcrError> {
+            let n = self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let c = self.confs.get(n).copied().unwrap_or(0.0);
+            Ok(vec![pdfcraft_ocr::Line { words: vec![pdfcraft_ocr::Word::new("word", [10.0, 10.0, 90.0, 30.0], "scripted").with_confidence(c)] }])
+        }
+    }
+
+    fn read_scripted(confs: &[f32]) -> (OcrPage, usize, Option<DeskewReport>) {
+        let mut s = Session::new();
+        let bytes = s.create_from_text("t", "One page").unwrap();
+        let id = s.open("t.pdf", None, bytes, None).unwrap();
+        let settings = OcrSettings { force_ocr: true, auto_rotate: true, ..Default::default() };
+        let rec = Arc::new(Scripted { confs: confs.to_vec(), calls: std::sync::atomic::AtomicUsize::new(0) });
+        let r = Recognizers { primary: rec.clone(), secondary: None };
+        let mut steps = s.ocr_job(id, &[], settings).unwrap().steps();
+        let shot = steps.next_page().unwrap().unwrap();
+        let before = shot.deskew;
+        let page = shot.read(&r);
+        (page, rec.calls.load(std::sync::atomic::Ordering::SeqCst), before)
+    }
+
+    /// A poor upright reading is retried turned 180° and the clearly better one wins; the page
+    /// reports the extra half turn.
+    #[test]
+    fn a_poor_reading_is_retried_upside_down_and_the_better_one_wins() {
+        let (page, calls, before) = read_scripted(&[20.0, 90.0]);
+        assert_eq!(calls, 2);
+        let (before, after) = (before.unwrap(), page.deskew.unwrap());
+        assert_eq!(after.orientation_turns, (before.orientation_turns + 2) % 4);
+        assert_eq!(page.words.len(), 1);
+    }
+
+    /// A good first reading is never retried; a retry that is not clearly better is ignored.
+    #[test]
+    fn a_good_or_unimproved_reading_is_not_flipped() {
+        let (page, calls, before) = read_scripted(&[95.0, 99.0]);
+        assert_eq!(calls, 1, "above the low-confidence bar: no retry");
+        assert_eq!(page.deskew.unwrap().orientation_turns, before.unwrap().orientation_turns);
+        let (page, calls, before) = read_scripted(&[20.0, 25.0]);
+        assert_eq!(calls, 2);
+        assert_eq!(page.deskew.unwrap().orientation_turns, before.unwrap().orientation_turns, "a marginal gain keeps the upright reading");
+    }
+
+    /// With deskew on, the page carries what was measured; with it off there is no report.
+    #[test]
+    fn pages_carry_the_deskew_report() {
+        let mut s = Session::new();
+        let bytes = s.create_from_text("t", "One page").unwrap();
+        let id = s.open("t.pdf", None, bytes, None).unwrap();
+        let (r, _) = fake_recognizers();
+        let on = s.ocr_job(id, &[], OcrSettings { force_ocr: true, ..Default::default() }).unwrap().run(&r, |_, _| true);
+        assert!(on[0].deskew.is_some(), "deskew is on by default");
+        let off = s.ocr_job(id, &[], OcrSettings { force_ocr: true, deskew: false, ..Default::default() }).unwrap().run(&r, |_, _| true);
+        assert_eq!(off[0].deskew, None);
+    }
+
     /// Skip-files: a file that already has text is passed over entirely — the engine never
     /// runs, the original bytes come back, and the result is its own skipped bucket.
     #[test]
@@ -2024,6 +2175,7 @@ mod tests {
             words: confs.iter().map(|c| word(*c)).collect(),
             skipped: skipped.map(str::to_string),
             notes: Vec::new(),
+            deskew: None,
         };
         let pages = vec![
             page(0, &[95.0, 40.0], None),
@@ -2045,7 +2197,11 @@ mod tests {
         let mut s = Session::new();
         let id = s.open("src.pdf", None, Arc::new(fixture(2)), None).unwrap();
         assert!(
-            s.editable_ocr_bytes(id, &[OcrPage { already_on_page: 0, page: 0, words: vec![], skipped: None, unusable_text: false, notes: Vec::new() }]).is_err(),
+            s.editable_ocr_bytes(
+                id,
+                &[OcrPage { already_on_page: 0, page: 0, words: vec![], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None }]
+            )
+            .is_err(),
             "zero words are refused"
         );
         let info = s.get(id).unwrap().info.pages[0].clone();
@@ -2060,8 +2216,8 @@ mod tests {
             source: "ocrs".into(),
         };
         let found = vec![
-            OcrPage { already_on_page: 0, page: 0, words: vec![w], skipped: None, unusable_text: false, notes: Vec::new() },
-            OcrPage { already_on_page: 0, page: 1, words: vec![], skipped: None, unusable_text: false, notes: Vec::new() },
+            OcrPage { already_on_page: 0, page: 0, words: vec![w], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None },
+            OcrPage { already_on_page: 0, page: 1, words: vec![], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None },
         ];
         let before = s.get(id).unwrap().bytes.clone();
         let bytes = s.editable_ocr_bytes(id, &found).unwrap();
@@ -2100,7 +2256,12 @@ mod tests {
             confidence: None,
             source: "ocrs".into(),
         };
-        let bytes = s.editable_ocr_bytes(id, &[OcrPage { already_on_page: 0, page: 0, words: vec![w], skipped: None, unusable_text: false, notes: Vec::new() }]).unwrap();
+        let bytes = s
+            .editable_ocr_bytes(
+                id,
+                &[OcrPage { already_on_page: 0, page: 0, words: vec![w], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None }],
+            )
+            .unwrap();
         let mut out = Session::new();
         let oid = out.open("ocr.pdf", None, bytes, None).unwrap();
         let otext = crate::tests::page_texts(&out, oid)[0].clone();
@@ -2197,7 +2358,7 @@ mod tests {
         let before = s.save_bytes(id).unwrap();
         let word =
             PlacedWord { text: "word".into(), origin: [20.0, 80.0], across: [30.0, 0.0], up: [0.0, 5.0], confidence: None, source: "test".into() };
-        let page = |page, words| OcrPage { already_on_page: 0, page, words, skipped: None, unusable_text: false, notes: Vec::new() };
+        let page = |page, words| OcrPage { already_on_page: 0, page, words, skipped: None, unusable_text: false, notes: Vec::new(), deskew: None };
         let mut invalid = word.clone();
         invalid.origin[0] = f64::INFINITY;
         let mut long = word.clone();
@@ -2226,7 +2387,12 @@ mod tests {
             confidence: None,
             source: "ocrs".into(),
         };
-        let bytes = s.editable_ocr_bytes(id, &[OcrPage { already_on_page: 0, page: 0, words: vec![w], skipped: None, unusable_text: false, notes: Vec::new() }]).unwrap();
+        let bytes = s
+            .editable_ocr_bytes(
+                id,
+                &[OcrPage { already_on_page: 0, page: 0, words: vec![w], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None }],
+            )
+            .unwrap();
         let mut out = Session::new();
         let oid = out.open("ocr.pdf", None, bytes, None).unwrap();
         let text = crate::tests::page_texts(&out, oid)[0].clone();
@@ -2258,7 +2424,12 @@ mod tests {
             source: "ocrs".into(),
         };
         let words = vec![word("Привет", 250.0, 80.0), word("Hello", 100.0, 50.0)];
-        let bytes = s.editable_ocr_bytes(id, &[OcrPage { already_on_page: 0, page: 0, words, skipped: None, unusable_text: false, notes: Vec::new() }]).unwrap();
+        let bytes = s
+            .editable_ocr_bytes(
+                id,
+                &[OcrPage { already_on_page: 0, page: 0, words, skipped: None, unusable_text: false, notes: Vec::new(), deskew: None }],
+            )
+            .unwrap();
         let mut out = Session::new().with_clock(|| 1_700_000_000);
         let oid = out.open("ocr.pdf", None, bytes, None).unwrap();
         let before = crate::tests::page_texts(&out, oid)[0].clone();
@@ -2310,8 +2481,24 @@ mod tests {
         // Different scripts, so each page's words live in different planned fonts (and page 2
         // would inherit page 1's codes under page-local indexing into the shared plan).
         let found = vec![
-            OcrPage { already_on_page: 0, page: 0, words: vec![word("日本語")], skipped: None, unusable_text: false, notes: Vec::new() },
-            OcrPage { already_on_page: 0, page: 1, words: vec![word("Привет")], skipped: None, unusable_text: false, notes: Vec::new() },
+            OcrPage {
+                already_on_page: 0,
+                page: 0,
+                words: vec![word("日本語")],
+                skipped: None,
+                unusable_text: false,
+                notes: Vec::new(),
+                deskew: None,
+            },
+            OcrPage {
+                already_on_page: 0,
+                page: 1,
+                words: vec![word("Привет")],
+                skipped: None,
+                unusable_text: false,
+                notes: Vec::new(),
+                deskew: None,
+            },
         ];
         let bytes = s.editable_ocr_bytes(id, &found).unwrap();
         let mut out = Session::new();

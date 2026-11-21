@@ -62,16 +62,19 @@ pub fn preprocess(image: OcrImage, source_dpi: f32, options: &PreprocessOptions)
     // they see letter-sized strokes. With every step off nothing is resampled. A broken dpi
     // (zero, negative, NaN) is left alone.
     let mut dpi = if source_dpi.is_finite() && source_dpi >= 1.0 { source_dpi } else { 300.0 };
-    if options.any() && dpi < 300.0 {
+    // Deskew works on its own ~1100 px analysis copy, so it never forces the enlargement.
+    if (options.auto_rotate || options.denoise || options.binarize) && dpi < 300.0 {
         let scale = f64::from(300.0 / dpi);
         current = resize_bilinear(&current, scale)?;
         inverse = compose(&inverse, &InverseTransform::scale(1.0 / scale));
         dpi = 300.0;
     }
     // (b) Orientation: turn 90/180/270 scans upright (opt-in, skipped for small images).
+    let mut turned = 0;
     if options.auto_rotate {
         let (w, h) = (current.width, current.height);
         let turns = detect_orientation(&current);
+        turned = turns;
         if turns != 0 {
             current = rotate_quarter_turns(&current, turns);
             inverse = compose(&inverse, &inverse_quarter_turns(turns, w, h));
@@ -80,14 +83,14 @@ pub fn preprocess(image: OcrImage, source_dpi: f32, options: &PreprocessOptions)
     // (c) Deskew: straighten skewed lines (opt-in): the `deskew` module measures the skew (±20°)
     // and a confidence gate leaves straight, blank or textless pages untouched. Quarter turns
     // are step (b)'s job here, so the detector's own orientation search is off.
-    let mut deskew_report = None;
+    let mut deskew_report = (options.auto_rotate || options.deskew).then(|| DeskewReport { orientation_turns: turned, ..DeskewReport::default() });
     if options.deskew {
         let straightened = deskew::straighten(&current, &DeskewOptions { detect_orientation: false, ..Default::default() })?;
         if straightened.report.changes_page() {
             current = straightened.image;
             inverse = compose(&inverse, &straightened.inverse_transform);
         }
-        deskew_report = Some(straightened.report);
+        deskew_report = Some(DeskewReport { orientation_turns: turned, ..straightened.report });
     }
     // (d) Denoise: 3×3 median with edge clamping (opt-in; dimensions never change).
     if options.denoise {
@@ -139,6 +142,13 @@ impl InverseTransform {
             e: outer.a * inner.e + outer.c * inner.f + outer.e,
             f: outer.b * inner.e + outer.d * inner.f + outer.f,
         }
+    }
+
+    /// This map followed by the inverse of turning a `width`×`height` image `turns` quarter
+    /// turns clockwise: for a processed image that was then turned, maps the turned image's
+    /// pixels back to the input raster.
+    pub fn after_quarter_turns(&self, turns: u32, width: u32, height: u32) -> InverseTransform {
+        compose(self, &inverse_quarter_turns(turns % 4, width, height))
     }
 
     /// Map a point from the processed image back to the input raster.
@@ -338,6 +348,11 @@ pub(crate) fn band_bottom_heaviness(profile: &[u64]) -> f64 {
 }
 
 /// Rotate the raster `k` quarter turns clockwise (an exact pixel permutation).
+/// Turn an image `turns` quarter turns clockwise (an exact pixel permutation).
+pub fn turn_image(image: &OcrImage, turns: u32) -> OcrImage {
+    rotate_quarter_turns(image, turns % 4)
+}
+
 pub(crate) fn rotate_quarter_turns(image: &OcrImage, k: QuarterTurns) -> OcrImage {
     let (w, h) = (image.width as usize, image.height as usize);
     let (nw, nh) = if k.is_multiple_of(2) { (image.width, image.height) } else { (image.height, image.width) };
