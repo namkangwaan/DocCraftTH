@@ -999,6 +999,12 @@ impl Automation {
             settings.despeckle = on;
         }
         let id = self.doc(a)?.id;
+        // Optional: first turn each skewed scan straight (one undoable step of its own).
+        let straightened = if a.opt_bool("straighten")?.unwrap_or(false) {
+            self.session.straighten_scans(id, &pages, &pdfcraft_engine::ocr::OcrSettings::default()).map_err(failed)?
+        } else {
+            Vec::new()
+        };
         let report = self.session.enhance_scanned_pages(id, &pages, settings).map_err(failed)?;
         let numbered = |p: &[usize]| p.iter().map(|p| p + 1).collect::<Vec<_>>();
         let skipped: Vec<Value> = report.skipped.iter().map(|k| json!({ "pages": numbered(&k.pages), "name": k.name, "reason": k.reason })).collect();
@@ -1007,6 +1013,8 @@ impl Automation {
         out["images"] = json!(report.images);
         out["not_scanned"] = json!(numbered(&report.not_scanned));
         out["skipped"] = json!(skipped);
+        out["straightened"] =
+            json!(straightened.iter().map(|(p, d)| json!({ "page": p + 1, "degrees": (d * 100.0).round() / 100.0 })).collect::<Vec<_>>());
         Ok(out)
     }
 }
