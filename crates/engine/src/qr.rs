@@ -61,7 +61,7 @@ pub fn scan_qr_from_rgba(width: usize, height: usize, rgba_bytes: &[u8]) -> Vec<
 pub fn scan_page_qr(bytes: std::sync::Arc<Vec<u8>>, config: pdfcraft_render::RenderConfig, page: usize) -> Result<Vec<QrCodeInfo>, String> {
     let mut renderer = PageRenderer::new(bytes, config);
     // Render at 150 DPI for sharp QR code detection
-    let r = renderer.render(RenderRequest { page, scale: 150.0 / 72.0, ..Default::default() });
+    let r = renderer.render(RenderRequest { page, scale: QR_SCAN_SCALE, ..Default::default() });
     if let Some(err) = r.error {
         return Err(err);
     }
@@ -109,38 +109,48 @@ fn ordered_span(lo: f64, hi: f64, min: f64, max: f64) -> (f64, f64) {
     (lo, hi)
 }
 
-/// Map pixel bounds `[min_x, min_y, max_x, max_y]` of a render made at `scale` (pixels per user
-/// unit) of a page with crop box `crop` (`[x0, y0, x1, y1]`) to user space. The pixel y axis points
-/// down and the user y axis up, so `user_y = crop_y1 - pixel_y / scale`. `px_h` is the render
-/// height, used to clamp pixel y. The result is clamped into the crop box and always has
-/// `x0 < x1` and `y0 < y1`.
-pub fn pixel_bounds_to_user(bounds: [u32; 4], scale: f32, crop: [f32; 4], px_h: u32) -> [f64; 4] {
+/// Map pixel bounds `[min_x, min_y, max_x, max_y]` of a render `px_size` (`[width, height]` in
+/// pixels) to page user space. The render shows the page as displayed, so the pixels are in view
+/// space (y down, after `/Rotate`); the mapping is the one `PageInfo::view_to_user` applies, in
+/// fractions of the render so the render scale does not matter. `crop` is the crop box
+/// `[x0, y0, x1, y1]` and `rotation` the clockwise `/Rotate` in degrees (taken modulo 360; any
+/// value that is not a quarter turn counts as 0). The result is unrotated user space (PDF y-up),
+/// clamped into the crop box, with `x0 < x1` and `y0 < y1`.
+pub fn pixel_bounds_to_user(bounds: [u32; 4], px_size: [u32; 2], crop: [f32; 4], rotation: u16) -> [f64; 4] {
     let (ca, cb) = (finite_f64(crop[0]), finite_f64(crop[2]));
     let (cc, cd) = (finite_f64(crop[1]), finite_f64(crop[3]));
     let (cx0, cx1) = (ca.min(cb), ca.max(cb));
     let (cy0, cy1) = (cc.min(cd), cc.max(cd));
-    let s = if scale.is_finite() && scale > 0.0 { f64::from(scale) } else { 1.0 };
-    let h = f64::from(px_h);
-    let py_top = f64::from(bounds[1]).min(h);
-    let py_bottom = f64::from(bounds[3]).min(h);
+    let (w, h) = (f64::from(px_size[0]).max(1.0), f64::from(px_size[1]).max(1.0));
+    let frac = |px: u32, len: f64| (f64::from(px) / len).clamp(0.0, 1.0);
+    let (fx0, fy0, fx1, fy1) = (frac(bounds[0], w), frac(bounds[1], h), frac(bounds[2], w), frac(bounds[3], h));
 
-    let x0 = cx0 + f64::from(bounds[0]) / s;
-    let x1 = cx0 + f64::from(bounds[2]) / s;
-    let y_hi = cy1 - py_top / s;
-    let y_lo = cy1 - py_bottom / s;
+    // View fractions (a across, b down) -> unrotated fractions (u across from the crop's left, v down from its top).
+    let to_uv = |a: f64, b: f64| match rotation % 360 {
+        90 => (b, 1.0 - a),
+        180 => (1.0 - a, 1.0 - b),
+        270 => (1.0 - b, a),
+        _ => (a, b),
+    };
+    let (u0, v0) = to_uv(fx0, fy0);
+    let (u1, v1) = to_uv(fx1, fy1);
+    let to_user = |u: f64, v: f64| (cx0 + u * (cx1 - cx0), cy1 - v * (cy1 - cy0));
+    let (xa, ya) = to_user(u0, v0);
+    let (xb, yb) = to_user(u1, v1);
 
-    let (x0, x1) = ordered_span(x0, x1, cx0, cx1);
-    let (y0, y1) = ordered_span(y_lo, y_hi, cy0, cy1);
+    let (x0, x1) = ordered_span(xa.min(xb), xa.max(xb), cx0, cx1);
+    let (y0, y1) = ordered_span(ya.min(yb), ya.max(yb), cy0, cy1);
     [x0, y0, x1, y1]
 }
 
-/// Scan a page for QR codes and return each with its user-space rectangle. `crop` is the page
-/// crop box in user space, `[x0, y0, x1, y1]`.
+/// Scan a page for QR codes and return each with its user-space rectangle. `info` is the page's
+/// [`pdfcraft_render::PageInfo`] (crop box and `/Rotate`); the rectangles are in unrotated user
+/// space, ready for the same view transform as any other user-space rectangle.
 pub fn scan_page_qr_regions(
     bytes: std::sync::Arc<Vec<u8>>,
     config: pdfcraft_render::RenderConfig,
     page: usize,
-    crop: [f32; 4],
+    info: &pdfcraft_render::PageInfo,
 ) -> Result<Vec<QrRegion>, String> {
     let mut renderer = PageRenderer::new(bytes, config);
     let r = renderer.render(RenderRequest { page, scale: QR_SCAN_SCALE, ..Default::default() });
@@ -148,7 +158,11 @@ pub fn scan_page_qr_regions(
         return Err(err);
     }
     let found = scan_qr_from_rgba(r.width as usize, r.height as usize, &r.rgba);
-    Ok(found.into_iter().map(|q| QrRegion { rect_user: pixel_bounds_to_user(q.bounds, QR_SCAN_SCALE, crop, r.height), content: q.content }).collect())
+    let regions = found
+        .into_iter()
+        .map(|q| QrRegion { rect_user: pixel_bounds_to_user(q.bounds, [r.width, r.height], info.crop, info.rotation), content: q.content })
+        .collect();
+    Ok(regions)
 }
 
 /// Keep at most `max_chars` characters of `text`, adding `…` when it was cut.
@@ -194,24 +208,57 @@ mod tests {
         assert!(results.is_empty());
     }
 
+    /// Non-square page, non-origin crop box (200 x 400 user units at x 10..210, y 20..420), rendered at 2 px per unit.
+    const CROP: [f32; 4] = [10.0, 20.0, 210.0, 420.0];
+
+    fn close(got: [f64; 4], want: [f64; 4]) {
+        assert!(got.iter().zip(want).all(|(g, w)| (g - w).abs() < 1e-3), "got {got:?}, want {want:?}");
+    }
+
     #[test]
     fn region_maps_pixel_bounds_to_user_space() {
-        let scale = 150.0_f32 / 72.0;
-        let r = pixel_bounds_to_user([150, 150, 300, 300], scale, [0.0, 0.0, 612.0, 792.0], 1650);
-        assert!((r[0] - 72.0).abs() < 0.01, "x0 {}", r[0]);
-        assert!((r[2] - 144.0).abs() < 0.01, "x1 {}", r[2]);
-        assert!((r[3] - (792.0 - 72.0)).abs() < 0.01, "y1 {}", r[3]);
-        assert!((r[1] - (792.0 - 144.0)).abs() < 0.01, "y0 {}", r[1]);
+        // Unrotated 612 x 792 page at 150 DPI.
+        let r = pixel_bounds_to_user([150, 150, 300, 300], [1275, 1650], [0.0, 0.0, 612.0, 792.0], 0);
+        close(r, [72.0, 792.0 - 144.0, 144.0, 792.0 - 72.0]);
+    }
+
+    #[test]
+    fn region_honours_page_rotation() {
+        // The same QR at view fractions x 0.1..0.3, y 0.5..0.9 of the displayed page.
+        close(pixel_bounds_to_user([40, 400, 120, 720], [400, 800], CROP, 0), [30.0, 60.0, 70.0, 220.0]);
+        close(pixel_bounds_to_user([80, 200, 240, 360], [800, 400], CROP, 90), [110.0, 60.0, 190.0, 140.0]);
+        close(pixel_bounds_to_user([40, 400, 120, 720], [400, 800], CROP, 180), [150.0, 220.0, 190.0, 380.0]);
+        close(pixel_bounds_to_user([80, 200, 240, 360], [800, 400], CROP, 270), [30.0, 300.0, 110.0, 380.0]);
+        // An odd rotation is treated as unrotated, and 360 wraps.
+        close(pixel_bounds_to_user([40, 400, 120, 720], [400, 800], CROP, 45), [30.0, 60.0, 70.0, 220.0]);
+        close(pixel_bounds_to_user([80, 200, 240, 360], [800, 400], CROP, 450), [110.0, 60.0, 190.0, 140.0]);
+    }
+
+    #[test]
+    fn region_round_trips_through_page_info_view_space() {
+        for rotation in [0u16, 90, 180, 270] {
+            let (w, h) = if rotation % 180 == 0 { (200.0, 400.0) } else { (400.0, 200.0) };
+            let info = pdfcraft_render::PageInfo { width: w, height: h, label: String::new(), crop: CROP, rotation };
+            let px = [(w * 2.0) as u32, (h * 2.0) as u32];
+            let bounds = [px[0] / 10, px[1] / 5, px[0] / 3, px[1] / 2];
+            let r = pixel_bounds_to_user(bounds, px, CROP, rotation);
+            let (a, b) = (info.user_to_view(r[0] as f32, r[1] as f32), info.user_to_view(r[2] as f32, r[3] as f32));
+            let view = [a[0].min(b[0]), a[1].min(b[1]), a[0].max(b[0]), a[1].max(b[1])];
+            let want = bounds.map(|v| v as f32 / 2.0);
+            assert!(view.iter().zip(want).all(|(g, w)| (g - w).abs() < 0.05), "rotation {rotation}: {view:?} vs {want:?}");
+        }
     }
 
     #[test]
     fn region_is_clamped_and_ordered_for_degenerate_input() {
         let crop = [10.0_f32, 20.0, 110.0, 220.0];
-        let r = pixel_bounds_to_user([5000, 5000, 5000, 5000], 2.0, crop, 400);
-        assert!(r[0] < r[2] && r[1] < r[3], "{r:?}");
-        assert!(r[0] >= 10.0 && r[2] <= 110.0 && r[1] >= 20.0 && r[3] <= 220.0, "{r:?}");
-        let bad = pixel_bounds_to_user([0, 0, 10, 10], 0.0, crop, 400);
-        assert!(bad.iter().all(|v| v.is_finite()) && bad[0] < bad[2] && bad[1] < bad[3]);
+        for rotation in [0u16, 90, 180, 270] {
+            let r = pixel_bounds_to_user([5000, 5000, 5000, 5000], [200, 400], crop, rotation);
+            assert!(r[0] < r[2] && r[1] < r[3], "{r:?}");
+            assert!(r[0] >= 10.0 && r[2] <= 110.0 && r[1] >= 20.0 && r[3] <= 220.0, "{r:?}");
+            let bad = pixel_bounds_to_user([0, 0, 10, 10], [0, 0], [f32::NAN, 0.0, f32::INFINITY, 5.0], rotation);
+            assert!(bad.iter().all(|v| v.is_finite()) && bad[0] < bad[2] && bad[1] < bad[3], "{bad:?}");
+        }
     }
 
     #[test]
