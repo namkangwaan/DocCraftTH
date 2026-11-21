@@ -112,6 +112,10 @@ impl InverseTransform {
         InverseTransform { a: 1.0, b: 0.0, c: 0.0, d: 1.0, e: 0.0, f: 0.0 }
     }
 
+    pub(crate) fn from_parts(a: f64, b: f64, c: f64, d: f64, e: f64, f: f64) -> InverseTransform {
+        InverseTransform { a, b, c, d, e, f }
+    }
+
     fn scale(s: f64) -> InverseTransform {
         InverseTransform { a: s, b: 0.0, c: 0.0, d: s, e: 0.0, f: 0.0 }
     }
@@ -165,7 +169,7 @@ impl InverseTransform {
 
 /// The step inverses compose in pipeline order: each new step's inverse is applied *after*
 /// the inverses accumulated so far.
-fn compose(outer: &InverseTransform, inner: &InverseTransform) -> InverseTransform {
+pub(crate) fn compose(outer: &InverseTransform, inner: &InverseTransform) -> InverseTransform {
     InverseTransform::compose_(outer, inner)
 }
 
@@ -213,12 +217,12 @@ fn resize_bilinear(image: &OcrImage, scale: f64) -> Result<OcrImage, OcrError> {
 }
 
 /// Grayscale (Rec.601 luma) of every pixel.
-fn grayscale(image: &OcrImage) -> Vec<u8> {
+pub(crate) fn grayscale(image: &OcrImage) -> Vec<u8> {
     image.rgba.as_chunks::<4>().0.iter().map(|p| ((299 * p[0] as u32 + 587 * p[1] as u32 + 114 * p[2] as u32) / 1000).min(255) as u8).collect()
 }
 
 /// How the page must be turned (quarter turns, clockwise) to read upright.
-type QuarterTurns = u32;
+pub(crate) type QuarterTurns = u32;
 
 /// Detect the correction for pages scanned sideways or upside down. Method (documented,
 /// panic-free, no OCR): ink is everything darker than the midpoint between the darkest and
@@ -308,7 +312,7 @@ fn rotated_row_profile(ink: &[bool], w: usize, h: usize, k: u32) -> Vec<u64> {
 
 /// Sum over text-line bands of (ink in the band's lower half − ink in its upper half):
 /// positive when the bands carry more ink near their bottoms, as real text does.
-fn band_bottom_heaviness(profile: &[u64]) -> f64 {
+pub(crate) fn band_bottom_heaviness(profile: &[u64]) -> f64 {
     let mut asym = 0.0;
     let mut start: Option<usize> = None;
     for (i, &p) in profile.iter().chain(std::iter::once(&0)).enumerate() {
@@ -328,7 +332,7 @@ fn band_bottom_heaviness(profile: &[u64]) -> f64 {
 }
 
 /// Rotate the raster `k` quarter turns clockwise (an exact pixel permutation).
-fn rotate_quarter_turns(image: &OcrImage, k: QuarterTurns) -> OcrImage {
+pub(crate) fn rotate_quarter_turns(image: &OcrImage, k: QuarterTurns) -> OcrImage {
     let (w, h) = (image.width as usize, image.height as usize);
     let (nw, nh) = if k.is_multiple_of(2) { (image.width, image.height) } else { (image.height, image.width) };
     let mut out = vec![255u8; nw as usize * nh as usize * 4];
@@ -349,7 +353,7 @@ fn rotate_quarter_turns(image: &OcrImage, k: QuarterTurns) -> OcrImage {
 }
 
 /// The inverse of a `k`-quarter-turn correction: where each corrected pixel came from.
-fn inverse_quarter_turns(k: QuarterTurns, old_w: u32, old_h: u32) -> InverseTransform {
+pub(crate) fn inverse_quarter_turns(k: QuarterTurns, old_w: u32, old_h: u32) -> InverseTransform {
     let (w, h) = (f64::from(old_w), f64::from(old_h));
     match k {
         // Forward (content moves): (x, y) ↦ (h−1−y, x) for one turn clockwise.
