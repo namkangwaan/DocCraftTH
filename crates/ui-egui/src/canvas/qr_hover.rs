@@ -122,6 +122,8 @@ impl QrCache {
         let wake = RepaintOnDrop(ctx.clone());
         let work = move || {
             let _wake = wake;
+            // Declared after the guard so it drops first: the UI is woken with the channel closed.
+            let sender = sender;
             let _ = sender.send(scanner(bytes, RenderConfig::default(), page, info));
         };
         #[cfg(not(target_arch = "wasm32"))]
@@ -140,7 +142,8 @@ impl QrCache {
 }
 
 /// The region under `at` (user space), edges included. Where regions overlap, the smallest wins:
-/// it is the one the pointer is most specifically over. A NaN point is over none.
+/// it is the one the pointer is most specifically over. A NaN point is over none, and a region
+/// with a non-finite corner is under none.
 pub(crate) fn region_at(regions: &[QrRegion], at: [f64; 2]) -> Option<&QrRegion> {
     let [x, y] = at;
     let bounds = |r: &QrRegion| {
@@ -153,6 +156,7 @@ pub(crate) fn region_at(regions: &[QrRegion], at: [f64; 2]) -> Option<&QrRegion>
     };
     regions
         .iter()
+        .filter(|r| r.rect_user.iter().all(|v| v.is_finite()))
         .filter(|r| {
             let (x0, y0, x1, y1) = bounds(r);
             x0 <= x && x <= x1 && y0 <= y && y <= y1
@@ -177,6 +181,20 @@ pub(crate) fn tip_for(content: &str) -> String {
         let what = crate::i18n::fmt(tl!("QR Code text: {text}"), &[("text", &preview)]);
         format!("{what}\n({})", tl!("Right-click to copy or check"))
     }
+}
+
+/// What the page's right-click menu offers for a QR code.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum QrMenu {
+    /// A web address, ready for a browser (`www.` gets `https://`): open it or copy it.
+    Link(String),
+    /// Any other payload, unchanged: copy it.
+    Text(String),
+}
+
+/// The right-click menu choice for a QR code carrying `content`.
+pub(crate) fn menu_for(content: &str) -> QrMenu {
+    if pdfcraft_engine::qr::is_url(content) { QrMenu::Link(pdfcraft_engine::qr::normalize_url(content)) } else { QrMenu::Text(content.to_string()) }
 }
 
 /// Frame `rect` (screen) as the QR code under the pointer: a rounded outline in `color` over a
@@ -237,6 +255,24 @@ mod tests {
         assert!(region_at(&regions, [30.0, 60.1]).is_none());
         assert!(region_at(&regions, [f64::NAN, 40.0]).is_none());
         assert!(region_at(&[], [30.0, 40.0]).is_none());
+    }
+
+    #[test]
+    fn region_at_ignores_non_finite_regions() {
+        let regions = [region("inf", [0.0, 0.0, f64::INFINITY, 100.0]), region("nan", [0.0, f64::NAN, 100.0, 100.0])];
+        assert!(region_at(&regions, [50.0, 50.0]).is_none());
+        // A finite region next to them is still found.
+        let regions = [region("inf", [f64::NEG_INFINITY, 0.0, 100.0, 100.0]), region("ok", [40.0, 40.0, 60.0, 60.0])];
+        assert_eq!(region_at(&regions, [5.0, 5.0]).map(|r| r.content.as_str()), None);
+        assert_eq!(region_at(&regions, [50.0, 50.0]).map(|r| r.content.as_str()), Some("ok"));
+    }
+
+    #[test]
+    fn menu_choice_for_url_and_text() {
+        assert_eq!(menu_for("https://example.com/menu?table=7"), QrMenu::Link("https://example.com/menu?table=7".into()));
+        assert_eq!(menu_for("www.example.com"), QrMenu::Link("https://www.example.com".into()));
+        assert_eq!(menu_for("สวัสดีครับ"), QrMenu::Text("สวัสดีครับ".into()));
+        assert_eq!(menu_for("table 7"), QrMenu::Text("table 7".into()));
     }
 
     #[test]

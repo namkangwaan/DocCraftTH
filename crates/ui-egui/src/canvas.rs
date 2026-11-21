@@ -1976,59 +1976,35 @@ fn draw_pages(
                     hit
                 }
             };
-            // QR Code detection under right-click position (image or page)
-            let qr_key = egui::Id::unique("qr-under-context-menu");
-            let cached_qr = ui.data(|d| d.get_temp::<(usize, [f64; 2], Option<String>)>(qr_key)).filter(|c| c.0 == page && c.1 == at);
-            let qr_content: Option<String> = match cached_qr {
-                Some(c) => c.2,
-                None => {
-                    let mut found = None;
-                    if let Some(image) = hit
-                        && let Ok((w, h, rgba)) = doc.page_image_rgba(page, image)
-                    {
-                        let list = pdfcraft_engine::qr::scan_qr_from_rgba(w as usize, h as usize, &rgba);
-                        found = list.into_iter().next().map(|q| q.content);
-                    }
-                    if found.is_none()
-                        && let Ok(list) = pdfcraft_engine::qr::scan_page_qr(doc.display.clone(), pdfcraft_render::RenderConfig::default(), page)
-                    {
-                        found = list.into_iter().next().map(|q| q.content);
-                    }
-                    ui.data_mut(|d| d.insert_temp(qr_key, (page, at, found.clone())));
-                    found
-                }
-            };
+            // The QR code under the right-click point, from the same per-page scan the hover frame uses.
+            let qr_content = qr_hover::region_at(view.qr_cache.regions(doc, info, page, ui.ctx()), at).map(|r| r.content.clone());
             if let Some(qr_text) = qr_content {
-                let is_url = pdfcraft_engine::qr::is_url(&qr_text);
+                let menu = qr_hover::menu_for(&qr_text);
                 ui.horizontal(|ui| {
                     ui.label(egui::RichText::new("📷 QR Code:").strong());
-                    if is_url {
+                    if matches!(menu, qr_hover::QrMenu::Link(_)) {
                         ui.label(egui::RichText::new("Link").small().color(ui.visuals().hyperlink_color));
                     }
                 });
-                let preview = if qr_text.len() > 64 {
-                    format!("{}…", &qr_text[..61])
-                } else {
-                    qr_text.clone()
-                };
-                ui.label(egui::RichText::new(preview).italics());
+                ui.label(egui::RichText::new(pdfcraft_engine::qr::truncate_chars(&qr_text, 64)).italics());
                 ui.add_space(2.0);
 
-                if is_url {
-                    let url = pdfcraft_engine::qr::normalize_url(&qr_text);
-                    if ui.button(egui::RichText::new(format!("🌐 {}", tl!("Open in Browser"))).color(ui.visuals().hyperlink_color)).clicked() {
-                        ui.ctx().open_url(egui::OpenUrl::new_tab(&url));
-                        ui.close();
+                match menu {
+                    qr_hover::QrMenu::Link(url) => {
+                        if ui.button(egui::RichText::new(format!("🌐 {}", tl!("Open in Browser"))).color(ui.visuals().hyperlink_color)).clicked() {
+                            ui.ctx().open_url(egui::OpenUrl::new_tab(&url));
+                            ui.close();
+                        }
+                        if ui.button(tl!("Copy Link")).clicked() {
+                            ui.ctx().copy_text(url);
+                            ui.close();
+                        }
                     }
-                    if ui.button(tl!("Copy Link")).clicked() {
-                        ui.ctx().copy_text(url);
-                        ui.close();
-                    }
-                } else {
-                    let copy_val = qr_text.clone();
-                    if ui.button(tl!("Copy text")).clicked() {
-                        ui.ctx().copy_text(copy_val);
-                        ui.close();
+                    qr_hover::QrMenu::Text(text) => {
+                        if ui.button(tl!("Copy text")).clicked() {
+                            ui.ctx().copy_text(text);
+                            ui.close();
+                        }
                     }
                 }
 
