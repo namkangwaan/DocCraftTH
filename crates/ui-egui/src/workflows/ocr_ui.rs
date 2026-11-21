@@ -198,10 +198,13 @@ impl OcrDraft {
 /// (`None` when it has). The sentence for a named language is [`OcrError::NoLanguageModel`]'s own
 /// wording with `{language}` where it names the language: that is the catalogs' key.
 fn missing_models(language: &str) -> Option<String> {
-    // The web build downloads the English models on first use (the dialog says so); it has no
-    // other language's.
+    // The web build downloads the models on first use (the dialog says so): English always, and
+    // Thai when `models/` holds its files. They are fetched together, so until the English models
+    // are loaded Thai is still on its way.
     #[cfg(target_arch = "wasm32")]
-    let installed = language == "en";
+    let installed = language == "en"
+        || pdfcraft_engine::ocr::available_for(language)
+        || (language == "th" && pdfcraft_engine::ocr::engine_unavailable_reason(EngineChoice::Ocrs).is_some());
     #[cfg(not(target_arch = "wasm32"))]
     let installed = pdfcraft_engine::ocr::available_for(language);
     if installed {
