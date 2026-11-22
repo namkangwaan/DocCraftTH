@@ -558,8 +558,18 @@ impl OpenThai {
         Ok(ctc_decode(&probs, shape.get(2).copied().unwrap_or(0), chars))
     }
 
-    /// Recognise one box; `None` when the reading is dropped by the line filter.
-    fn read_box(&self, page: &Rgb, q: &Quad, median_h: f32) -> Result<Option<Read>, OcrError> {
+    /// Read the whole of `image` as one line of text (no detection): the text, canonical, and the
+    /// recognizer's mean confidence (0 to 1). `None` when the image is too small to read.
+    pub fn read_line(&self, image: &OcrImage) -> Result<Option<(String, f32)>, OcrError> {
+        let page = Rgb::from_image(image);
+        let (w, h) = (page.w as f32, page.h as f32);
+        let quad = Quad { c: [w / 2.0, h / 2.0], right: [1.0, 0.0], down: [0.0, 1.0], len: w, hgt: h };
+        self.read_crop(&page, &quad)
+    }
+
+    /// Cut `q` out of `page` and read it: the first recognizer, then the second when the first
+    /// mixed Latin letters into Thai words and the second does so less.
+    fn read_crop(&self, page: &Rgb, q: &Quad) -> Result<Option<(String, f32)>, OcrError> {
         let Some((grey, w)) = crop_flat(page, q) else { return Ok(None) };
         let (mut text, mut conf) = Self::run(&self.rec, &grey, w, &self.chars)?;
         if let Some(rec2) = self.rec2.as_ref().filter(|_| mixed(&text) > 0) {
@@ -568,7 +578,12 @@ impl OpenThai {
                 (text, conf) = (t2, c2);
             }
         }
-        let text = canonical(&text);
+        Ok(Some((canonical(&text), conf)))
+    }
+
+    /// Recognise one box; `None` when the reading is dropped by the line filter.
+    fn read_box(&self, page: &Rgb, q: &Quad, median_h: f32) -> Result<Option<Read>, OcrError> {
+        let Some((text, conf)) = self.read_crop(page, q)? else { return Ok(None) };
         if !keep(&text, conf, q.hgt / median_h) {
             return Ok(None);
         }

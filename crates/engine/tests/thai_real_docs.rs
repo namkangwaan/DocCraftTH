@@ -388,3 +388,100 @@ fn test_eval_set_b_real_scan_lines() {
     eprintln!("  CER Delta:      {:+.4}", cand_mean - base_mean);
     eprintln!("===================================================================\n");
 }
+
+/// An RGB image as `(width, height, RGBA bytes)`.
+fn rgba_of(rgb: image::RgbImage) -> (u32, u32, Vec<u8>) {
+    let (w, h) = (rgb.width(), rgb.height());
+    let raw = rgb.into_raw();
+    (w, h, raw.as_chunks::<3>().0.iter().flat_map(|p| [p[0], p[1], p[2], 255]).collect())
+}
+
+/// Set A, recognizer only and end to end, for the previous Thai engine (`assets/models`) and the
+/// OpenThai 2.1 Text engine (`openthai-*` files in the same folder, or `THAI_OPENTHAI_MODELS_DIR`).
+/// Prints both and does not assert: it is an evaluation, like `compare_models_on_real_corpus`.
+/// Skips when `THAI_TESTSET_DIR` is unset or either model set is missing.
+#[test]
+fn compare_openthai_on_real_corpus() {
+    use pdfcraft_ocr::OcrImage;
+    use pdfcraft_ocr::openthai::OpenThai;
+    use std::time::Instant;
+
+    let Some(testset) = std::env::var_os("THAI_TESTSET_DIR").map(PathBuf::from).filter(|d| d.is_dir()) else {
+        eprintln!("skipping: THAI_TESTSET_DIR is not set to a directory");
+        return;
+    };
+    let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/models");
+    let ot_dir = std::env::var_os("THAI_OPENTHAI_MODELS_DIR").map(PathBuf::from).unwrap_or_else(|| assets.clone());
+    let (Some(models), true) = (Models::in_dir_for(&assets, "th"), OpenThai::in_dir(&ot_dir)) else {
+        eprintln!("skipping: both the previous Thai models and the OpenThai models must be installed");
+        return;
+    };
+    let base = Ocr::load(&models).expect("load the previous Thai engine");
+    let ot = OpenThai::load(&ot_dir).expect("load OpenThai");
+
+    // Set A, recognizer only: ground-truth line crops.
+    let (mut base_rates, mut ot_rates) = (Vec::new(), Vec::new());
+    if let Ok(file) = File::open(testset.join("set_a/labels.tsv")) {
+        for line in BufReader::new(file).lines().skip(1).map_while(Result::ok) {
+            let cols: Vec<&str> = line.split('\t').collect();
+            if cols.len() < 11 {
+                continue;
+            }
+            let Ok(img) = image::open(testset.join("set_a").join(cols[10])) else { continue };
+            let (w, h, rgba) = rgba_of(img.to_rgb8());
+            let Ok(oi) = OcrImage::new(w, h, rgba.clone()) else { continue };
+            let px: Vec<u8> = rgba.as_chunks::<4>().0.iter().flat_map(|p| [p[0], p[1], p[2]]).collect();
+            let b = base.recognize_crop(&px, w, h, [0, 0, w, h]).ok().flatten().unwrap_or_default();
+            let o = ot.read_line(&oi).ok().flatten().map(|(t, _)| t).unwrap_or_default();
+            base_rates.push(cer(cols[8], &b));
+            ot_rates.push(cer(cols[8], &o));
+        }
+    }
+    let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len().max(1) as f64;
+    eprintln!("Set A recognizer-only ({} lines): previous {:.4}, OpenThai {:.4}", base_rates.len(), mean(&base_rates), mean(&ot_rates));
+
+    // Set A, end to end: whole pages, lines matched by position.
+    let pages = testset.join("set_a/pages");
+    let (mut base_pages, mut ot_pages, mut base_ms, mut ot_ms) = (Vec::new(), Vec::new(), 0.0f64, 0.0f64);
+    for entry in std::fs::read_dir(&pages).into_iter().flatten().flatten() {
+        let p = entry.path();
+        let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+        let Some(stem) = name.strip_suffix(".lines.tsv") else { continue };
+        let Ok(lines) = File::open(&p) else { continue };
+        let expected: Vec<ExpectedLine> = BufReader::new(lines)
+            .lines()
+            .skip(1)
+            .map_while(Result::ok)
+            .filter_map(|l| {
+                let c: Vec<&str> = l.split('\t').collect();
+                let f = |i: usize| c.get(i).and_then(|v| v.parse::<f32>().ok());
+                Some(ExpectedLine { rect: [f(0)?, f(1)?, f(2)?, f(3)?], text: c.get(4)?.to_string() })
+            })
+            .collect();
+        let Ok(img) = image::open(pages.join(format!("{stem}.png"))) else { continue };
+        if expected.is_empty() {
+            continue;
+        }
+        let (w, h, rgba) = rgba_of(img.to_rgb8());
+        let Ok(oi) = OcrImage::new(w, h, rgba.clone()) else { continue };
+        let t = Instant::now();
+        let b = base.recognize(&rgba, w, h).unwrap_or_default();
+        base_ms += t.elapsed().as_secs_f64() * 1e3;
+        let t = Instant::now();
+        let o = ot.read(&oi).unwrap_or_default();
+        ot_ms += t.elapsed().as_secs_f64() * 1e3;
+        base_pages.push(page_cer_by_line_matching(&expected, &b));
+        ot_pages.push(page_cer_by_line_matching(&expected, &o));
+    }
+    let n = base_pages.len().max(1) as f64;
+    eprintln!(
+        "Set A end-to-end ({} pages): previous {:.4} ({:.0} ms/page), OpenThai {:.4} ({:.0} ms/page)",
+        base_pages.len(),
+        mean(&base_pages),
+        base_ms / n,
+        mean(&ot_pages),
+        ot_ms / n
+    );
+    let better = base_pages.iter().zip(&ot_pages).filter(|(b, o)| o < b).count();
+    eprintln!("OpenThai better on {better} of {} pages", base_pages.len());
+}
