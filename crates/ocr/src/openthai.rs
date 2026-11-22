@@ -632,9 +632,25 @@ fn keep(text: &str, conf: f32, height_ratio: f32) -> bool {
     bare.len() >= MIN_CHARS || short_ok
 }
 
-/// Reading order: rows by vertical proximity (half a line height), each left to right; one
-/// [`Line`] per box, its words sharing the box's width in proportion to their length.
-fn into_lines(mut reads: Vec<Read>, median_h: f32) -> Vec<Line> {
+/// Minimum clear horizontal gap (in line heights) between two prose columns.
+const COLUMN_GUTTER_H: f32 = 1.5;
+/// Minimum lines per side and minimum mean line width (in line heights) to treat a split as prose
+/// columns rather than a short key-value form or table.
+const MIN_COLUMN_LINES: usize = 4;
+const MIN_COLUMN_WIDTH_H: f32 = 6.0;
+
+/// Order `reads` into reading order: if a clear vertical gutter separates two wide prose columns
+/// with overlapping vertical spans, read the left column top-to-bottom then the right column;
+/// otherwise group into horizontal rows (within half a line height) and sort left-to-right.
+fn into_lines(reads: Vec<Read>, median_h: f32) -> Vec<Line> {
+    let mut reads = match split_columns(reads, median_h) {
+        Ok((left, right)) => {
+            let mut out = into_lines(left, median_h);
+            out.extend(into_lines(right, median_h));
+            return out;
+        }
+        Err(reads) => reads,
+    };
     reads.sort_by(|a, b| a.centre_y.total_cmp(&b.centre_y));
     let mut rows: Vec<Vec<Read>> = Vec::new();
     for r in reads {
@@ -649,6 +665,59 @@ fn into_lines(mut reads: Vec<Read>, median_h: f32) -> Vec<Line> {
             row.into_iter().map(|r| line_of(&r))
         })
         .collect()
+}
+
+fn split_columns(reads: Vec<Read>, median_h: f32) -> Result<(Vec<Read>, Vec<Read>), Vec<Read>> {
+    if reads.len() < MIN_COLUMN_LINES * 2 || median_h <= 0.0 {
+        return Err(reads);
+    }
+    let min_gutter = COLUMN_GUTTER_H * median_h;
+    let min_mean_w = MIN_COLUMN_WIDTH_H * median_h;
+    let mut spans: Vec<(f32, f32)> = reads.iter().map(|r| (r.bounds[0], r.bounds[2])).collect();
+    spans.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+    // Sweep x-intervals to find a clear vertical gutter with no crossing boxes.
+    let mut max_right = spans[0].1;
+    let mut best_split = None;
+    let mut best_gap = min_gutter;
+    for &(x0, x1) in spans.iter().skip(1) {
+        let gap = x0 - max_right;
+        if gap >= best_gap {
+            best_gap = gap;
+            best_split = Some((max_right + x0) * 0.5);
+        }
+        max_right = max_right.max(x1);
+    }
+    let Some(split_x) = best_split else {
+        return Err(reads);
+    };
+
+    let mut left = Vec::new();
+    let mut right = Vec::new();
+    for r in &reads {
+        if r.bounds[2] <= split_x {
+            left.push(r);
+        } else {
+            right.push(r);
+        }
+    }
+    let mean_w = |xs: &[&Read]| xs.iter().map(|r| (r.bounds[2] - r.bounds[0]).max(0.0)).sum::<f32>() / xs.len() as f32;
+    let y_range = |xs: &[&Read]| {
+        let lo = xs.iter().map(|r| r.centre_y).fold(f32::INFINITY, f32::min);
+        let hi = xs.iter().map(|r| r.centre_y).fold(f32::NEG_INFINITY, f32::max);
+        (lo, hi)
+    };
+    let (ly0, ly1) = y_range(&left);
+    let (ry0, ry1) = y_range(&right);
+    if left.len() < MIN_COLUMN_LINES
+        || right.len() < MIN_COLUMN_LINES
+        || mean_w(&left) < min_mean_w
+        || mean_w(&right) < min_mean_w
+        || !(ly0 < ry1 && ry0 < ly1)
+    {
+        return Err(reads);
+    }
+    Ok(reads.into_iter().partition(|r| r.bounds[2] <= split_x))
 }
 
 fn line_of(r: &Read) -> Line {
@@ -849,6 +918,40 @@ mod tests {
         let dir = std::env::temp_dir().join("pdfcraft-openthai-none");
         assert!(!OpenThai::in_dir(&dir));
         assert!(matches!(OpenThai::load(&dir), Err(OcrError::Load(..))));
+    }
+
+    #[test]
+    fn two_prose_columns_read_left_column_before_right_column() {
+        let mk = |text: &str, x0: f32, y: f32, x1: f32| Read { text: text.into(), conf: 0.99, bounds: [x0, y, x1, y + 20.0], centre_y: y + 10.0, left: x0 };
+        let reads = vec![
+            mk("R1", 400.0, 100.0, 600.0),
+            mk("L1", 50.0, 100.0, 250.0),
+            mk("R2", 400.0, 130.0, 600.0),
+            mk("L2", 50.0, 130.0, 250.0),
+            mk("R3", 400.0, 160.0, 600.0),
+            mk("L3", 50.0, 160.0, 250.0),
+            mk("R4", 400.0, 190.0, 600.0),
+            mk("L4", 50.0, 190.0, 250.0),
+        ];
+        let got: Vec<String> = into_lines(reads, 20.0).into_iter().map(|l| l.text()).collect();
+        assert_eq!(got, vec!["L1", "L2", "L3", "L4", "R1", "R2", "R3", "R4"]);
+    }
+
+    #[test]
+    fn a_short_key_value_form_stays_row_by_row() {
+        let mk = |text: &str, x0: f32, y: f32, x1: f32| Read { text: text.into(), conf: 0.99, bounds: [x0, y, x1, y + 20.0], centre_y: y + 10.0, left: x0 };
+        let reads = vec![
+            mk("Name", 50.0, 100.0, 110.0),
+            mk("Somchai", 250.0, 100.0, 350.0),
+            mk("Date", 50.0, 130.0, 110.0),
+            mk("2569", 250.0, 130.0, 310.0),
+            mk("Role", 50.0, 160.0, 110.0),
+            mk("Director", 250.0, 160.0, 350.0),
+            mk("Dept", 50.0, 190.0, 110.0),
+            mk("MOE", 250.0, 190.0, 310.0),
+        ];
+        let got: Vec<String> = into_lines(reads, 20.0).into_iter().map(|l| l.text()).collect();
+        assert_eq!(got, vec!["Name", "Somchai", "Date", "2569", "Role", "Director", "Dept", "MOE"]);
     }
 
     proptest! {

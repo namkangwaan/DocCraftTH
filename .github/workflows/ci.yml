@@ -4,9 +4,9 @@ name: CI
 # Non-target OSes (Linux desktop, macOS, FreeBSD, Nix) are excluded.
 on:
   push:
-    branches: [main, "chore/**", "feat/**"]
-  pull_request:
     branches: [main]
+  pull_request:
+    branches: [main, "chore/**", "feat/**"]
   workflow_dispatch:
 
 permissions:
@@ -35,6 +35,9 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Run Cargo Check and Tests
         shell: pwsh
         run: |
@@ -62,6 +65,9 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
 
       # Pin trunk. With the default (latest) the action asks the GitHub API (via the old thedodd/trunk
       # path, which now answers 301) for the newest release and, when that gives no tag, silently falls
