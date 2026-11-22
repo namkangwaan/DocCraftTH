@@ -32,6 +32,9 @@ mkdir -p "$WORK/$NAME"
 cp -R "$SITE/." "$WORK/$NAME/"
 # Scan & OCR downloads its models from models/ beside index.html the first time it's used.
 stage_models "$WORK/$NAME/models"
+if compgen -G "$ROOT/assets/models/openthai-*" > /dev/null; then
+  cp "$ROOT"/assets/models/openthai-* "$WORK/$NAME/models/"
+fi
 # Sample server configs (MIME type, caching, compression); harmless where unused.
 cp "$HERE/_headers" "$HERE/.htaccess" "$WORK/$NAME/"
 cp "$HERE/README.md" "$WORK/$NAME/HOSTING.md"
