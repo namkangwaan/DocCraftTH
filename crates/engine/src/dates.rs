@@ -591,6 +591,18 @@ pub fn era_year(code: &str, year: i64) -> i64 {
     if code.trim().eq_ignore_ascii_case("th") { year.saturating_add(BUDDHIST_ERA_OFFSET) } else { year }
 }
 
+/// Form date fields (`AFDate_FormatEx`, `util.printd`, `util.scand`) write month and weekday
+/// names in date language `code` from now on, as a localized Acrobat writes its own language's:
+/// `dd-mmm-yy` is `18-ott-26` in Italian (#5303). An unknown code is English.
+pub fn use_form_date_language(code: &str) {
+    let l = date_language(code).unwrap_or(&DATE_LANGUAGES[0]);
+    let names = pdfcraft_forms::af::DateNames { months: l.months, months_short: l.months_short, days: l.days, days_short: l.days_short };
+    if pdfcraft_forms::af::date_names() != names {
+        pdfcraft_forms::af::set_date_names(names);
+        pdfcraft_js::set_date_names(l.months, l.months_short, l.days, l.days_short);
+    }
+}
+
 /// The characters of `text` that Fill & Sign can't write into a PDF yet, each once. Its text is
 /// drawn in Helvetica with WinAnsi encoding (Western European letters), so anything else (`ř`,
 /// Japanese, Chinese) would become `?` in the file.

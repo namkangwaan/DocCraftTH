@@ -5,8 +5,6 @@
 crates/ui-egui/src/thai_fonts.rs
 crates/fonts/src/thai.rs
 crates/fonts/src/shaping.rs
-crates/forms/src/thai_text.rs
-crates/edit/src/invisible_font.rs
 crates/ui-egui/src/i18n/th_breaks.rs
 crates/ui-egui/src/i18n/th.tsv
 crates/ui-egui/src/i18n/th_tests.rs
@@ -40,7 +38,7 @@ crates/render/src/text.rs::fn map_thai_pua
 crates/render/src/text.rs::fn is_combining_mark
 crates/render/src/text.rs::pub fn fold_case
 crates/engine/src/ocr.rs::Thai recognizer
-crates/ocr/src/lib.rs::pub fn dot_leaders
+crates/ocr/src/thai.rs::pub fn dot_leaders
 crates/forms/src/detect.rs::pub fn detect_with
 crates/engine/src/scan_fields.rs::dot_leaders
 # Fork font code must be reached, not just defined

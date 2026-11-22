@@ -201,6 +201,10 @@ fn thai_leaves_no_unapproved_english_fallbacks() {
         "Continue from previous section",
         "{font}, {size} pt",
         "Preflight",
+        "Tesseract",
+        "CMYK",
+        "RGB",
+        "{why} ({n})",
         "DN: ",
     ];
     const KEY_CAPS: &[&str] = &["Ctrl", "Shift", "Delete", "Esc", "Home", "End", "Space"];

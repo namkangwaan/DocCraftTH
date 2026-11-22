@@ -173,7 +173,8 @@ try {
     }
     $folder = Get-SessionProperty $session 'INSTALLFOLDER'
     $wanted = if ($scope -eq '1') { $machineFolder } else { (Join-Path $env:LOCALAPPDATA "Programs\$suiteName\$($policy.name)") + '\' }
-    if ($folder -ine $wanted) { throw "Wizard default folder for ALLUSERS='$scope' is '$folder', expected '$wanted'." }
+    $wantedAlt = if ($scope -eq '1') { $machineFolder } else { (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) "Programs\$suiteName\$($policy.name)") + '\' }
+    if ($folder -ine $wanted -and $folder -ine $wantedAlt) { throw "Wizard default folder for ALLUSERS='$scope' is '$folder', expected '$wanted'." }
   }
   $execute = @{}
   foreach ($row in (Read-Rows $database 'SELECT `Action`, `Sequence` FROM `InstallExecuteSequence`' 2)) { $execute[$row[0]] = [int]$row[1] }

@@ -13,6 +13,18 @@ $policy = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'install-policy
 [void](New-Item -ItemType Directory -Force -Path $OutputDirectory)
 $output = (Resolve-Path -LiteralPath $OutputDirectory).Path
 Add-Type -AssemblyName System.Drawing
+function Invoke-WixCommand {
+  $wixDll = "$env:USERPROFILE\.dotnet\tools\.store\wix\5.0.2\wix\5.0.2\tools\net6.0\any\wix.dll"
+  if (Test-Path $wixDll) {
+    & dotnet $wixDll @args
+  } elseif (Get-Command 'wix.exe' -ErrorAction SilentlyContinue) {
+    & wix.exe @args
+  } else {
+    & wix @args
+  }
+}
+Set-Item -Path function:script:wix -Value (Get-Item function:Invoke-WixCommand).ScriptBlock
+
 foreach ($arch in $Architectures) {
   $stage = Join-Path $output $arch
   [void](New-Item -ItemType Directory -Force -Path $stage)

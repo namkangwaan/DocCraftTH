@@ -159,7 +159,7 @@
 	Next page	หน้าถัดไป
 	Previous page	หน้าก่อนหน้า
 	Current page — type a page number or label (such as iv) and press Enter	หน้าปัจจุบัน — พิมพ์เลขหน้าหรือป้ายหน้า (เช่น iv) แล้วกด Enter
-	Welcome to PdfCraft	ยินดีต้อนรับสู่ PdfCraft
+	Welcome to PdfCraft	ยินดีต้อนรับสู่ DTHFrame
 	An open-source PDF workbench — local, private, and scriptable.	โต๊ะทำงาน PDF แบบโอเพนซอร์ส — ทำงานในเครื่อง เป็นส่วนตัว และเขียนสคริปต์ได้
 	Join the ArtCraft community	เข้าร่วมชุมชน ArtCraft
 	Get help, share feedback and follow development on Discord.	ขอความช่วยเหลือ ส่งความคิดเห็น และติดตามการพัฒนาได้ที่ Discord
@@ -167,9 +167,9 @@
 	Use now	ใช้ตอนนี้
 	Open file	เปิดไฟล์
 	Recent	ล่าสุด
-	Files you open in PdfCraft appear here. Drop a PDF anywhere to open it.	ไฟล์ที่คุณเปิดใน PdfCraft จะแสดงที่นี่ วาง PDF ที่ใดก็ได้เพื่อเปิด
+	Files you open in PdfCraft appear here. Drop a PDF anywhere to open it.	ไฟล์ที่คุณเปิดใน DTHFrame จะแสดงที่นี่ วาง PDF ที่ใดก็ได้เพื่อเปิด
 	Privacy	ความเป็นส่วนตัว
-	PdfCraft works offline. No telemetry, no account, and no cloud processing unless you add a provider.	PdfCraft ทำงานแบบออฟไลน์ ไม่มีการเก็บข้อมูลการใช้งาน ไม่ต้องมีบัญชี และไม่ประมวลผลบนคลาวด์ เว้นแต่คุณจะเพิ่มผู้ให้บริการเอง
+	PdfCraft works offline. No telemetry, no account, and no cloud processing unless you add a provider.	DTHFrame ทำงานแบบออฟไลน์ ไม่มีการเก็บข้อมูลการใช้งาน ไม่ต้องมีบัญชี และไม่ประมวลผลบนคลาวด์ เว้นแต่คุณจะเพิ่มผู้ให้บริการเอง
 	Scripts run in a sandbox without file or network access. With JavaScript off, Acrobat's standard format, validate and calculate functions still work.	สคริปต์ทำงานในแซนด์บ็อกซ์ที่เข้าถึงไฟล์และเครือข่ายไม่ได้ เมื่อปิด JavaScript ฟังก์ชันมาตรฐานของ Acrobat สำหรับจัดรูปแบบ ตรวจสอบ และคำนวณยังคงทำงานได้
 	Back to all tools	กลับไปที่เครื่องมือทั้งหมด
 	Close panel	ปิดแผง
@@ -321,7 +321,7 @@
 	PdfCraft on GitHub	PdfCraft บน GitHub
 	ArtCraft website	เว็บไซต์ ArtCraft
 	Check for updates…	ตรวจหาการอัปเดต…
-	About PdfCraft	เกี่ยวกับ PdfCraft
+	About PdfCraft	เกี่ยวกับ DTHFrame
 	Export a PDF	ส่งออก PDF
 	Export to	ส่งออกเป็น
 	Microsoft Word (.docx)	Microsoft Word (.docx)
@@ -778,7 +778,7 @@
 	The image has been copied as a {ext} file	คัดลอกรูปภาพเป็นไฟล์ {ext} แล้ว
 	The page has changed; select the image again	หน้ามีการเปลี่ยนแปลง โปรดเลือกรูปภาพอีกครั้ง
 	No check has run yet.	ยังไม่ได้ตรวจสอบ
-	PdfCraft {v} is available.	มี PdfCraft {v} ให้ใช้งานแล้ว
+	PdfCraft {v} is available.	มี DTHFrame {v} ให้ใช้งานแล้ว
 	You have version {c}. Download the new version from its release page.	คุณใช้รุ่น {c} ดาวน์โหลดรุ่นใหม่ได้จากหน้ารุ่นที่เผยแพร่
 	Asks GitHub for the latest release. Nothing is downloaded or installed automatically.	ถาม GitHub ว่ามีรุ่นล่าสุดหรือไม่ จะไม่มีการดาวน์โหลดหรือติดตั้งโดยอัตโนมัติ
 	Download	ดาวน์โหลด
@@ -898,8 +898,8 @@
 	No changes allowed	ไม่อนุญาตให้เปลี่ยนแปลง
 	Annotations, form fill-in, and digital signatures	คำอธิบายประกอบ การกรอกแบบฟอร์ม และลายเซ็นดิจิทัล
 	Form fill-in and digital signatures	การกรอกแบบฟอร์มและลายเซ็นดิจิทัล
-	The key is in the macOS Keychain, which may ask to allow PdfCraft to use it.	กุญแจอยู่ใน Keychain ของ macOS ซึ่งอาจถามเพื่ออนุญาตให้ PdfCraft ใช้งาน
-	The key is in the Windows certificate store, which may ask to allow PdfCraft to use it.	กุญแจอยู่ในที่เก็บใบรับรองของ Windows ซึ่งอาจถามเพื่ออนุญาตให้ PdfCraft ใช้งาน
+	The key is in the macOS Keychain, which may ask to allow PdfCraft to use it.	กุญแจอยู่ใน Keychain ของ macOS ซึ่งอาจถามเพื่ออนุญาตให้ DTHFrame ใช้งาน
+	The key is in the Windows certificate store, which may ask to allow PdfCraft to use it.	กุญแจอยู่ในที่เก็บใบรับรองของ Windows ซึ่งอาจถามเพื่ออนุญาตให้ DTHFrame ใช้งาน
 	Digital ID password	รหัสผ่าน Digital ID
 	Back	ย้อนกลับ
 	Validate all	ตรวจสอบทั้งหมด
@@ -1258,7 +1258,7 @@
 	Downsample to	ลดความละเอียดเป็น
 	Also recognize pages that already have text	รู้จำหน้าที่มีข้อความอยู่แล้วด้วย
 	Pictures on those pages are recognized too; words already in the page's text are not added again	รูปภาพในหน้าเหล่านั้นจะถูกรู้จำด้วย คำที่มีอยู่แล้วในข้อความของหน้าจะไม่ถูกเพิ่มซ้ำ
-	Text recognition isn't installed: its model files are missing. Reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them.	ยังไม่ได้ติดตั้งการรู้จำข้อความ: ไม่พบไฟล์โมเดล โปรดติดตั้ง PdfCraft ใหม่ หรือตั้ง PDFCRAFT_MODELS ไปยังโฟลเดอร์ที่มีไฟล์เหล่านั้น
+	Text recognition isn't installed: its model files are missing. Reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them.	ยังไม่ได้ติดตั้งการรู้จำข้อความ: ไม่พบไฟล์โมเดล โปรดติดตั้ง DTHFrame ใหม่ หรือตั้ง PDFCRAFT_MODELS ไปยังโฟลเดอร์ที่มีไฟล์เหล่านั้น
 	Settings	การตั้งค่า
 	Optional	ไม่บังคับ
 	Planned · {m}	วางแผนไว้ · {m}
@@ -1402,7 +1402,7 @@
 	Anyone opening the document will need this password. It's applied when you save.	ทุกคนที่เปิดเอกสารจะต้องใช้รหัสผ่านนี้ รหัสผ่านจะมีผลเมื่อคุณบันทึก
 	The document opens without a password; this password is needed to change the restrictions. It's applied when you save.	เอกสารเปิดได้โดยไม่ต้องใช้รหัสผ่าน รหัสผ่านนี้ใช้สำหรับเปลี่ยนข้อจำกัด และจะมีผลเมื่อคุณบันทึก
 	Recover unsaved documents?	กู้คืนเอกสารที่ยังไม่ได้บันทึกหรือไม่
-	PdfCraft didn't shut down normally. These documents had changes that were autosaved:	PdfCraft ปิดตัวลงอย่างไม่ปกติ เอกสารเหล่านี้มีการเปลี่ยนแปลงที่ถูกบันทึกอัตโนมัติไว้:
+	PdfCraft didn't shut down normally. These documents had changes that were autosaved:	DTHFrame ปิดตัวลงอย่างไม่ปกติ เอกสารเหล่านี้มีการเปลี่ยนแปลงที่ถูกบันทึกอัตโนมัติไว้:
 	just now	เมื่อสักครู่
 	{n} min ago	{n} นาทีที่แล้ว
 	{n} h ago	{n} ชม. ที่แล้ว
@@ -1560,10 +1560,10 @@
 	On the web, open or drop an image to convert it	บนเว็บ ให้เปิดหรือวางรูปภาพเพื่อแปลง
 	Couldn't optimize the file: {e}	ปรับไฟล์ให้เหมาะสมไม่ได้: {e}
 	Couldn't write {path}: {e}	เขียน {path} ไม่ได้: {e}
-	The form asks to be submitted to {u}; PdfCraft doesn't send form data. Save the document to keep your entries.	แบบฟอร์มขอให้ส่งไปที่ {u} แต่ PdfCraft ไม่ส่งข้อมูลแบบฟอร์ม บันทึกเอกสารเพื่อเก็บสิ่งที่คุณกรอก
+	The form asks to be submitted to {u}; PdfCraft doesn't send form data. Save the document to keep your entries.	แบบฟอร์มขอให้ส่งไปที่ {u} แต่ DTHFrame ไม่ส่งข้อมูลแบบฟอร์ม บันทึกเอกสารเพื่อเก็บสิ่งที่คุณกรอก
 	This PDF uses the unsupported {s} action.	PDF นี้ใช้การทำงาน {s} ที่ไม่รองรับ
 	{name}: the {other} action isn't supported yet	{name}: ยังไม่รองรับการทำงาน {other}
-	{name} submits the form to {url}; PdfCraft doesn't send form data. Save the document to keep your entries.	{name} จะส่งแบบฟอร์มไปที่ {url} แต่ PdfCraft ไม่ส่งข้อมูลแบบฟอร์ม บันทึกเอกสารเพื่อเก็บสิ่งที่คุณกรอก
+	{name} submits the form to {url}; PdfCraft doesn't send form data. Save the document to keep your entries.	{name} จะส่งแบบฟอร์มไปที่ {url} แต่ DTHFrame ไม่ส่งข้อมูลแบบฟอร์ม บันทึกเอกสารเพื่อเก็บสิ่งที่คุณกรอก
 	Export stopped: {e}	การส่งออกหยุดลง: {e}
 	Exported 1 image	ส่งออกแล้ว 1 รูป
 	Exported {n} images	ส่งออกแล้ว {n} รูป
@@ -1725,7 +1725,7 @@
 	Couldn't open {name}: {e}	เปิด {name} ไม่ได้: {e}
 	Couldn't read {name}: {e}	อ่าน {name} ไม่ได้: {e}
 	Portable mode is off: {folder} can't be written ({error}). Settings are kept in your user folder instead.	โหมดพกพาปิดอยู่: เขียนลงใน {folder} ไม่ได้ ({error}) การตั้งค่าจะถูกเก็บในโฟลเดอร์ผู้ใช้ของคุณแทน
-	PdfCraft is drawing without a graphics processor, so it may be slow. Updating the graphics driver may help.	PdfCraft กำลังวาดโดยไม่ใช้หน่วยประมวลผลกราฟิก จึงอาจทำงานช้า การอัปเดตไดรเวอร์กราฟิกอาจช่วยได้
+	PdfCraft is drawing without a graphics processor, so it may be slow. Updating the graphics driver may help.	DTHFrame กำลังวาดโดยไม่ใช้หน่วยประมวลผลกราฟิก จึงอาจทำงานช้า การอัปเดตไดรเวอร์กราฟิกอาจช่วยได้
 	Couldn't save: {e}	บันทึกไม่ได้: {e}
 	Downloading attachments on the web arrives with M3.10 ({n} bytes ready)	การดาวน์โหลดไฟล์แนบบนเว็บจะมาใน M3.10 (พร้อมแล้ว {n} ไบต์)
 	`{command}` {when}	`{command}` {when}
@@ -1799,9 +1799,9 @@
 	Signed and all signatures are valid.	เซ็นแล้วและลายเซ็นทั้งหมดถูกต้อง
 	At least one signature has problems.	มีลายเซ็นอย่างน้อยหนึ่งรายการที่มีปัญหา
 	This document is secured. Some changes are restricted by its security settings.	เอกสารนี้มีการรักษาความปลอดภัย การเปลี่ยนแปลงบางอย่างถูกจำกัดโดยการตั้งค่าความปลอดภัย
-	This is a dynamic XFA form, which PdfCraft can't display yet. What you see is the file's placeholder page.	นี่เป็นแบบฟอร์ม XFA แบบไดนามิก ซึ่ง PdfCraft ยังแสดงไม่ได้ สิ่งที่คุณเห็นคือหน้าตัวแทนของไฟล์
+	This is a dynamic XFA form, which PdfCraft can't display yet. What you see is the file's placeholder page.	นี่เป็นแบบฟอร์ม XFA แบบไดนามิก ซึ่ง DTHFrame ยังแสดงไม่ได้ สิ่งที่คุณเห็นคือหน้าตัวแทนของไฟล์
 	This form's scripts are turned off because one ran too long. Reopen the document to run them again.	สคริปต์ของแบบฟอร์มนี้ถูกปิดเพราะมีสคริปต์ทำงานนานเกินไป เปิดเอกสารใหม่เพื่อรันอีกครั้ง
-	This form also contains XFA data, which PdfCraft doesn't read yet. You can fill its fields, but Acrobat may show the XFA values instead.	แบบฟอร์มนี้มีข้อมูล XFA ด้วย ซึ่ง PdfCraft ยังอ่านไม่ได้ คุณกรอกช่องได้ แต่ Acrobat อาจแสดงค่าของ XFA แทน
+	This form also contains XFA data, which PdfCraft doesn't read yet. You can fill its fields, but Acrobat may show the XFA values instead.	แบบฟอร์มนี้มีข้อมูล XFA ด้วย ซึ่ง DTHFrame ยังอ่านไม่ได้ คุณกรอกช่องได้ แต่ Acrobat อาจแสดงค่าของ XFA แทน
 	This document contains {n} interactive form fields.	เอกสารนี้มีช่องแบบฟอร์มแบบโต้ตอบ {n} ช่อง
 	This file was damaged and has been repaired. Saving keeps the repaired version.	ไฟล์นี้เสียหายและได้รับการซ่อมแซมแล้ว การบันทึกจะเก็บรุ่นที่ซ่อมแซมไว้
 	Dismiss	ปิดข้อความ
@@ -1850,7 +1850,7 @@
 	there are no pages to print	ไม่มีหน้าให้พิมพ์
 	the document has no tags	เอกสารไม่มีแท็ก
 	{0}: {1}	{0}: {1}
-	the text recognition models are not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them)	ยังไม่ได้ติดตั้งโมเดลการรู้จำข้อความ (ติดตั้ง PdfCraft ใหม่ หรือตั้ง PDFCRAFT_MODELS ไปยังโฟลเดอร์ที่มีไฟล์เหล่านั้น)
+	the text recognition models are not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds them)	ยังไม่ได้ติดตั้งโมเดลการรู้จำข้อความ (ติดตั้ง DTHFrame ใหม่ หรือตั้ง PDFCRAFT_MODELS ไปยังโฟลเดอร์ที่มีไฟล์เหล่านั้น)
 	the image is empty	รูปภาพว่างเปล่า
 	this file isn't XFDF, FDF, XML or text form data	ไฟล์นี้ไม่ใช่ข้อมูลแบบฟอร์มชนิด XFDF, FDF, XML หรือข้อความ
 	nothing in the file matches this document	ไม่มีอะไรในไฟล์ที่ตรงกับเอกสารนี้
@@ -2061,11 +2061,11 @@
 	Couldn't import the signature image: {e}	นำเข้ารูปลายเซ็นไม่ได้: {e}
 	Go to page…	ไปที่หน้า…
 	For page sizes and margins.	สำหรับขนาดหน้าและระยะขอบ
-	Reopen the files that were open when PdfCraft last closed	เปิดไฟล์ที่เปิดค้างไว้ตอนปิด PdfCraft ครั้งล่าสุดอีกครั้ง
+	Reopen the files that were open when PdfCraft last closed	เปิดไฟล์ที่เปิดค้างไว้ตอนปิด DTHFrame ครั้งล่าสุดอีกครั้ง
 	The PDF text fonts can't draw “{c}” ({code}). Choose supported text.	แบบอักษรข้อความของ PDF วาด “{c}” ({code}) ไม่ได้ โปรดเลือกข้อความที่รองรับ
 	The standard fonts can't draw “{c}” ({code}). Only Western European characters can be added as text for now.	แบบอักษรมาตรฐานวาด “{c}” ({code}) ไม่ได้ ตอนนี้เพิ่มเป็นข้อความได้เฉพาะอักขระยุโรปตะวันตก
-	This field's font can't draw “{c}” ({code}), so PdfCraft shows ? in its place. The value is saved, and other PDF viewers redraw the field from it.	แบบอักษรของช่องนี้วาด “{c}” ({code}) ไม่ได้ PdfCraft จึงแสดง ? แทน ค่าถูกบันทึกไว้ และโปรแกรมอ่าน PDF อื่นจะวาดช่องใหม่จากค่านั้น
-	The fonts PdfCraft writes with can't draw “{c}” ({code}), so it shows as ? in every PDF viewer. The text is saved.	แบบอักษรที่ PdfCraft ใช้เขียนวาด “{c}” ({code}) ไม่ได้ จึงแสดงเป็น ? ในโปรแกรมอ่าน PDF ทุกตัว ข้อความถูกบันทึกไว้แล้ว
+	This field's font can't draw “{c}” ({code}), so PdfCraft shows ? in its place. The value is saved, and other PDF viewers redraw the field from it.	แบบอักษรของช่องนี้วาด “{c}” ({code}) ไม่ได้ DTHFrame จึงแสดง ? แทน ค่าถูกบันทึกไว้ และโปรแกรมอ่าน PDF อื่นจะวาดช่องใหม่จากค่านั้น
+	The fonts PdfCraft writes with can't draw “{c}” ({code}), so it shows as ? in every PDF viewer. The text is saved.	แบบอักษรที่ DTHFrame ใช้เขียนวาด “{c}” ({code}) ไม่ได้ จึงแสดงเป็น ? ในโปรแกรมอ่าน PDF ทุกตัว ข้อความถูกบันทึกไว้แล้ว
 	Open arrow	ลูกศรเปิด
 	Closed arrow	ลูกศรปิด
 	Butt	ปลายตัด
@@ -2183,8 +2183,8 @@
 	Write this email?	เขียนอีเมลนี้หรือไม่
 	XFA form: its fields and its XFA data are kept in step, so other viewers show what you fill in.	แบบฟอร์ม XFA: ช่องและข้อมูล XFA ถูกปรับให้ตรงกันเสมอ โปรแกรมอ่านอื่นจึงแสดงสิ่งที่คุณกรอก
 	{n} contributors · {c} commits	ผู้ร่วมพัฒนา {n} คน · {c} คอมมิต
-	{who} in this document tried to open an address PdfCraft won't open: {e}.	{who}ในเอกสารนี้พยายามเปิดที่อยู่ที่ PdfCraft จะไม่เปิด: {e}
-	{who} in this document tried to open an address PdfCraft won't open: {e}. Only web (http, https) and email (mailto) links open from documents.	{who}ในเอกสารนี้พยายามเปิดที่อยู่ที่ PdfCraft จะไม่เปิด: {e} เอกสารเปิดได้เฉพาะลิงก์เว็บ (http, https) และอีเมล (mailto)
+	{who} in this document tried to open an address PdfCraft won't open: {e}.	{who}ในเอกสารนี้พยายามเปิดที่อยู่ที่ DTHFrame จะไม่เปิด: {e}
+	{who} in this document tried to open an address PdfCraft won't open: {e}. Only web (http, https) and email (mailto) links open from documents.	{who}ในเอกสารนี้พยายามเปิดที่อยู่ที่ DTHFrame จะไม่เปิด: {e} เอกสารเปิดได้เฉพาะลิงก์เว็บ (http, https) และอีเมล (mailto)
 	{who} in this document wants to open this address in your browser:	{who}ในเอกสารนี้ต้องการเปิดที่อยู่นี้ในเบราว์เซอร์ของคุณ:
 	{who} in this document wants to open your email app with this address:	{who}ในเอกสารนี้ต้องการเปิดแอปอีเมลของคุณด้วยที่อยู่นี้:
 	ΔLOC	ΔLOC
@@ -2314,7 +2314,7 @@ animation effects	Off	ปิด
 	no unused output name	ไม่มีชื่อผลลัพธ์ที่ยังไม่ถูกใช้
 	no output folder was chosen	ยังไม่ได้เลือกโฟลเดอร์ผลลัพธ์
 	Scan	สแกน
-	Sign a sheet of white paper and take a photo of it in bright, even light (use the flash). Choose the photo or drop it here: PdfCraft finds the signature and removes the paper.	เซ็นชื่อบนกระดาษขาวแล้วถ่ายรูปในที่สว่างสม่ำเสมอ (ใช้แฟลช) เลือกรูปถ่ายหรือวางที่นี่ PdfCraft จะหาลายเซ็นและเอาพื้นกระดาษออก
+	Sign a sheet of white paper and take a photo of it in bright, even light (use the flash). Choose the photo or drop it here: PdfCraft finds the signature and removes the paper.	เซ็นชื่อบนกระดาษขาวแล้วถ่ายรูปในที่สว่างสม่ำเสมอ (ใช้แฟลช) เลือกรูปถ่ายหรือวางที่นี่ DTHFrame จะหาลายเซ็นและเอาพื้นกระดาษออก
 	Choose photo…	เลือกรูปถ่าย…
 	No photo chosen	ยังไม่ได้เลือกรูปถ่าย
 	Photo	รูปถ่าย
@@ -2393,7 +2393,7 @@ action wizard	Start	เริ่ม
 	The signature's byte range does not exclude exactly its contents.	ช่วงไบต์ของลายเซ็นไม่ได้เว้นเฉพาะเนื้อหาของลายเซ็นพอดี
 	The signature contents are not hexadecimal.	เนื้อหาลายเซ็นไม่ใช่เลขฐานสิบหก
 	The signature could not be read ({}).	อ่านลายเซ็นไม่ได้ ({})
-	PdfCraft can't check this signature yet: {}.	PdfCraft ยังตรวจสอบลายเซ็นนี้ไม่ได้: {}
+	PdfCraft can't check this signature yet: {}.	DTHFrame ยังตรวจสอบลายเซ็นนี้ไม่ได้: {}
 	The signature uses the legacy adbe.x509.rsa_sha1 format.	ลายเซ็นใช้รูปแบบเก่า adbe.x509.rsa_sha1
 	The signature is BER-encoded (indefinite lengths) rather than DER; it was read leniently.	ลายเซ็นเข้ารหัสแบบ BER (ความยาวไม่กำหนด) แทน DER จึงอ่านแบบผ่อนปรน
 	The signed content is a constructed (segmented) OCTET STRING, as BER allows; it was read anyway.	เนื้อหาที่เซ็นเป็น OCTET STRING แบบแบ่งส่วนตามที่ BER อนุญาต แต่ยังอ่านได้
@@ -2415,7 +2415,7 @@ action wizard	Start	เริ่ม
 	The signer's certificate was not valid at the time of signing.	ใบรับรองของผู้เซ็นไม่ถูกต้อง ณ เวลาที่เซ็น
 	The signer's certificate does not allow digital signatures (its key usage has neither digital signature nor non-repudiation).	ใบรับรองของผู้เซ็นไม่อนุญาตให้ใช้กับลายเซ็นดิจิทัล (key usage ไม่มีทั้ง digital signature และ non-repudiation)
 	The signer's certificate is not issued for signing documents (its extended key usage has no document-signing purpose).	ใบรับรองของผู้เซ็นไม่ได้ออกให้สำหรับเซ็นเอกสาร (extended key usage ไม่มีวัตถุประสงค์การเซ็นเอกสาร)
-	The signer's certificate has critical extensions PdfCraft does not recognize ({}).	ใบรับรองของผู้เซ็นมีส่วนขยายสำคัญที่ PdfCraft ไม่รู้จัก ({})
+	The signer's certificate has critical extensions PdfCraft does not recognize ({}).	ใบรับรองของผู้เซ็นมีส่วนขยายสำคัญที่ DTHFrame ไม่รู้จัก ({})
 	The certificate of {} is not a CA certificate that may issue certificates, so it is not used to vouch for {}.	ใบรับรองของ {} ไม่ใช่ใบรับรอง CA ที่ออกใบรับรองได้ จึงไม่ถูกใช้รับรอง {}
 	The certificate of {} does not allow this many CA certificates below it (path length), so it is not used to vouch for {}.	ใบรับรองของ {} ไม่อนุญาตให้มีใบรับรอง CA อยู่ใต้ลงไปมากเท่านี้ (ความยาวเส้นทาง) จึงไม่ถูกใช้รับรอง {}
 	The certificate of {} was not valid at the time of signing, so it is not used to vouch for {}.	ใบรับรองของ {} ไม่ถูกต้อง ณ เวลาที่เซ็น จึงไม่ถูกใช้รับรอง {}
@@ -2685,6 +2685,10 @@ key	Space	Space
 	Word counting stopped unexpectedly.	การนับคำหยุดทำงานโดยไม่คาดคิด
 	Word count…	นับจำนวนคำ…
 @id	file.word_count	นับจำนวนคำ…
+@id	file.qr_scanner	สแกน QR Code…
+	Scan QR Code…	สแกน QR Code…
+	Open in Browser	เปิดในเบราว์เซอร์
+	Copy Link	คัดลอกลิงก์
 	Standard	มาตรฐาน
 	Mobile	อุปกรณ์พกพา
 	Merge image fragments	รวมชิ้นส่วนรูปภาพ
@@ -2783,7 +2787,7 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	; some pages have unreadable text (turn on “{option}” to read them)	; บางหน้ามีข้อความที่อ่านไม่ได้ (เปิด “{option}” เพื่ออ่านหน้าเหล่านั้น)
 	Zoom — type a percentage and press Enter	ซูม พิมพ์เปอร์เซ็นต์แล้วกด Enter
 	the name is not a plain file name	ชื่อนี้ไม่ใช่ชื่อไฟล์ธรรมดา
-	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	ไม่ได้ติดตั้งโมเดลการรู้จำข้อความสำหรับ {language} (ติดตั้ง PdfCraft ใหม่ หรือตั้ง PDFCRAFT_MODELS เป็นโฟลเดอร์ที่มีโมเดลนี้)
+	the {language} text recognition model is not installed (reinstall PdfCraft, or set PDFCRAFT_MODELS to the folder that holds it)	ไม่ได้ติดตั้งโมเดลการรู้จำข้อความสำหรับ {language} (ติดตั้ง DTHFrame ใหม่ หรือตั้ง PDFCRAFT_MODELS เป็นโฟลเดอร์ที่มีโมเดลนี้)
 	Continue from previous section	นับต่อจากส่วนก่อนหน้า
 	Interface font	แบบอักษรของหน้าจอ
 	Noto Sans Thai Medium draws the English and Thai interface.	Noto Sans Thai Medium ใช้แสดงภาษาอังกฤษและภาษาไทยบนหน้าจอ
@@ -2949,3 +2953,272 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	DTHFrame didn't shut down normally. These documents had changes that were autosaved:	DTHFrame ไม่ได้ปิดการทำงานตามปกติ เอกสารเหล่านี้มีการเปลี่ยนแปลงที่บันทึกอัตโนมัติไว้:
 	About DTHFrame	เกี่ยวกับ DTHFrame
 	DTHFrame on GitHub	DTHFrame บน GitHub
+
+# Added with the upstream sync to v0.20.0 (review workflow, engines, scan clean-up, comments).
+	+ Dictionary	+ พจนานุกรม
+	; cancelled — {n} files were not run	; ยกเลิก — {n} ไฟล์ยังไม่ได้ดำเนินการ
+	; {n} files already had text	; {n} ไฟล์มีข้อความอยู่แล้ว
+	A 3×3 median filter against scan speckle	ตัวกรองมัธยฐาน 3×3 สำหรับกำจัดจุดรบกวนจากการสแกน
+	A folder is asked for when a multiple-file run starts	ระบบจะถามหาโฟลเดอร์เมื่อเริ่มทำงานกับหลายไฟล์
+	AVG CONFIDENCE	ความเชื่อมั่นเฉลี่ย
+	Accept	ยอมรับ
+	Accept entire page	ยอมรับทั้งหน้า
+	Accept or reject the OCR review of the other document before running OCR here	ยอมรับหรือปฏิเสธการตรวจทาน OCR ของเอกสารอื่นก่อนรัน OCR ที่นี่
+	Add a second engine's reading when the first is unsure	เพิ่มผลการอ่านของเอนจินที่สองเมื่อเอนจินแรกไม่แน่ใจ
+	Also	และ
+	Always read with both engines and merge the words	อ่านด้วยทั้งสองเอนจินเสมอแล้วรวมคำเข้าด้วยกัน
+	Auto-rotate	หมุนอัตโนมัติ
+	Automatic	อัตโนมัติ
+	Background removal	ลบพื้นหลัง
+	Binarize	แปลงเป็นขาวดำ
+	Black and white (binarize)	ขาวดำ (binarize)
+	Border colour	สีเส้นขอบ
+	Border opacity	ความทึบของเส้นขอบ
+	Border shape	รูปทรงเส้นขอบ
+	Border:	เส้นขอบ:
+	Both engines, combined as the Strategy says	ทั้งสองเอนจิน รวมผลตามกลยุทธ์ที่เลือก
+	Built-in	ในตัว
+	CONFIDENCE	ความเชื่อมั่น
+	Cancel drawing	ยกเลิกการวาด
+	Cancel re-read	ยกเลิกการอ่านซ้ำ
+	Cancelled — {n} words were read on {m} of {t} pages; the rest were not read	ยกเลิกแล้ว — อ่านได้ {n} คำใน {m} จาก {t} หน้า ที่เหลือยังไม่ได้อ่าน
+	Changes here apply to all {n} selected comments	การเปลี่ยนแปลงตรงนี้มีผลกับความคิดเห็นที่เลือกทั้ง {n} รายการ
+	Check for updates when PdfCraft starts	ตรวจสอบการอัปเดตเมื่อ DTHFrame เริ่มทำงาน
+	Cleans up the scanned pictures in place: recognized text, comments and links on the pages stay as they are.	ทำความสะอาดภาพสแกนในที่เดิม: ข้อความที่รู้จำ ความคิดเห็น และลิงก์บนหน้าจะคงไว้ตามเดิม
+	Click a word to inspect it; drag a rectangle to re-read part of the page	คลิกคำเพื่อตรวจดู ลากสี่เหลี่ยมเพื่ออ่านบางส่วนของหน้าซ้ำ
+	Collapse {folder}	ยุบ {folder}
+	Columns and rows must each be 1 to 99.	คอลัมน์และแถวต้องเป็น 1 ถึง 99
+	Combine engines	รวมเอนจิน
+	Comments: {n}	ความคิดเห็น: {n}
+	Complete	เสร็จสมบูรณ์
+	Confidence weighted	ถ่วงน้ำหนักด้วยความเชื่อมั่น
+	Copy comment	คัดลอกความคิดเห็น
+	Copy comments	คัดลอกความคิดเห็น
+	Correct recognized text…	แก้ไขข้อความที่รู้จำ…
+	Corrected text (Enter commits)	ข้อความที่แก้ไข (กด Enter เพื่อยืนยัน)
+	Couldn't download the text recognition models: {e}	ดาวน์โหลดโมเดลรู้จำข้อความไม่สำเร็จ: {e}
+	Delete comments	ลบความคิดเห็น
+	Denoise	ลดสัญญาณรบกวน
+	Deskew	ปรับภาพที่เอียงให้ตรง
+	Despeckle	ลบจุดรบกวน
+	Discard all form submission, import and reset actions	ละทิ้งการส่ง นำเข้า และรีเซ็ตแบบฟอร์มทั้งหมด
+	Downloading the text recognition models…	กำลังดาวน์โหลดโมเดลรู้จำข้อความ…
+	ENGINE · STRATEGY	เอนจิน · กลยุทธ์
+	Edge shadow removal	ลบเงาที่ขอบ
+	Editable text	ข้อความที่แก้ไขได้
+	Engine	เอนจิน
+	Enhance	ปรับปรุง
+	Enhance Scanned File	ปรับปรุงไฟล์สแกน
+	Enhance scanned file…	ปรับปรุงไฟล์สแกน…
+	Enhancing scans… image {d} of {t}	กำลังปรับปรุงภาพสแกน… ภาพที่ {d} จาก {t}
+	Evens out the paper so a grey or yellowed background turns white, and darkens faint strokes. 0 is off.	ปรับกระดาษให้สม่ำเสมอ พื้นหลังสีเทาหรือเหลืองจะกลายเป็นสีขาว และเส้นจางจะเข้มขึ้น 0 คือปิด
+	Exit	ออก
+	Expand {folder}	ขยาย {folder}
+	F8: next word to review; Shift+F8 goes back	F8: คำถัดไปที่ต้องตรวจทาน; Shift+F8 ย้อนกลับ
+	Fill opacity	ความทึบของสีเติม
+	Fix hairlines…	แก้ไขเส้นบางพิเศษ…
+	Force OCR (override skip options)	บังคับ OCR (ข้ามตัวเลือกการข้าม)
+	HIGH (>= 90%)	สูง (>= 90%)
+	In multiple files: a file with any text is its own skipped bucket, and nothing is written for it	ในหลายไฟล์: ไฟล์ที่มีข้อความอยู่จะถูกนับเป็นกลุ่มที่ข้ามไป และจะไม่มีการเขียนผลลัพธ์
+	Inherit Zoom	ใช้การซูมเดิม
+	LOW (< 70%)	ต่ำ (< 70%)
+	LOW-CONFIDENCE WORDS	คำที่ความเชื่อมั่นต่ำ
+	Lightens shadows along the edges of the scan, such as a book's gutter or a copier's dark border	ทำให้เงาตามขอบของภาพสแกนจางลง เช่น สันหนังสือหรือขอบดำจากเครื่องถ่ายเอกสาร
+	Line opacity	ความทึบของเส้น
+	Lines drawn inside Type 3 glyphs and tiling patterns; off by default.	เส้นที่วาดภายในกลิฟ Type 3 และลวดลายแบบปูเรียง ปิดไว้เป็นค่าเริ่มต้น
+	MEDIUM (70-89%)	ปานกลาง (70-89%)
+	Mark this page as reviewed (Ctrl+T)	ทำเครื่องหมายว่าตรวจทานหน้านี้แล้ว (Ctrl+T)
+	Move comments	ย้ายความคิดเห็น
+	Narrower than	แคบกว่า
+	New width	ความกว้างใหม่
+	Next uncertain	รายการที่ไม่แน่ใจถัดไป
+	No active document	ไม่มีเอกสารที่ใช้งานอยู่
+	No scanned pages were cleaned up.	ไม่มีหน้าสแกนที่ถูกทำความสะอาด
+	OCR complete — no text recognized on this page.	OCR เสร็จสิ้น — ไม่พบข้อความที่รู้จำได้ในหน้านี้
+	Only web (http, https) and email addresses open, and PdfCraft asks first, as for other links.	เปิดได้เฉพาะที่อยู่เว็บ (http, https) และอีเมล และ DTHFrame จะถามก่อนเหมือนลิงก์อื่น
+	Open web and email addresses written in the page text	เปิดที่อยู่เว็บและอีเมลที่เขียนอยู่ในข้อความของหน้า
+	Optimizing… reading page {d} of {t}	กำลังปรับให้เหมาะสม… อ่านหน้า {d} จาก {t}
+	Optimizing… reading the pages	กำลังปรับให้เหมาะสม… กำลังอ่านหน้าต่าง ๆ
+	PAGE	หน้า
+	Page verified	ตรวจทานหน้าแล้ว
+	Page {page} holds more content than PdfCraft can read: part of it isn't drawn, and only part of its text can be found or copied.	หน้า {page} มีเนื้อหามากเกินกว่าที่ DTHFrame จะอ่านได้: บางส่วนไม่ได้ถูกวาด และค้นหาหรือคัดลอกข้อความได้เพียงบางส่วน
+	Pages with renderable text are left alone and reported as skipped	หน้าที่มีข้อความแสดงผลได้จะไม่ถูกแตะต้อง และรายงานว่าข้าม
+	Paste comments	วางความคิดเห็น
+	Pattern strokes	เส้นลวดลาย
+	PdfCraft's checks found no problems for {level}. This is not a validator result.	การตรวจสอบของ DTHFrame ไม่พบปัญหาสำหรับ {level} นี่ไม่ใช่ผลจากตัวตรวจสอบมาตรฐาน
+	PdfCraft's checks now find no problems for {level}. This is not a validator result. Save to keep the changes.	การตรวจสอบของ DTHFrame ไม่พบปัญหาสำหรับ {level} แล้ว นี่ไม่ใช่ผลจากตัวตรวจสอบมาตรฐาน บันทึกเพื่อเก็บการเปลี่ยนแปลง
+	Previous uncertain	รายการที่ไม่แน่ใจก่อนหน้า
+	Primary only	เฉพาะเอนจินหลัก
+	QR Code Scanner	ตัวสแกนคิวอาร์โค้ด
+	ROVER vote	โหวตแบบ ROVER
+	Re-OCR entire page	OCR ทั้งหน้าซ้ำ
+	Re-OCR this region	OCR บริเวณนี้ซ้ำ
+	Re-reading the page…	กำลังอ่านหน้าซ้ำ…
+	Re-reading the region…	กำลังอ่านบริเวณซ้ำ…
+	Read {n} words on {m} of {t} pages	อ่านได้ {n} คำใน {m} จาก {t} หน้า
+	Reading the drawing for snapping…	กำลังอ่านภาพวาดสำหรับการดูดจับ…
+	Reads pages and files even where the skip options would leave them alone	อ่านหน้าและไฟล์แม้ตัวเลือกการข้ามจะให้ปล่อยไว้
+	Recognized text	ข้อความที่รู้จำ
+	Recognized text applied ({n} words, one undoable step)	ใช้ข้อความที่รู้จำแล้ว ({n} คำ ย้อนกลับได้ในขั้นตอนเดียว)
+	Reject	ปฏิเสธ
+	Reject entire page	ปฏิเสธทั้งหน้า
+	Remove scan speckle	ลบจุดรบกวนจากการสแกน
+	Removes isolated dark specks such as dust and scanner noise. The only filter black and white scans take.	ลบจุดดำโดด ๆ เช่น ฝุ่นและสัญญาณรบกวนจากเครื่องสแกน เป็นตัวกรองเดียวที่ใช้กับสแกนขาวดำ
+	Run OCR	รัน OCR
+	Same as text	เหมือนข้อความ
+	Sauvola binarization: ink to black, paper to white	การแปลงขาวดำแบบ Sauvola: หมึกเป็นสีดำ กระดาษเป็นสีขาว
+	Scanning page for QR codes…	กำลังสแกนหน้าเพื่อหาคิวอาร์โค้ด…
+	Select a word on the page to inspect it	เลือกคำบนหน้าเพื่อตรวจดู
+	Several files have the same name, so their results would overwrite each other; nothing was written: {list}	มีหลายไฟล์ที่ชื่อเดียวกัน ผลลัพธ์จะเขียนทับกัน จึงยังไม่ได้เขียนอะไร: {list}
+	Shift+F8: the previous word to review	Shift+F8: คำก่อนหน้าที่ต้องตรวจทาน
+	Show tab numbers	แสดงหมายเลขแท็บ
+	Skip files that already have text	ข้ามไฟล์ที่มีข้อความอยู่แล้ว
+	Skip pages that already have text	ข้ามหน้าที่มีข้อความอยู่แล้ว
+	Source page	หน้าต้นทาง
+	Split down	แบ่งลง
+	Split right	แบ่งขวา
+	Straighten pages scanned sideways or upside down	ทำให้หน้าที่สแกนตะแคงหรือกลับหัวตั้งตรง
+	Straighten skewed text lines	ทำให้บรรทัดข้อความที่เอียงตรงขึ้น
+	Straightens skewed text lines before reading	ปรับบรรทัดข้อความที่เอียงให้ตรงก่อนอ่าน
+	Suggestions	ข้อเสนอแนะ
+	Tesseract	Tesseract
+	Text opacity	ความทึบของข้อความ
+	The built-in engine (pure Rust)	เอนจินในตัว (Rust ล้วน)
+	The output folder already holds files of these names; nothing was written: {list}	โฟลเดอร์ปลายทางมีไฟล์ชื่อเหล่านี้อยู่แล้ว จึงยังไม่ได้เขียนอะไร: {list}
+	The page was read again; its words were replaced (undo in the panel)	อ่านหน้าซ้ำแล้ว และแทนที่คำของหน้านั้น (ย้อนกลับได้ในแผงด้านข้าง)
+	The page's words were applied as one undoable step ({n} words)	ใช้คำของหน้าเป็นขั้นตอนเดียวที่ย้อนกลับได้ ({n} คำ)
+	The re-read was cancelled; the words are unchanged	ยกเลิกการอ่านซ้ำแล้ว คำยังคงเดิม
+	The region was read again; its words were replaced (undo in the panel)	อ่านบริเวณซ้ำแล้ว และแทนที่คำของบริเวณนั้น (ย้อนกลับได้ในแผงด้านข้าง)
+	The searchable copies are written here under the source names	ไฟล์ที่ค้นหาได้จะถูกเขียนที่นี่ โดยใช้ชื่อเดียวกับไฟล์ต้นฉบับ
+	The selected word is gone; choose another	คำที่เลือกหายไปแล้ว โปรดเลือกคำอื่น
+	The tesseract program, run as an external process	โปรแกรม tesseract ที่รันเป็นโพรเซสภายนอก
+	Turns pages scanned sideways or upside down upright before reading	หมุนหน้าที่สแกนตะแคงหรือกลับหัวให้ตั้งตรงก่อนอ่าน
+	Type 3 font glyphs	กลิฟฟอนต์ Type 3
+	Undo last point	ย้อนกลับจุดสุดท้าย
+	Undo the last review change (Ctrl+Z)	ย้อนกลับการเปลี่ยนแปลงตรวจทานล่าสุด (Ctrl+Z)
+	Use the chosen engine's reading alone	ใช้ผลการอ่านของเอนจินที่เลือกเพียงอย่างเดียว
+	VERIFIED %	ตรวจทานแล้ว %
+	Verified	ตรวจทานแล้ว
+	Word	คำ
+	Writes a new document of visible text; the scan is not changed	เขียนเอกสารใหม่ที่เป็นข้อความที่มองเห็นได้ ภาพสแกนจะไม่ถูกเปลี่ยน
+	Wrote {name}	เขียน {name} แล้ว
+	Zero-width lines always count as narrower.	เส้นที่ไม่มีความกว้างถือว่าแคบกว่าเสมอ
+	by	โดย
+	corrected	แก้ไขแล้ว
+	removed	ลบแล้ว
+	skipped	ข้ามแล้ว
+	unreviewed	ยังไม่ได้ตรวจทาน
+	verified	ตรวจทานแล้ว
+	{name}: {n} low-confidence word(s) on pages {pages}	{name}: คำที่ความเชื่อมั่นต่ำ {n} คำ ในหน้า {pages}
+	{n} pages hold more content than PdfCraft can read, page {page} first: parts of them aren't drawn, and only part of their text can be found or copied.	{n} หน้ามีเนื้อหามากเกินกว่าที่ DTHFrame จะอ่านได้ เริ่มจากหน้า {page}: บางส่วนไม่ได้ถูกวาด และค้นหาหรือคัดลอกข้อความได้เพียงบางส่วน
+	{n} word(s) to review	{n} คำที่ต้องตรวจทาน
+
+# Added with the upstream sync to v0.21.1 (printer marks, colour conversion, replace, page setup).
+	A script edited here can be at most 256 KiB long; that change wasn't made.	สคริปต์ที่แก้ไขตรงนี้ยาวได้ไม่เกิน 256 KiB จึงไม่ได้ทำการเปลี่ยนแปลงนั้น
+	Add a line filled in when the stamp is placed	เพิ่มบรรทัดที่จะกรอกเมื่อวางตรา
+	Add a paper size of your own to the list	เพิ่มขนาดกระดาษของคุณเองลงในรายการ
+	Add printer marks…	เพิ่มเครื่องหมายสำหรับงานพิมพ์…
+	All files	ไฟล์ทั้งหมด
+	All marks	เครื่องหมายทั้งหมด
+	Bleed marks	เครื่องหมายตัดตก
+	By the standard device formulas; profiles are not applied.	ใช้สูตรมาตรฐานของอุปกรณ์ ไม่ใช้โปรไฟล์สี
+	CMYK	CMYK
+	Colour bars	แถบสี
+	Comments and form fields	ความคิดเห็นและช่องแบบฟอร์ม
+	Convert colours	แปลงสี
+	Convert colours…	แปลงสี…
+	Convert to	แปลงเป็น
+	Creep:	ระยะเยื้อง (creep):
+	Custom calculation script:	สคริปต์คำนวณที่กำหนดเอง:
+	Custom…	กำหนดเอง…
+	Detecting paper…	กำลังตรวจหาขนาดกระดาษ…
+	Detecting…	กำลังตรวจหา…
+	Discard embedded search index	ละทิ้งดัชนีค้นหาที่ฝังไว้
+	Discard external cross-references	ละทิ้งการอ้างอิงข้ามภายนอก
+	Document: {name}	เอกสาร: {name}
+	Edit description	แก้ไขคำอธิบาย
+	Grayscale	ระดับสีเทา
+	Line weight	น้ำหนักเส้น
+	Lock into the page when saving	ล็อกเข้ากับหน้าเมื่อบันทึก
+	Lock now	ล็อกตอนนี้
+	Marks	เครื่องหมาย
+	Moves each sheet's pages toward the fold by this much more than the sheet outside it, so the margins match once the booklet is folded and trimmed.	ขยับหน้าของแต่ละแผ่นเข้าหาแนวพับมากกว่าแผ่นด้านนอกตามระยะนี้ เพื่อให้ขอบเท่ากันเมื่อพับและตัดเล่ม
+	No matches to replace	ไม่มีรายการที่ตรงกันให้แทนที่
+	Not replaced: {why}	ไม่ได้แทนที่: {why}
+	Nothing replaced	ไม่ได้แทนที่อะไร
+	Office documents	เอกสารออฟฟิศ
+	Otherwise, ask on the first save after a signature is placed	มิฉะนั้นให้ถามเมื่อบันทึกครั้งแรกหลังวางลายเซ็น
+	Page Setup…	ตั้งค่าหน้ากระดาษ…
+	Page information	ข้อมูลหน้า
+	Page setup dialog is not available on this system.	ระบบนี้ไม่มีกล่องโต้ตอบตั้งค่าหน้ากระดาษ
+	Pictures too	รวมถึงรูปภาพ
+	Preserve black	คงสีดำ
+	Print area…	พื้นที่พิมพ์…
+	RGB	RGB
+	Registration marks	เครื่องหมายทะเบียน
+	Remove printer marks	ลบเครื่องหมายสำหรับงานพิมพ์
+	Replace ({key})	แทนที่ ({key})
+	Replace all	แทนที่ทั้งหมด
+	Replace with	แทนที่ด้วย
+	Replaced {n} on {pages}	แทนที่แล้ว {n} รายการใน {pages}
+	Replace…	แทนที่…
+	Room on each side	ระยะเผื่อแต่ละด้าน
+	Save as image	บันทึกเป็นรูปภาพ
+	Save as image…	บันทึกเป็นรูปภาพ…
+	Selected area (page {page}, {size})	พื้นที่ที่เลือก (หน้า {page}, {size})
+	Selects paper size and orientation from the printer driver. For paper tray, print quality or other driver defaults, use Properties…	เลือกขนาดกระดาษและการวางแนวจากไดรเวอร์เครื่องพิมพ์ สำหรับถาดกระดาษ คุณภาพการพิมพ์ หรือค่าเริ่มต้นอื่นของไดรเวอร์ ให้ใช้คุณสมบัติ…
+	Show or hide toolbars and panels	แสดงหรือซ่อนแถบเครื่องมือและแผง
+	Signature added. Others can move it until it's locked.	เพิ่มลายเซ็นแล้ว ผู้อื่นย้ายได้จนกว่าจะถูกล็อก
+	Take this paper size off the list	เอาขนาดกระดาษนี้ออกจากรายการ
+	The creep moves the innermost sheet's pages too far for this many pages. Reduce Creep.	ระยะเยื้องขยับหน้าของแผ่นในสุดมากเกินไปสำหรับจำนวนหน้านี้ โปรดลดระยะเยื้อง
+	The document changed. Reopen Document Properties to edit the current version.	เอกสารมีการเปลี่ยนแปลง โปรดเปิดคุณสมบัติเอกสารอีกครั้งเพื่อแก้ไขเวอร์ชันปัจจุบัน
+	The trim box is kept where it is, so the printed page cuts the same.	กรอบตัดยังคงอยู่ที่เดิม หน้าที่พิมพ์จึงตัดได้เหมือนเดิม
+	This document's script is asking	สคริปต์ของเอกสารนี้ขอ
+	This request comes from the document, not PdfCraft. Only enter a password if you trust this document.	คำขอนี้มาจากเอกสาร ไม่ใช่ DTHFrame ใส่รหัสผ่านเฉพาะเมื่อคุณเชื่อถือเอกสารนี้
+	This script is too long to edit here ({kib} KiB); its start is shown. It is kept as it is.	สคริปต์นี้ยาวเกินกว่าจะแก้ไขที่นี่ ({kib} KiB) จึงแสดงเฉพาะส่วนต้น และเก็บไว้ตามเดิม
+	Trim marks	เครื่องหมายตัด
+	Widen the page to make room	ขยายหน้ากระดาษเพื่อเผื่อพื้นที่
+	printer marks	เครื่องหมายสำหรับงานพิมพ์
+	pure black stays 100% K or gray 0 instead of a mix	สีดำล้วนคงเป็น K 100% หรือเทา 0 แทนการผสมสี
+	re-encoded in the target space; JPEGs stay JPEG	เข้ารหัสใหม่ในปริภูมิสีปลายทาง JPEG ยังคงเป็น JPEG
+	their appearances as well as the page	รวมถึงลักษณะที่ปรากฏของสิ่งเหล่านั้นและหน้า
+	{k} skipped: {why}	ข้าม {k} รายการ: {why}
+	{name}, {date} and {time} become your name, the date and the time.	{name}, {date} และ {time} จะกลายเป็นชื่อของคุณ วันที่ และเวลา
+	{why} ({n})	{why} ({n})
+	User guide	คู่มือการใช้งาน
+	Getting started	เริ่มต้นใช้งาน
+	Open a PDF with Open on the top bar, or drop a file onto the window. Each document opens in its own tab.	เปิดไฟล์ PDF ด้วยปุ่ม เปิด บนแถบด้านบน หรือลากไฟล์มาวางบนหน้าต่าง เอกสารแต่ละฉบับจะเปิดในแท็บของตัวเอง
+	DTHFrame works offline. Your files are processed on this device and are never uploaded.	DTHFrame ทำงานแบบออฟไลน์ ไฟล์ของคุณถูกประมวลผลบนอุปกรณ์เครื่องนี้และจะไม่ถูกอัปโหลดไปที่ใด
+	Finding a tool	ค้นหาเครื่องมือ
+	All tools on the left lists everything DTHFrame can do. The search box at the top finds a tool or a command by name.	เครื่องมือทั้งหมด ทางซ้ายแสดงทุกอย่างที่ DTHFrame ทำได้ ช่องค้นหาด้านบนใช้หาเครื่องมือหรือคำสั่งจากชื่อ
+	Reading a document	การอ่านเอกสาร
+	Use the zoom controls, or hold Ctrl (⌘ on a Mac) and scroll, to change the size. Move between pages with the arrow keys, Page Up and Page Down.	ปรับขนาดด้วยปุ่มซูม หรือกด Ctrl (⌘ บน Mac) ค้างไว้แล้วเลื่อนล้อเมาส์ เลื่อนไปมาระหว่างหน้าด้วยปุ่มลูกศร Page Up และ Page Down
+	Find searches the text of the open document.	ค้นหา จะหาข้อความในเอกสารที่เปิดอยู่
+	Working with pages	การจัดการหน้า
+	Organize pages rotates, deletes, reorders and inserts pages.	จัดระเบียบหน้า ใช้หมุน ลบ เรียงลำดับใหม่ และแทรกหน้า
+	Combine files merges several PDFs into one, and Split divides one PDF into several.	รวมไฟล์ ใช้รวม PDF หลายไฟล์เป็นไฟล์เดียว และ แบ่ง ใช้แบ่ง PDF ไฟล์เดียวออกเป็นหลายไฟล์
+	Editing and commenting	การแก้ไขและแสดงความคิดเห็น
+	Edit a PDF changes the text and images on a page.	แก้ไข PDF ใช้เปลี่ยนข้อความและรูปภาพบนหน้า
+	Add comments adds highlights, notes and drawings without changing the page itself.	เพิ่มความคิดเห็น ใช้เพิ่มไฮไลต์ โน้ต และภาพวาด โดยไม่เปลี่ยนเนื้อหาของหน้า
+	Forms and signatures	แบบฟอร์มและลายเซ็น
+	Prepare a form turns a document into a fillable form and finds the fields, including fields drawn as dotted lines.	เตรียมแบบฟอร์ม ใช้เปลี่ยนเอกสารให้เป็นแบบฟอร์มที่กรอกได้ และค้นหาช่องกรอก รวมถึงช่องที่เป็นเส้นจุดไข่ปลา
+	Fill & Sign completes a form and adds your signature or initials.	กรอกและเซ็น ใช้กรอกแบบฟอร์มและเพิ่มลายเซ็นหรืออักษรย่อของคุณ
+	Scanned documents	เอกสารสแกน
+	Scan & OCR makes scanned pages searchable. Open Recognize text…, choose the language (English or Thai) and start.	สแกนและ OCR ทำให้หน้าที่สแกนมาค้นหาได้ เปิด รู้จำข้อความ… เลือกภาษา (อังกฤษหรือไทย) แล้วเริ่มได้เลย
+	Each language needs its model. DTHFrame tells you when one is missing.	แต่ละภาษาต้องมีโมเดลของตัวเอง หากโมเดลหายไป DTHFrame จะแจ้งให้ทราบ
+	Protecting a document	การปกป้องเอกสาร
+	Protect a PDF sets a password.	ป้องกัน PDF ใช้ตั้งรหัสผ่าน
+	Redact a PDF permanently removes sensitive text and images. Check the result before you share the file.	ปิดทับข้อมูลใน PDF จะลบข้อความและรูปภาพที่ละเอียดอ่อนออกอย่างถาวร ตรวจผลลัพธ์ก่อนแชร์ไฟล์
+	Saving and exporting	การบันทึกและส่งออก
+	Save keeps your changes in the file, and Save as writes a copy.	บันทึก เก็บการเปลี่ยนแปลงไว้ในไฟล์ และ บันทึกเป็น สร้างสำเนาใหม่
+	Export a PDF saves pages as images, text or other formats, and Compress a PDF makes the file smaller.	ส่งออก PDF ใช้บันทึกหน้าเป็นรูปภาพ ข้อความ หรือรูปแบบอื่น และ บีบอัด PDF ทำให้ไฟล์เล็กลง
+	More help	ความช่วยเหลือเพิ่มเติม
+	Help ▸ Keyboard shortcuts lists every key. Help ▸ DTHFrame on GitHub opens the project page for questions and bug reports. Help ▸ About shows the version and credits.	วิธีใช้ ▸ แป้นพิมพ์ลัด แสดงปุ่มลัดทั้งหมด วิธีใช้ ▸ DTHFrame บน GitHub เปิดหน้าโครงการสำหรับถามคำถามและแจ้งข้อบกพร่อง วิธีใช้ ▸ เกี่ยวกับ DTHFrame แสดงเวอร์ชันและรายชื่อผู้มีส่วนร่วม
+
+# DocCraftTH: automatic deskew and orientation check before text recognition (AI-assisted, not separately native-reviewed).
+	Also straighten the page in the document	ปรับหน้าในเอกสารให้ตรงด้วย
+	The scan is turned on the page (one undo step) before it is read; otherwise only the image that is read is straightened	หมุนภาพสแกนบนหน้าให้ตรงก่อนอ่าน (ย้อนกลับได้ในขั้นเดียว) ถ้าไม่เลือก จะปรับเฉพาะภาพที่ใช้อ่านเท่านั้น
+	STRAIGHTENING	การปรับให้ตรง
+	Straight	ตรงอยู่แล้ว
+	turn	หมุน
+	skew	เอียง

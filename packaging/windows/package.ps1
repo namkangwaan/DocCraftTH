@@ -30,6 +30,20 @@ param(
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 
+# Auto-detect craft-fonts directory from sibling path or user environment if unset
+if (-not $env:CRAFT_FONTS_DIR) {
+  $userFonts = [Environment]::GetEnvironmentVariable('CRAFT_FONTS_DIR', 'User')
+  $siblingFonts = Join-Path (Split-Path $Root -Parent) 'craft-fonts'
+  if ($userFonts -and (Test-Path $userFonts)) {
+    $env:CRAFT_FONTS_DIR = $userFonts
+  } elseif (Test-Path $siblingFonts) {
+    $env:CRAFT_FONTS_DIR = (Resolve-Path $siblingFonts).Path
+  }
+}
+if ($env:CRAFT_FONTS_DIR) {
+  Write-Output "Craft fonts: $env:CRAFT_FONTS_DIR"
+}
+
 if ($BuiltWithoutCraftFonts -and -not $SkipBuild) {
   throw '-BuiltWithoutCraftFonts describes an existing build made without CRAFT_FONTS_DIR; use it only with -SkipBuild.'
 }
@@ -39,6 +53,18 @@ if ($BuiltWithoutCraftFonts -and $env:CRAFT_FONTS_DIR) {
 if ($SkipBuild -and -not $env:CRAFT_FONTS_DIR -and -not $BuiltWithoutCraftFonts) {
   throw 'package.ps1 -SkipBuild needs CRAFT_FONTS_DIR to stage the OFL notices of embedded craft-fonts, or -BuiltWithoutCraftFonts when the binaries were built without it.'
 }
+
+function Invoke-WixCommand {
+  $wixDll = "$env:USERPROFILE\.dotnet\tools\.store\wix\5.0.2\wix\5.0.2\tools\net6.0\any\wix.dll"
+  if (Test-Path $wixDll) {
+    & dotnet $wixDll @args
+  } elseif (Get-Command 'wix.exe' -ErrorAction SilentlyContinue) {
+    & wix.exe @args
+  } else {
+    & wix @args
+  }
+}
+Set-Item -Path function:script:wix -Value (Get-Item function:Invoke-WixCommand).ScriptBlock
 
 function Invoke-Native([string] $What, [scriptblock] $Block) {
   Write-Output "==> $What"
@@ -64,22 +90,15 @@ $Dist = if ($env:DIST) { $env:DIST } else { Join-Path $Root 'dist\release' }
 $TargetDir = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $Root 'target' }
 New-Item -ItemType Directory -Force -Path $Dist | Out-Null
 
-if (-not $env:PDFCRAFT_BUILD_SHA) { $env:PDFCRAFT_BUILD_SHA = (git -C $Root rev-parse HEAD 2>$null) }
-if (-not $env:PDFCRAFT_BUILD_DATE) { $env:PDFCRAFT_BUILD_DATE = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd') }
-
-# Auto-detect craft-fonts directory from sibling path or user environment if unset
-if (-not $env:CRAFT_FONTS_DIR) {
-  $userFonts = [Environment]::GetEnvironmentVariable('CRAFT_FONTS_DIR', 'User')
-  $siblingFonts = Join-Path (Split-Path $Root -Parent) 'craft-fonts'
-  if ($userFonts -and (Test-Path $userFonts)) {
-    $env:CRAFT_FONTS_DIR = $userFonts
-  } elseif (Test-Path $siblingFonts) {
-    $env:CRAFT_FONTS_DIR = (Resolve-Path $siblingFonts).Path
+if (-not $env:PDFCRAFT_BUILD_SHA) {
+  try {
+    $sha = (cmd /c "git -C `"$Root`" rev-parse HEAD 2>nul")
+    if ($sha) { $env:PDFCRAFT_BUILD_SHA = $sha.Trim() } else { $env:PDFCRAFT_BUILD_SHA = 'local' }
+  } catch {
+    $env:PDFCRAFT_BUILD_SHA = 'local'
   }
 }
-if ($env:CRAFT_FONTS_DIR) {
-  Write-Output "Craft fonts: $env:CRAFT_FONTS_DIR"
-}
+if (-not $env:PDFCRAFT_BUILD_DATE) { $env:PDFCRAFT_BUILD_DATE = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd') }
 
 Write-Output "DTHFrame $Version for Windows $Arch ($Target)"
 
