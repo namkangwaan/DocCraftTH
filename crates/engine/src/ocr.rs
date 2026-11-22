@@ -17,7 +17,7 @@ use pdfcraft_render::{PageInfo, PageRenderer, RenderConfig, RenderRequest, Reque
 pub use pdfcraft_ocr::deskew::DeskewReport;
 pub use pdfcraft_ocr::{
     ConfidenceBand, DETECTION_MODEL, LANGUAGES, Line, MergeStrategy, Models, Ocr, OcrError, OcrImage, PlacedWord, RECOGNITION_MODEL, Recognizer,
-    StrategyOutcome, Word, band_for, is_suspect, lines_from_json, low_confidence,
+    StrategyOutcome, THAI_DICT, THAI_RECOGNITION_MODEL, Word, band_for, is_suspect, lines_from_json, low_confidence,
 };
 
 use crate::{DocId, Edit, EditError, Session};
@@ -356,7 +356,21 @@ static ENGINES: Mutex<Option<EngineCache>> = Mutex::new(None);
 /// looks for: the web build downloads the models and loads them with [`Ocr::from_bytes`]. From
 /// then on [`recognizers`] hands it out and the engine counts as available.
 pub fn install(ocr: Ocr) -> Arc<dyn Recognizer> {
-    let ocrs: Arc<dyn Recognizer> = Arc::new(pdfcraft_ocr::OcrsRecognizer::from_ocr(ocr));
+    install_with_thai(ocr, None)
+}
+
+/// Whether [`install_with_thai`] was given the Thai recogniser.
+static THAI_INSTALLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// [`install`], with the Thai recogniser too when the web build could download its files
+/// ([`Ocr::from_bytes_thai`]); `None` leaves Thai unavailable, as [`install`] does.
+pub fn install_with_thai(ocr: Ocr, thai: Option<Ocr>) -> Arc<dyn Recognizer> {
+    THAI_INSTALLED.store(thai.is_some(), std::sync::atomic::Ordering::Release);
+    let recognizer = match thai {
+        Some(thai) => pdfcraft_ocr::OcrsRecognizer::from_ocr_with_thai(ocr, thai),
+        None => pdfcraft_ocr::OcrsRecognizer::from_ocr(ocr),
+    };
+    let ocrs: Arc<dyn Recognizer> = Arc::new(recognizer);
     ENGINES.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(|| EngineCache { ocrs: None }).ocrs = Some(ocrs.clone());
     ocrs
 }
@@ -681,7 +695,8 @@ pub fn available() -> bool {
 
 /// Whether the recognition models for `lang` (`"en"`, `"th"`) are installed.
 pub fn available_for(lang: &str) -> bool {
-    Models::find_for(lang).is_some()
+    let installed_in_memory = matches!(lang, "th" | "tha") && THAI_INSTALLED.load(std::sync::atomic::Ordering::Acquire);
+    installed_in_memory || Models::find_for(lang).is_some()
 }
 
 /// Why `engine` cannot run right now, named for the UI's tooltips (the Engine dropdown

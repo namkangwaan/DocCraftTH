@@ -43,6 +43,8 @@ pub const THAI_DICT: &str = "dict-th.txt";
 /// parser can spin forever on bytes that aren't a model (64 × 0xff does).
 pub const DETECTION_MODEL_SHA256: &str = "a917b23dbd9524b465df7e922641b3ff2981623df4ded5a0234004ef2fee7cfe";
 pub const RECOGNITION_MODEL_SHA256: &str = "86c145c2edb96c8caed5b1ebb8f44d706408922211451c309c625157dd6061c5";
+pub const THAI_RECOGNITION_MODEL_SHA256: &str = "8b70e6d18967e93fccb32e045e0f80ee3859efe7ccdd67586a9d136a284e834a";
+pub const THAI_DICT_SHA256: &str = "57f5406f94bb6688fb7077f7be65f08bbd71cecf48c01ea26c522cb5c4836b7a";
 
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
@@ -208,6 +210,28 @@ impl Ocr {
         Self::with_models(load(DETECTION_MODEL, DETECTION_MODEL_SHA256, detection)?, load(RECOGNITION_MODEL, RECOGNITION_MODEL_SHA256, recognition)?)
     }
 
+    /// The Thai (CTC) recogniser from the contents of its files, where there is no file system:
+    /// the same detection model as [`Ocr::from_bytes`], [`THAI_RECOGNITION_MODEL`] and
+    /// [`THAI_DICT`]. Each is checked against its SHA-256 first, like the English models.
+    pub fn from_bytes_thai(detection: Vec<u8>, recognition: Vec<u8>, dictionary: &[u8]) -> Result<Ocr, OcrError> {
+        let checked = |name: &str, sha256: &str, data: &[u8]| {
+            if sha256_hex(data) == sha256 { Ok(()) } else { Err(OcrError::Load(name.into(), "not the expected model file (SHA-256 differs)".into())) }
+        };
+        checked(DETECTION_MODEL, DETECTION_MODEL_SHA256, &detection)?;
+        checked(THAI_RECOGNITION_MODEL, THAI_RECOGNITION_MODEL_SHA256, &recognition)?;
+        checked(THAI_DICT, THAI_DICT_SHA256, dictionary)?;
+        let load = |name: &str, data: Vec<u8>| rten::Model::load(data).map_err(|e| OcrError::Load(name.into(), e.to_string()));
+        let detector_params =
+            ocrs::OcrEngineParams { detection_model: Some(load(DETECTION_MODEL, detection)?), recognition_model: None, ..Default::default() };
+        let detector = ocrs::OcrEngine::new(detector_params).map_err(|e| OcrError::Load("ocr detector".into(), e.to_string()))?;
+        let model = Box::new(load(THAI_RECOGNITION_MODEL, recognition)?);
+        let raw = std::str::from_utf8(dictionary).map_err(|e| OcrError::Load(THAI_DICT.into(), e.to_string()))?;
+        // As in `load`: one class per line, then the space class PaddleOCR appends.
+        let mut dict: Vec<char> = raw.lines().filter_map(|line| line.chars().next()).collect();
+        dict.push(' ');
+        Ok(Ocr { engine: Engine::Ctc { detector, model, dict, fixed_width: None } })
+    }
+
     fn with_models(detection: rten::Model, recognition: rten::Model) -> Result<Ocr, OcrError> {
         let params = ocrs::OcrEngineParams {
             detection_model: Some(detection),
@@ -311,6 +335,15 @@ impl OcrsRecognizer {
     /// models and loads them with [`Ocr::from_bytes`].
     pub fn from_ocr(engine: Ocr) -> OcrsRecognizer {
         OcrsRecognizer { engine, in_memory: true, thai: OnceLock::new() }
+    }
+
+    /// [`OcrsRecognizer::from_ocr`] with the Thai recogniser already loaded
+    /// ([`Ocr::from_bytes_thai`]), so Thai is read without looking for model files.
+    pub fn from_ocr_with_thai(engine: Ocr, thai: Ocr) -> OcrsRecognizer {
+        let recognizer = OcrsRecognizer { engine, in_memory: true, thai: OnceLock::new() };
+        // A fresh `OnceLock` is empty, so this always sets it.
+        let _ = recognizer.thai.set(Some(thai));
+        recognizer
     }
 
     /// Load the models found by [`Models::find`].
@@ -519,6 +552,34 @@ mod tests {
         }
     }
 
+    /// The web build loads Thai from downloaded bytes: anything but the three files
+    /// ATTRIBUTION.toml names is refused before it reaches the model parser.
+    #[test]
+    fn thai_from_bytes_refuses_files_that_are_not_the_models() {
+        let junk = || vec![0xffu8; 64];
+        assert!(matches!(Ocr::from_bytes_thai(junk(), junk(), b"a\nb\n"), Err(OcrError::Load(name, _)) if name == DETECTION_MODEL));
+        assert!(Ocr::from_bytes_thai(Vec::new(), Vec::new(), b"").is_err());
+    }
+
+    /// With the Thai models installed, loading them from bytes reads a page exactly as loading
+    /// them from files does (the same recogniser; only the way it is loaded differs).
+    #[test]
+    fn thai_from_bytes_reads_like_thai_from_files() {
+        let Some(models) = Models::find_for("th") else {
+            eprintln!("skipped: Thai OCR models not installed");
+            return;
+        };
+        let (Some(dict), true) = (models.dictionary.as_ref(), models.recognition.ends_with(THAI_RECOGNITION_MODEL)) else {
+            eprintln!("skipped: not the Thai model layout");
+            return;
+        };
+        let read = |p: &Path| std::fs::read(p).expect("a model file that was just found");
+        let from_bytes = Ocr::from_bytes_thai(read(&models.detection), read(&models.recognition), &read(dict)).expect("loads from bytes");
+        let from_files = Ocr::load(&models).expect("loads from files");
+        // A page with nothing on it: both read no lines, through the whole Thai pipeline.
+        let blank = vec![255u8; 400 * 120 * 4];
+        assert_eq!(from_bytes.recognize(&blank, 400, 120).expect("reads").len(), from_files.recognize(&blank, 400, 120).expect("reads").len());
+    }
 
     /// Writes `meta` as `model_meta.json` in a fresh per-test directory (unique per name and
     /// process, so parallel tests never share one) and returns the path of a model beside it.

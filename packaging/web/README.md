@@ -10,7 +10,7 @@ static site in `pdfcraft-web-<version>/`:
 | `pdfcraft-web-<hash>_bg.wasm` | The app, about 13 MB, or 5 MB with compression |
 | `pdfcraft-ocr-worker-<hash>.js`, `_bg.wasm`, `_loader.js` | The text recognition worker (about 3 MB), started only when OCR runs |
 | `_headers`, `.htaccess` | Sample header rules for Netlify/Cloudflare Pages and Apache |
-| `models/` | The text recognition (OCR) models, about 12 MB, with their licences (CC-BY-SA-4.0) |
+| `models/` | The text recognition (OCR) models, about 20 MB with the Thai ones, with their licences |
 
 There is no server-side code. Upload the folder's contents anywhere that serves static files.
 
@@ -60,9 +60,11 @@ Local test: `python3 -m http.server 8765` inside the folder, then open http://lo
 ## Text recognition (OCR)
 
 Scan & OCR ▸ Recognize Text downloads `models/text-detection.onnx` and
-`models/text-recognition.onnx`, relative to the page, the first time it is opened in a visit.
-Keep `models/` beside `index.html`. The app loads only the files whose SHA-256 matches
-`ATTRIBUTION.toml`, so a wrong file fails like a missing one. Their file names carry no content
+`models/text-recognition.onnx` (English), then `models/text-recognition-th.rten` and
+`models/dict-th.txt` (Thai, about 8 MB more), relative to the page, the first time it is opened in
+a visit. Keep `models/` beside `index.html`. The app loads only the files whose SHA-256 matches
+`ATTRIBUTION.toml`, so a wrong file fails like a missing one. The Thai files are optional: without
+them (or with wrong ones) English still works and the dialog says Thai isn't installed. Their file names carry no content
 hash, so the app asks the server before using a cached copy (`no-cache`): the server must answer
 that check correctly (an ETag, or a `Last-Modified` that changes whenever the file does). Without
 the models, everything else works and the Recognize Text dialog says the download failed.
