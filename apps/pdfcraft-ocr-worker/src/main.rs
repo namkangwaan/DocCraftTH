@@ -42,6 +42,7 @@ fn main() {
 #[cfg(target_arch = "wasm32")]
 mod worker {
     use pdfcraft_ocr::Ocr;
+    use pdfcraft_ocr::openthai::OpenThai;
     use wasm_bindgen::{JsCast, JsValue};
 
     /// The models are about 20 MB together with the Thai ones.
@@ -57,10 +58,15 @@ mod worker {
         o.into()
     }
 
+    enum ThaiReader {
+        Legacy(Ocr),
+        OpenThai(OpenThai),
+    }
+
     /// What the worker reads with: the English models, and the Thai ones when the page sent them.
     pub struct Reader {
         english: Ocr,
-        thai: Option<Ocr>,
+        thai: Option<ThaiReader>,
     }
 
     /// Answer one message from the page.
@@ -68,7 +74,17 @@ mod worker {
         let get = |k: &str| js_sys::Reflect::get(data, &k.into()).unwrap_or(JsValue::UNDEFINED);
         let id = get("id");
         let reply = match get("type").as_string().as_deref() {
-            Some("models") => load(&get("detection"), &get("recognition"), &get("thai_recognition"), &get("thai_dictionary")).map(|o| {
+            Some("models") => load(
+                &get("detection"),
+                &get("recognition"),
+                &get("thai_recognition"),
+                &get("thai_dictionary"),
+                &get("openthai_det"),
+                &get("openthai_rec"),
+                &get("openthai_rec2"),
+                &get("openthai_dict"),
+            )
+            .map(|o| {
                 *ocr = Some(o);
                 message(&[("type", "loaded".into())])
             }),
@@ -90,24 +106,36 @@ mod worker {
         Ok(a.to_vec())
     }
 
-    fn load(detection: &JsValue, recognition: &JsValue, thai_recognition: &JsValue, thai_dictionary: &JsValue) -> Result<Reader, String> {
+    #[allow(clippy::too_many_arguments)]
+    fn load(
+        detection: &JsValue,
+        recognition: &JsValue,
+        thai_recognition: &JsValue,
+        thai_dictionary: &JsValue,
+        openthai_det: &JsValue,
+        openthai_rec: &JsValue,
+        openthai_rec2: &JsValue,
+        openthai_dict: &JsValue,
+    ) -> Result<Reader, String> {
         let max = u64::from(MAX_MODEL_BYTES);
         let (detection, recognition) = (bytes(detection, max)?, bytes(recognition, max)?);
-        let thai = if thai_recognition.is_undefined() && thai_dictionary.is_undefined() {
-            None
-        } else {
+        let thai = if !openthai_det.is_undefined() && !openthai_rec.is_undefined() && !openthai_dict.is_undefined() {
+            let det = bytes(openthai_det, max)?;
+            let rec = bytes(openthai_rec, max)?;
+            let rec2 = if openthai_rec2.is_undefined() { None } else { Some(bytes(openthai_rec2, max)?) };
+            let dict = bytes(openthai_dict, max)?;
+            Some(ThaiReader::OpenThai(OpenThai::from_bytes(det, rec, rec2, &dict).map_err(|e| e.to_string())?))
+        } else if !thai_recognition.is_undefined() && !thai_dictionary.is_undefined() {
             let (thai_recognition, thai_dictionary) = (bytes(thai_recognition, max)?, bytes(thai_dictionary, max)?);
-            Some(Ocr::from_bytes_thai(detection.clone(), thai_recognition, &thai_dictionary).map_err(|e| e.to_string())?)
+            Some(ThaiReader::Legacy(Ocr::from_bytes_thai(detection.clone(), thai_recognition, &thai_dictionary).map_err(|e| e.to_string())?))
+        } else {
+            None
         };
         let english = Ocr::from_bytes(detection, recognition).map_err(|e| e.to_string())?;
         Ok(Reader { english, thai })
     }
 
     fn recognize(reader: &Reader, language: &JsValue, width: &JsValue, height: &JsValue, pixels: &JsValue) -> Result<String, String> {
-        let ocr = match language.as_string().as_deref() {
-            Some("th" | "tha") => reader.thai.as_ref().ok_or("the Thai text recognition model isn't loaded")?,
-            _ => &reader.english,
-        };
         let side = |v: &JsValue| v.as_f64().filter(|v| v.fract() == 0.0 && (1.0..=f64::from(u32::MAX)).contains(v)).map(|v| v as u32);
         let (Some(w), Some(h)) = (side(width), side(height)) else {
             return Err("the page size is not a positive whole number".into());
@@ -116,6 +144,13 @@ mod worker {
         if u64::from(w).checked_mul(u64::from(h)).and_then(|n| n.checked_mul(4)) != Some(px.len() as u64) {
             return Err("the pixels don't match the page size".into());
         }
-        ocr.recognize(&px, w, h).map(|lines| pdfcraft_ocr::lines_to_json(&lines)).map_err(|e| e.to_string())
+        let lines = match language.as_string().as_deref() {
+            Some("th" | "tha") => match reader.thai.as_ref().ok_or("the Thai text recognition model isn't loaded")? {
+                ThaiReader::OpenThai(ot) => ot.read_rgba(&px, w, h),
+                ThaiReader::Legacy(ocr) => ocr.recognize(&px, w, h),
+            },
+            _ => reader.english.recognize(&px, w, h),
+        };
+        lines.map(|lines| pdfcraft_ocr::lines_to_json(&lines)).map_err(|e| e.to_string())
     }
 }

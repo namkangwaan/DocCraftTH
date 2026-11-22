@@ -364,6 +364,14 @@ impl OcrsRecognizer {
         recognizer
     }
 
+    /// [`OcrsRecognizer::from_ocr`] with an in-memory [`crate::openthai::OpenThai`] reader
+    /// (for the web build).
+    pub fn from_ocr_with_openthai(engine: Ocr, openthai: crate::openthai::OpenThai) -> OcrsRecognizer {
+        let recognizer = OcrsRecognizer { engine, in_memory: true, thai: OnceLock::new(), openthai: OnceLock::new() };
+        let _ = recognizer.openthai.set(Some(openthai));
+        recognizer
+    }
+
     /// Load the models found by [`Models::find`].
     pub fn find() -> Result<OcrsRecognizer, OcrError> {
         Self::load(&Models::find().ok_or(OcrError::NoModels)?)
@@ -385,6 +393,9 @@ impl Recognizer for OcrsRecognizer {
 
     fn recognize(&self, image: &OcrImage, options: &RecognizeOptions) -> Result<Vec<Line>, OcrError> {
         if matches!(options.language.as_str(), "th" | "tha") {
+            if let Some(openthai) = self.openthai.get().and_then(Option::as_ref) {
+                return openthai.read(image);
+            }
             // An in-memory recogniser (the web build) carries its own Thai models; files are for the desktop.
             if !self.in_memory
                 && !legacy_thai_requested()

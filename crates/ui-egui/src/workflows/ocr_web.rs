@@ -49,11 +49,29 @@ pub enum State {
 static STATE: Mutex<State> = Mutex::new(State::NotStarted);
 
 /// The downloaded model files, kept to hand to each worker.
+enum ThaiFiles {
+    OpenThai {
+        det: js_sys::Uint8Array,
+        rec: js_sys::Uint8Array,
+        rec2: Option<js_sys::Uint8Array>,
+        dict: js_sys::Uint8Array,
+    },
+    Legacy {
+        recognition: js_sys::Uint8Array,
+        dictionary: js_sys::Uint8Array,
+    },
+}
+
+enum LoadedThai {
+    OpenThai(Box<pdfcraft_engine::ocr::openthai::OpenThai>),
+    Legacy(Ocr),
+}
+
 struct Files {
     detection: js_sys::Uint8Array,
     recognition: js_sys::Uint8Array,
-    /// The Thai recogniser and its dictionary, when `models/` holds them and they loaded.
-    thai: Option<(js_sys::Uint8Array, js_sys::Uint8Array)>,
+    /// The Thai recogniser and its files, when `models/` holds them and they loaded.
+    thai: Option<ThaiFiles>,
 }
 
 thread_local! {
@@ -76,7 +94,17 @@ pub fn start(ctx: egui::Context) {
     wasm_bindgen_futures::spawn_local(async move {
         let next = match load().await {
             Ok((ocr, thai, files)) => {
-                pdfcraft_engine::ocr::install_with_thai(ocr, thai);
+                match thai {
+                    Some(LoadedThai::OpenThai(ot)) => {
+                        pdfcraft_engine::ocr::install_with_openthai(ocr, *ot);
+                    }
+                    Some(LoadedThai::Legacy(t)) => {
+                        pdfcraft_engine::ocr::install_with_thai(ocr, Some(t));
+                    }
+                    None => {
+                        pdfcraft_engine::ocr::install_with_thai(ocr, None);
+                    }
+                }
                 MODELS.with_borrow_mut(|m| *m = Some(files));
                 State::NotStarted
             }
@@ -87,27 +115,41 @@ pub fn start(ctx: egui::Context) {
     });
 }
 
-async fn load() -> Result<(Ocr, Option<Ocr>, Files), String> {
+async fn load() -> Result<(Ocr, Option<LoadedThai>, Files), String> {
     let detection = fetch(DETECTION_MODEL).await?;
     let recognition = fetch(RECOGNITION_MODEL).await?;
     let ocr = Ocr::from_bytes(detection.to_vec(), recognition.to_vec()).map_err(|e| e.to_string())?;
-    // Thai is optional: a site without its files (or with ones that don't load) still reads
-    // English, and the dialog says Thai isn't installed.
-    let (thai, thai_files) = match load_thai(&detection).await {
-        Ok((ocr, files)) => (Some(ocr), Some(files)),
-        Err(e) => {
-            log::warn!("Thai text recognition isn't available: {e}");
-            (None, None)
-        }
+    // Prefer OpenThai 2.1 Text when its files exist in `models/`, falling back to the legacy
+    // PaddleOCR Thai model, or English-only when neither is present.
+    let (thai, thai_files) = match load_openthai().await {
+        Ok((ot, files)) => (Some(LoadedThai::OpenThai(Box::new(ot))), Some(files)),
+        Err(_) => match load_thai(&detection).await {
+            Ok((ocr, files)) => (Some(LoadedThai::Legacy(ocr)), Some(files)),
+            Err(e) => {
+                log::warn!("Thai text recognition isn't available: {e}");
+                (None, None)
+            }
+        },
     };
     Ok((ocr, thai, Files { detection, recognition, thai: thai_files }))
 }
 
-async fn load_thai(detection: &js_sys::Uint8Array) -> Result<(Ocr, (js_sys::Uint8Array, js_sys::Uint8Array)), String> {
+async fn load_openthai() -> Result<(pdfcraft_engine::ocr::openthai::OpenThai, ThaiFiles), String> {
+    use pdfcraft_engine::ocr::openthai::{DET_MODEL, DICT, OpenThai, REC_MODEL, REC2_MODEL};
+    let det = fetch(DET_MODEL).await?;
+    let rec = fetch(REC_MODEL).await?;
+    let rec2 = fetch(REC2_MODEL).await.ok();
+    let dict = fetch(DICT).await?;
+    let ot = OpenThai::from_bytes(det.to_vec(), rec.to_vec(), rec2.as_ref().map(js_sys::Uint8Array::to_vec), &dict.to_vec())
+        .map_err(|e| e.to_string())?;
+    Ok((ot, ThaiFiles::OpenThai { det, rec, rec2, dict }))
+}
+
+async fn load_thai(detection: &js_sys::Uint8Array) -> Result<(Ocr, ThaiFiles), String> {
     let recognition = fetch(THAI_RECOGNITION_MODEL).await?;
     let dictionary = fetch(THAI_DICT).await?;
     let ocr = Ocr::from_bytes_thai(detection.to_vec(), recognition.to_vec(), &dictionary.to_vec()).map_err(|e| e.to_string())?;
-    Ok((ocr, (recognition, dictionary)))
+    Ok((ocr, ThaiFiles::Legacy { recognition, dictionary }))
 }
 
 /// `models/<name>`, relative to the page, so the site works under any path. The names carry no
@@ -278,9 +320,20 @@ impl Pool {
                         let kind = JsValue::from_str("models");
                         let mut fields: Vec<(&str, &JsValue)> =
                             vec![("type", &kind), ("detection", files.detection.as_ref()), ("recognition", files.recognition.as_ref())];
-                        if let Some((recognition, dictionary)) = &files.thai {
-                            fields.push(("thai_recognition", recognition.as_ref()));
-                            fields.push(("thai_dictionary", dictionary.as_ref()));
+                        match &files.thai {
+                            Some(ThaiFiles::OpenThai { det, rec, rec2, dict }) => {
+                                fields.push(("openthai_det", det.as_ref()));
+                                fields.push(("openthai_rec", rec.as_ref()));
+                                if let Some(rec2) = rec2 {
+                                    fields.push(("openthai_rec2", rec2.as_ref()));
+                                }
+                                fields.push(("openthai_dict", dict.as_ref()));
+                            }
+                            Some(ThaiFiles::Legacy { recognition, dictionary }) => {
+                                fields.push(("thai_recognition", recognition.as_ref()));
+                                fields.push(("thai_dictionary", dictionary.as_ref()));
+                            }
+                            None => {}
                         }
                         m.worker.post_message(&message(&fields)).ok()
                     });

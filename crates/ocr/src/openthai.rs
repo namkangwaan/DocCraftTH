@@ -499,6 +499,18 @@ impl OpenThai {
         })
     }
 
+    /// Load the model set from downloaded bytes (for environments without a filesystem, such as WebAssembly).
+    pub fn from_bytes(det: Vec<u8>, rec: Vec<u8>, rec2: Option<Vec<u8>>, dictionary: &[u8]) -> Result<OpenThai, OcrError> {
+        let load = |name: &str, data: Vec<u8>| Model::load(data).map_err(|e| OcrError::Load(name.into(), e.to_string()));
+        let dict_str = std::str::from_utf8(dictionary).map_err(|e| OcrError::Load(DICT.into(), e.to_string()))?;
+        Ok(OpenThai {
+            det: load(DET_MODEL, det)?,
+            rec: load(REC_MODEL, rec)?,
+            rec2: rec2.map(|b| load(REC2_MODEL, b)).transpose()?,
+            chars: class_table(dict_str),
+        })
+    }
+
     /// Whether `dir` holds the required files.
     pub fn in_dir(dir: &Path) -> bool {
         [DET_MODEL, REC_MODEL, DICT].iter().all(|f| dir.join(f).is_file())
@@ -526,6 +538,12 @@ impl OpenThai {
             }
         }
         Ok(into_lines(reads, median_h))
+    }
+
+    /// Validate `rgba` (`width` × `height`) as an [`OcrImage`] and read its lines.
+    pub fn read_rgba(&self, rgba: &[u8], width: u32, height: u32) -> Result<Vec<Line>, OcrError> {
+        let image = OcrImage::new(width, height, rgba.to_vec())?;
+        self.read(&image)
     }
 
     fn detect(&self, page: &Rgb) -> Result<Vec<Quad>, OcrError> {

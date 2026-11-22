@@ -15,6 +15,7 @@ use pdfcraft_render::text::{TextFilter, unreadable};
 use pdfcraft_render::{PageInfo, PageRenderer, RenderConfig, RenderRequest, RequestKind};
 
 pub use pdfcraft_ocr::deskew::DeskewReport;
+pub use pdfcraft_ocr::openthai;
 pub use pdfcraft_ocr::{
     ConfidenceBand, DETECTION_MODEL, LANGUAGES, Line, MergeStrategy, Models, Ocr, OcrError, OcrImage, PlacedWord, RECOGNITION_MODEL, Recognizer,
     StrategyOutcome, THAI_DICT, THAI_RECOGNITION_MODEL, Word, band_for, is_suspect, lines_from_json, low_confidence,
@@ -371,6 +372,14 @@ pub fn install_with_thai(ocr: Ocr, thai: Option<Ocr>) -> Arc<dyn Recognizer> {
         None => pdfcraft_ocr::OcrsRecognizer::from_ocr(ocr),
     };
     let ocrs: Arc<dyn Recognizer> = Arc::new(recognizer);
+    ENGINES.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(|| EngineCache { ocrs: None }).ocrs = Some(ocrs.clone());
+    ocrs
+}
+
+/// [`install`], with an in-memory OpenThai 2.1 Text reader for Thai.
+pub fn install_with_openthai(ocr: Ocr, openthai: pdfcraft_ocr::openthai::OpenThai) -> Arc<dyn Recognizer> {
+    THAI_INSTALLED.store(true, std::sync::atomic::Ordering::Release);
+    let ocrs: Arc<dyn Recognizer> = Arc::new(pdfcraft_ocr::OcrsRecognizer::from_ocr_with_openthai(ocr, openthai));
     ENGINES.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(|| EngineCache { ocrs: None }).ocrs = Some(ocrs.clone());
     ocrs
 }
