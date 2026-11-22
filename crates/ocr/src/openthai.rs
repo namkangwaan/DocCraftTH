@@ -472,8 +472,23 @@ pub struct OpenThai {
     chars: Vec<char>,
 }
 
+/// The first bytes of an `.rten` file. rten's loader also accepts ONNX, and its ONNX parser spins
+/// forever on bytes that are neither (64 bytes of 0xff do), so nothing without this header
+/// reaches it: the model set is `.rten` only.
+const RTEN_MAGIC: &[u8] = b"RTEN";
+
+/// Parse `data` as an `.rten` model; `name` is what a failure names.
+fn model_from_bytes(name: &str, data: Vec<u8>) -> Result<Model, OcrError> {
+    if !data.starts_with(RTEN_MAGIC) {
+        return Err(OcrError::Load(name.into(), "not an .rten model file".into()));
+    }
+    Model::load(data).map_err(|e| OcrError::Load(name.into(), e.to_string()))
+}
+
 fn load_model(path: &Path) -> Result<Model, OcrError> {
-    Model::load_file(path).map_err(|e| OcrError::Load(path.display().to_string(), e.to_string()))
+    let name = path.display().to_string();
+    let data = std::fs::read(path).map_err(|e| OcrError::Load(name.clone(), e.to_string()))?;
+    model_from_bytes(&name, data)
 }
 
 /// The class table: the blank, the dictionary's characters (one per line), then the space the
@@ -501,7 +516,7 @@ impl OpenThai {
 
     /// Load the model set from downloaded bytes (for environments without a filesystem, such as WebAssembly).
     pub fn from_bytes(det: Vec<u8>, rec: Vec<u8>, rec2: Option<Vec<u8>>, dictionary: &[u8]) -> Result<OpenThai, OcrError> {
-        let load = |name: &str, data: Vec<u8>| Model::load(data).map_err(|e| OcrError::Load(name.into(), e.to_string()));
+        let load = model_from_bytes;
         let dict_str = std::str::from_utf8(dictionary).map_err(|e| OcrError::Load(DICT.into(), e.to_string()))?;
         Ok(OpenThai {
             det: load(DET_MODEL, det)?,
