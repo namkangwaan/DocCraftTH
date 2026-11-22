@@ -87,3 +87,25 @@ The app looks for `text-recognition-th.rten`, `dict-th.txt` and the shared `text
 ## Ruling
 
 `Thai recognizer = B` (`text-recognition-th.rten` + `dict-th.txt`, Apache-2.0). Mean CER is `0.0136`, well within the `0.05` gate. Path A (training an ocrs-format model) is not needed.
+
+## OpenThai 2.1 Text engine (`crates/ocr/src/openthai.rs`)
+
+Checked 2026-11-22. An alternative Thai (and Latin) line reader that replaces both the English text detector and the Thai recognizer above when its files are installed. It is iApp's `OpenThai2.1-OCR-Text` (https://huggingface.co/iapp/OpenThai2.1-OCR-Text-20261118, revision `v2.1.4`, Apache-2.0): a PP-OCRv6 tiny DB detector (`det.onnx`), a CTC recognizer (`rec.onnx`, 530 classes) and a second recognizer (`rec2.onnx`) for lines in which the first mixed Latin look-alikes into Thai words. About 6.6 MB in all, CPU only.
+
+**Files.** `openthai-det.rten`, `openthai-rec.rten`, `openthai-rec2.rten` (optional) and `openthai-dict.txt`, found like the other models (`$PDFCRAFT_MODELS`, beside the executable, `assets/models/`). The engine is used by `OcrsRecognizer` for Thai when they are present; `PDFCRAFT_THAI_ENGINE=legacy` selects the PaddleOCR recognizer again. `OpenThaiRecognizer` is the same engine as a standalone `Recognizer` (id `openthai`).
+
+**Conversion.** `rten-convert --no-infer-shapes <file>.onnx <file>.rten` (rten-convert 0.22.0; shape inference needs a temporary file that cannot be reopened on Windows). The operators are the standard set; `rec.rten` matches ONNX Runtime to about 1e-5 on real lines.
+
+**Pipeline** (a Rust port of the reference runtime's line path): pad the page, scale its long side to 1280 px (multiples of 32), run the detector, threshold the map at 0.3, take each 8-connected component's minimum-area rectangle, keep those whose mean probability is at least 0.6, unclip by 1.5 and map back; cut each box at 48 px, flatten the background column by column, run the recognizer, decode greedily, re-read mixed-script lines with `rec2`, normalise Thai spelling (marks ordered, nikhahit + sara aa composed to sara am), drop readings under 0.8 mean confidence or two characters, and order the lines in rows. Not ported: splitting lines at wide gaps, re-attaching floating marks, page rotation (`preprocess` straightens pages first) and column ordering.
+
+**`rten-imageproc` 0.26 `min_area_rect` is wrong for some hulls**: it returned rectangles under a pixel thick for wide line components, which dropped a third of the lines on a page. `openthai.rs` computes the rectangle itself from the hull's edge directions (`a_wide_line_component_has_its_true_minimum_rectangle`). Other users of that function (the `ocrs` detector) were not checked.
+
+**Measured** on 24 pages sampled at random (seed 42) from the project's PDF corpus, rendered at 200 dpi, against each page's native text layer (page CER, whitespace ignored; several `_OCR` pages and a few broken-font pages have imperfect references, so read the numbers as a comparison, not as absolute accuracy), 6-core CPU under WSL, release build:
+
+| Engine | Mean page CER | Better than the previous engine on | Mean time per page |
+| --- | --- | --- | --- |
+| PaddleOCR v5 Thai recognizer + `ocrs` detector | `0.1416` | – | 2,089 ms |
+| OpenThai 2.1 Text (`openthai.rs`) | `0.1007` | 24 of 24 pages | 758 ms |
+| OpenThai reference runtime (Python, ONNX Runtime) | `0.0997` | 24 of 24 pages | 912 ms |
+
+**Not done.** The converted `.rten` files are not published, so `ATTRIBUTION.toml` has no `[[fetched]]` entries for them yet and `cargo xtask models` does not fetch them (a dangling URL would break that command for everyone). To ship: upload the four files to a release, add four `[[fetched]]` entries (`kind = "model"`, Apache-2.0, source the revision above, SHA-256 of each file), run `cargo xtask assets --write` and add them to the packages. The web build still loads the previous Thai models from bytes. `Models::find_for("th")`, and so the UI's Thai availability, still requires the previous model files.

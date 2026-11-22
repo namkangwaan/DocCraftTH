@@ -26,6 +26,7 @@ pub mod ctc;
 pub mod merge;
 pub mod metrics;
 mod ocrs;
+pub mod openthai;
 pub mod preprocess;
 mod thai;
 #[cfg(not(target_arch = "wasm32"))]
