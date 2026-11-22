@@ -1993,7 +1993,11 @@ fn draw_pages(
 
                 match menu {
                     qr_hover::QrMenu::Link(url) => {
-                        if ui.button(egui::RichText::new(format!("🌐 {}", tl!("Open in Browser"))).color(ui.visuals().hyperlink_color)).clicked() {
+                        let open_label = match pdfcraft_engine::links::display_host(&url) {
+                            Some(host) => format!("🌐 {} ({})", tl!("Open in Browser"), host.ascii),
+                            None => format!("🌐 {}", tl!("Open in Browser")),
+                        };
+                        if ui.button(egui::RichText::new(open_label).color(ui.visuals().hyperlink_color)).clicked() {
                             // A document's address: the user is asked first, as for a link.
                             page_action = Some(PageMenuAction::OpenQrUrl(url.clone()));
                             ui.close();

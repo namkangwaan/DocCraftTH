@@ -11003,3 +11003,194 @@ fn a_bad_bookmark_tree_is_refused_whole_and_names_the_node() {
     assert!(!out.exists());
     assert_eq!(ok(&mut a, "bookmark_list", json!({ "doc": doc }))["bookmarks"], json!([]));
 }
+
+#[test]
+fn page_qr_codes_scans_and_reports_view_rect_and_url() {
+    fn qr_v1_codewords(text: &str) -> Vec<u8> {
+        fn gf_mul(x: u8, y: u8) -> u8 {
+            let mut z: u16 = 0;
+            for i in (0..8).rev() {
+                z = (z << 1) ^ ((z >> 7) * 0x11D);
+                z ^= u16::from((y >> i) & 1) * u16::from(x);
+            }
+            z as u8
+        }
+        let mut bits = Vec::new();
+        let put = |v: u32, n: usize, b: &mut Vec<bool>| {
+            for i in (0..n).rev() {
+                b.push((v >> i) & 1 != 0);
+            }
+        };
+        put(0b0100, 4, &mut bits);
+        put(text.len() as u32, 8, &mut bits);
+        for byte in text.bytes() {
+            put(u32::from(byte), 8, &mut bits);
+        }
+        let term = (19 * 8 - bits.len()).min(4);
+        put(0, term, &mut bits);
+        while bits.len() % 8 != 0 {
+            bits.push(false);
+        }
+        let mut data: Vec<u8> = bits.chunks(8).map(|c| c.iter().fold(0u8, |acc, b| (acc << 1) | u8::from(*b))).collect();
+        let mut pad = 0xECu8;
+        while data.len() < 19 {
+            data.push(pad);
+            pad ^= 0xEC ^ 0x11;
+        }
+        let mut div = vec![0u8; 7];
+        div[6] = 1;
+        let mut root = 1u8;
+        for _ in 0..7 {
+            for j in 0..7 {
+                div[j] = gf_mul(div[j], root);
+                if j + 1 < 7 {
+                    div[j] ^= div[j + 1];
+                }
+            }
+            root = gf_mul(root, 2);
+        }
+        let mut ec = vec![0u8; 7];
+        for &b in &data {
+            let f = b ^ ec.remove(0);
+            ec.push(0);
+            for (r, &d) in ec.iter_mut().zip(&div) {
+                *r ^= gf_mul(d, f);
+            }
+        }
+        data.extend(ec);
+        data
+    }
+
+    // Version 1-L QR matrix for "https://a.example" (21x21 modules), drawn as vector squares.
+    fn qr_v1_ops(text: &str, left: f64, top_from_bottom: f64, module: f64) -> String {
+        const SIZE: usize = 21;
+        let data = qr_v1_codewords(text);
+        let mut dark = [[false; SIZE]; SIZE];
+        let mut func = [[false; SIZE]; SIZE];
+        let mut set_f = |x: usize, y: usize, d: bool| {
+            dark[y][x] = d;
+            func[y][x] = true;
+        };
+        for i in 0..SIZE {
+            set_f(6, i, i % 2 == 0);
+            set_f(i, 6, i % 2 == 0);
+        }
+        for (cx, cy) in [(3i32, 3i32), (17, 3), (3, 17)] {
+            for dy in -4..=4 {
+                for dx in -4..=4 {
+                    let (x, y) = (cx + dx, cy + dy);
+                    if (0..21).contains(&x) && (0..21).contains(&y) {
+                        let d = dx.abs().max(dy.abs());
+                        set_f(x as usize, y as usize, d != 2 && d != 4);
+                    }
+                }
+            }
+        }
+        let mut rem = 1u32 << 3;
+        for _ in 0..10 {
+            rem = (rem << 1) ^ ((rem >> 9) * 0x537);
+        }
+        let fmt = ((1u32 << 13) | rem) ^ 0x5412;
+        let bit = |i: usize| (fmt >> i) & 1 != 0;
+        for i in 0..=5 {
+            set_f(8, i, bit(i));
+        }
+        set_f(8, 7, bit(6));
+        set_f(8, 8, bit(7));
+        set_f(7, 8, bit(8));
+        for i in 9..15 {
+            set_f(14 - i, 8, bit(i));
+        }
+        for i in 0..8 {
+            set_f(SIZE - 1 - i, 8, bit(i));
+        }
+        for i in 8..15 {
+            set_f(8, SIZE - 15 + i, bit(i));
+        }
+        set_f(8, SIZE - 8, true);
+        let mut i = 0;
+        let mut right = SIZE as i32 - 1;
+        while right >= 1 {
+            if right == 6 {
+                right = 5;
+            }
+            for vert in 0..SIZE {
+                for j in 0..2 {
+                    let x = (right - j) as usize;
+                    let y = if ((right + 1) & 2) == 0 { SIZE - 1 - vert } else { vert };
+                    if !func[y][x] && i < data.len() * 8 {
+                        dark[y][x] = (data[i >> 3] >> (7 - (i & 7))) & 1 != 0;
+                        i += 1;
+                    }
+                }
+            }
+            right -= 2;
+        }
+        for (y, row) in dark.iter_mut().enumerate() {
+            for (x, cell) in row.iter_mut().enumerate() {
+                if !func[y][x] && (x + y) % 2 == 0 {
+                    *cell = !*cell;
+                }
+            }
+        }
+        let mut ops = String::from("1 1 1 rg 0 0 300 400 re f 0 0 0 rg\n");
+        for (r, row) in dark.iter().enumerate() {
+            for (c, &d) in row.iter().enumerate() {
+                if d {
+                    let (x, y) = (left + c as f64 * module, top_from_bottom - (r as f64 + 1.0) * module);
+                    ops.push_str(&format!("{x} {y} {module} {module} re\n"));
+                }
+            }
+        }
+        ops.push_str("f\n");
+        ops
+    }
+
+    let dir = workdir("page-qr-codes");
+    let ops = qr_v1_ops("https://a.example", 40.0, 340.0, 4.0);
+    let objs: Vec<Vec<u8>> = vec![
+        b"<< /Type /Catalog /Pages 2 0 R >>".to_vec(),
+        b"<< /Type /Pages /Kids [3 0 R 5 0 R] /Count 2 >>".to_vec(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Contents 4 0 R >>".to_vec(),
+        format!("<< /Length {} >>\nstream\n{ops}\nendstream", ops.len()).into_bytes(),
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 400] /Contents 6 0 R >>".to_vec(),
+        b"<< /Length 27 >>\nstream\n1 1 1 rg 0 0 300 400 re f\nendstream".to_vec(),
+    ];
+    let mut qr_pdf = b"%PDF-1.7\n".to_vec();
+    let mut offsets = Vec::new();
+    for (i, o) in objs.iter().enumerate() {
+        offsets.push(qr_pdf.len());
+        qr_pdf.extend_from_slice(format!("{} 0 obj\n", i + 1).as_bytes());
+        qr_pdf.extend_from_slice(o);
+        qr_pdf.extend_from_slice(b"\nendobj\n");
+    }
+    let xref = qr_pdf.len();
+    qr_pdf.extend_from_slice(format!("xref\n0 {}\n0000000000 65535 f \n", objs.len() + 1).as_bytes());
+    for o in offsets {
+        qr_pdf.extend_from_slice(format!("{o:010} 00000 n \n").as_bytes());
+    }
+    qr_pdf.extend_from_slice(format!("trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n", objs.len() + 1).as_bytes());
+    std::fs::write(dir.join("qr.pdf"), qr_pdf).unwrap();
+
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({ "path": "qr.pdf" }))["doc"].as_u64().unwrap();
+
+    let res = ok(&mut a, "page_qr_codes", json!({ "doc": doc, "page": 1 }));
+    assert_eq!(res["page"], 1);
+    assert_eq!(res["count"], 1);
+    let code = &res["codes"][0];
+    assert_eq!(code["content"], "https://a.example");
+    assert_eq!(code["url"], "https://a.example");
+    let rect: Vec<f64> = code["rect"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+    // Drawn at left=40, top_from_bottom=340 (view y0=60), side=84.
+    assert!((rect[0] - 40.0).abs() <= 6.0, "{rect:?}");
+    assert!((rect[1] - 60.0).abs() <= 6.0, "{rect:?}");
+    assert!((rect[2] - 124.0).abs() <= 6.0, "{rect:?}");
+    assert!((rect[3] - 144.0).abs() <= 6.0, "{rect:?}");
+
+    let blank = ok(&mut a, "page_qr_codes", json!({ "doc": doc, "page": 2 }));
+    assert_eq!(blank["count"], 0);
+    assert_eq!(blank["codes"], json!([]));
+
+    assert!(matches!(a.call("page_qr_codes", &json!({ "doc": doc, "page": 3 })), Err(ToolError::InvalidArgs(_))));
+}
