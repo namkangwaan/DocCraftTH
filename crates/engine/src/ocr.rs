@@ -696,7 +696,7 @@ pub fn available() -> bool {
 /// Whether the recognition models for `lang` (`"en"`, `"th"`) are installed.
 pub fn available_for(lang: &str) -> bool {
     let installed_in_memory = matches!(lang, "th" | "tha") && THAI_INSTALLED.load(std::sync::atomic::Ordering::Acquire);
-    installed_in_memory || Models::find_for(lang).is_some()
+    installed_in_memory || Models::find_for(lang).is_some() || (matches!(lang, "th" | "tha") && pdfcraft_ocr::thai_available())
 }
 
 /// Why `engine` cannot run right now, named for the UI's tooltips (the Engine dropdown

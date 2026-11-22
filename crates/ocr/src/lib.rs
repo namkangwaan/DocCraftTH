@@ -36,7 +36,7 @@ pub use confidence::{ConfidenceBand, band_for, is_suspect, low_confidence};
 pub use merge::{MergeStrategy, StrategyOutcome, mean_confidence, recognize_with_strategy, rover_merge};
 pub use ocrs::{
     ALPHABET, DETECTION_MODEL, DETECTION_MODEL_SHA256, LANGUAGES, Models, Ocr, OcrsRecognizer, RECOGNITION_MODEL, RECOGNITION_MODEL_SHA256,
-    THAI_DICT, THAI_DICT_SHA256, THAI_RECOGNITION_MODEL, THAI_RECOGNITION_MODEL_SHA256,
+    THAI_DICT, THAI_DICT_SHA256, THAI_RECOGNITION_MODEL, THAI_RECOGNITION_MODEL_SHA256, openthai_available, thai_available,
 };
 pub use thai::{DotLeader, dot_leaders};
 

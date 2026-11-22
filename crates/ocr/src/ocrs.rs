@@ -329,8 +329,18 @@ pub struct OcrsRecognizer {
 }
 
 /// Whether the environment asks for the previous Thai engine (the PaddleOCR v5 recognizer).
-fn legacy_thai_requested() -> bool {
+pub(crate) fn legacy_thai_requested() -> bool {
     std::env::var("PDFCRAFT_THAI_ENGINE").is_ok_and(|v| v.eq_ignore_ascii_case("legacy"))
+}
+
+/// Whether the OpenThai 2.1 Text models are installed and not disabled by `PDFCRAFT_THAI_ENGINE=legacy`.
+pub fn openthai_available() -> bool {
+    !legacy_thai_requested() && crate::openthai::OpenThai::find_dir().is_some()
+}
+
+/// Whether Thai OCR models (either OpenThai 2.1 Text or the legacy PaddleOCR v5 set) are installed.
+pub fn thai_available() -> bool {
+    Models::find_for("th").is_some() || openthai_available()
 }
 
 impl OcrsRecognizer {
