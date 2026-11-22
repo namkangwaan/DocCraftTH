@@ -276,10 +276,10 @@ fn lcg(seed: &mut u64) -> f64 {
     (*seed >> 11) as f64 / (1u64 << 53) as f64
 }
 
-/// A greyscale scan of `payload`'s QR code: `px` pixels a module, a 4-module quiet zone, and
-/// noise: every pixel's grey moves by up to ±`jitter` levels from a dark 30 or a light 225 (a
-/// scan's ink and paper, not pure black and white).
-fn noisy_scan(payload: &str, px: usize, jitter: f64, seed: u64) -> (usize, Vec<u8>) {
+/// A greyscale raster of `payload`'s QR code as a scan prints it: `px` pixels a module, a
+/// 4-module quiet zone, ink at grey 30 and paper at 225 (not black and white), and every pixel
+/// moved by up to ±`jitter` levels.
+fn grey_raster(payload: &str, px: usize, jitter: f64, seed: u64) -> (usize, Vec<u8>) {
     let side = (SIZE + 8) * px;
     let modules = encode(payload.as_bytes());
     let mut seed = seed;
@@ -295,48 +295,125 @@ fn noisy_scan(payload: &str, px: usize, jitter: f64, seed: u64) -> (usize, Vec<u
     (side, grey)
 }
 
-/// A one-page US Letter PDF showing a square greyscale image `side` pixels wide, drawn at 150 DPI
-/// with its top-left corner at (`left`, `top`).
-fn image_page_pdf(side: usize, grey: &[u8], left: f64, top: f64) -> std::sync::Arc<Vec<u8>> {
+/// A one-page PDF of `width` × `height` points, turned `rotate` degrees, showing a square
+/// greyscale image (`side` pixels wide, its pixels) at 150 DPI with its top-left corner at (`left`, `top`),
+/// then drawing `extra`.
+fn image_page_pdf(
+    width: f64,
+    height: f64,
+    rotate: u16,
+    (side, grey): (usize, &[u8]),
+    (left, top): (f64, f64),
+    extra: &str,
+) -> std::sync::Arc<Vec<u8>> {
     let pt = side as f64 * 72.0 / 150.0;
-    let content = format!("q {pt} 0 0 {pt} {left} {} cm /Im0 Do Q\n", top - pt);
+    let content = format!("q {pt} 0 0 {pt} {left} {} cm /Im0 Do Q\n{extra}", top - pt);
     let bytes = pdfcraft_testkit::Pdf::new()
         .obj("<< /Type /Catalog /Pages 2 0 R >>")
         .obj("<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
-        .obj("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>")
+        .obj(format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {width} {height}] /Rotate {rotate} /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>"
+        ))
         .stream("", content)
         .stream(&format!("/Type /XObject /Subtype /Image /Width {side} /Height {side} /ColorSpace /DeviceGray /BitsPerComponent 8"), grey)
         .build();
     std::sync::Arc::new(bytes)
 }
 
-/// A scanned QR code (an embedded greyscale image at 150 DPI, 6 pixels a module, ink and paper
-/// grey and noisy) that the plain 150 DPI pass misses is found by the binarized second pass,
-/// where it was drawn.
-#[test]
-fn scanned_qr_the_plain_pass_misses_is_found() {
-    let (left, top) = (100.0, 700.0);
-    let (side, grey) = noisy_scan("QR-ONE", 6, 40.0, 1);
-    let bytes = image_page_pdf(side, &grey, left, top);
-    // The first pass alone, as the scan was before the second pass: nothing.
+fn letter() -> pdfcraft_render::PageInfo {
+    pdfcraft_render::PageInfo { width: 612.0, height: 792.0, label: String::new(), crop: [0.0, 0.0, 612.0, 792.0], rotation: 0 }
+}
+
+/// The box a raster from [`grey_raster`] with `px`-pixel modules shows its symbol in (without the
+/// quiet zone), drawn at 150 DPI from (`left`, `top`), and the tolerance a found box gets.
+fn raster_symbol(px: usize, left: f64, top: f64) -> ([f64; 4], f64) {
+    let module = px as f64 * 72.0 / 150.0;
+    let (sx, sy) = (left + 4.0 * module, top - 4.0 * module);
+    ([sx, sy - SIZE as f64 * module, sx + SIZE as f64 * module, sy], (1.5 * module).max(2.0))
+}
+
+fn assert_raster_box(got: [f64; 4], (want, tolerance): ([f64; 4], f64)) {
+    assert!(got.iter().zip(want).all(|(g, w)| (g - w).abs() <= tolerance), "got {got:?}, drawn {want:?}");
+}
+
+/// The first pass alone (the scan before the second pass existed) on page 0 of `bytes`.
+fn first_pass(bytes: &std::sync::Arc<Vec<u8>>) -> Vec<QrCodeInfo> {
     let mut renderer = PageRenderer::new(bytes.clone(), pdfcraft_render::RenderConfig::default());
     let r = renderer.render(RenderRequest { page: 0, scale: QR_SCAN_SCALE, ..Default::default() });
-    assert!(scan_qr_from_rgba(r.width as usize, r.height as usize, &r.rgba).is_empty(), "the plain pass finds this one: the test proves nothing");
-    let info = pdfcraft_render::PageInfo { width: 612.0, height: 792.0, label: String::new(), crop: [0.0, 0.0, 612.0, 792.0], rotation: 0 };
+    scan_qr_from_rgba(r.width as usize, r.height as usize, &r.rgba)
+}
+
+/// A grey 30/225 raster QR (6 pixels a module, ±40 jitter) that the plain 150 DPI pass misses is
+/// found by the second pass, and mapped back from its larger render to where it was drawn. This
+/// shows the second pass runs, decodes and maps; it does not show noise is what defeats the
+/// first pass, which misses this raster even without the jitter.
+#[test]
+fn grey_raster_the_plain_pass_misses_is_found() {
+    let (left, top) = (100.0, 700.0);
+    let (side, grey) = grey_raster("QR-ONE", 6, 40.0, 1);
+    let bytes = image_page_pdf(612.0, 792.0, 0, (side, &grey), (left, top), "");
+    assert!(first_pass(&bytes).is_empty(), "the plain pass finds this one: the test proves nothing");
+    let regions = scan_page_qr_regions(bytes.clone(), pdfcraft_render::RenderConfig::default(), 0, &letter()).expect("page renders");
+    assert_eq!(regions.iter().map(|r| r.content.as_str()).collect::<Vec<_>>(), vec!["QR-ONE"]);
+    assert_raster_box(regions[0].rect_user, raster_symbol(6, left, top));
+    // The Scan QR Code dialog's scan runs the same passes.
+    let found = scan_page_qr(bytes, pdfcraft_render::RenderConfig::default(), 0).expect("page renders");
+    assert_eq!(found.iter().map(|q| q.content.as_str()).collect::<Vec<_>>(), vec!["QR-ONE"]);
+}
+
+/// The same raster on a page turned a quarter: the second pass's code lands where it was drawn
+/// in unrotated user space.
+#[test]
+fn grey_raster_on_a_turned_page_is_found_in_user_space() {
+    let (left, top) = (100.0, 700.0);
+    let (side, grey) = grey_raster("QR-ONE", 6, 40.0, 1);
+    let bytes = image_page_pdf(612.0, 792.0, 90, (side, &grey), (left, top), "");
+    let info = pdfcraft_render::PageInfo { width: 792.0, height: 612.0, label: String::new(), crop: [0.0, 0.0, 612.0, 792.0], rotation: 90 };
     let regions = scan_page_qr_regions(bytes, pdfcraft_render::RenderConfig::default(), 0, &info).expect("page renders");
     assert_eq!(regions.iter().map(|r| r.content.as_str()).collect::<Vec<_>>(), vec!["QR-ONE"]);
-    // The symbol (without its quiet zone) spans 21 modules of 6 pixels at 150 DPI.
-    let module = 6.0 * 72.0 / 150.0;
-    let (sx, sy) = (left + 4.0 * module, top - 4.0 * module);
-    let want = [sx, sy - SIZE as f64 * module, sx + SIZE as f64 * module, sy];
-    let tolerance = (1.5 * module).max(2.0);
-    assert!(regions[0].rect_user.iter().zip(want).all(|(g, w)| (g - w).abs() <= tolerance), "got {:?}, drawn {want:?}", regions[0].rect_user);
+    assert_raster_box(regions[0].rect_user, raster_symbol(6, left, top));
+}
+
+/// A code both passes find is reported once, where the first pass found it.
+#[test]
+fn a_code_both_passes_find_is_reported_once() {
+    // A vector QR, and a raster elsewhere so the page draws an image and the second pass runs.
+    let (left, top) = (300.0, 500.0);
+    let (side, grey) = grey_raster("other", 2, 0.0, 1);
+    let bytes = image_page_pdf(612.0, 792.0, 0, (side, &grey), (40.0, 780.0), &qr_ops("QR-ONE", left, top, MODULE));
+    let first = first_pass(&bytes);
+    assert_eq!(first.iter().map(|q| q.content.as_str()).collect::<Vec<_>>(), vec!["QR-ONE"]);
+    // The second pass on its own finds it too.
+    let scale = fine_scale(612.0, 792.0).expect("Letter gets a second pass");
+    let mut renderer = PageRenderer::new(bytes.clone(), pdfcraft_render::RenderConfig::default());
+    let fine = renderer.render(RenderRequest { page: 0, scale, ..Default::default() });
+    let grey_page = grey_of(fine.width as usize, fine.height as usize, &fine.rgba);
+    let second = scan_qr_binarized(fine.width as usize, fine.height as usize, grey_page);
+    assert!(second.iter().any(|q| q.content == "QR-ONE"), "{second:?}");
+    let regions = scan_page_qr_regions(bytes, pdfcraft_render::RenderConfig::default(), 0, &letter()).expect("page renders");
+    assert_eq!(regions.iter().filter(|r| r.content == "QR-ONE").count(), 1, "{regions:?}");
+    assert_box(regions.iter().find(|r| r.content == "QR-ONE").map(|r| r.rect_user).unwrap_or_default(), left, top);
+}
+
+#[test]
+fn second_pass_runs_only_on_pages_that_draw_images() {
+    let vector = page_pdf(612.0, 792.0, 0, &qr_ops("QR-ONE", 100.0, 700.0, MODULE));
+    assert!(!page_may_draw_images(vector, None, 0));
+    let (side, grey) = grey_raster("QR-ONE", 2, 0.0, 1);
+    assert!(page_may_draw_images(image_page_pdf(612.0, 792.0, 0, (side, &grey), (100.0, 700.0), ""), None, 0));
+    let inline = page_pdf(612.0, 792.0, 0, "q 10 0 0 10 50 50 cm BI /W 1 /H 1 /CS /G /BPC 8 ID \u{0} EI Q\n");
+    assert!(page_may_draw_images(inline, None, 0));
+    // What can't be read is scanned rather than skipped.
+    assert!(page_may_draw_images(std::sync::Arc::new(b"not a pdf".to_vec()), None, 0));
+    let vector = page_pdf(612.0, 792.0, 0, "0 0 10 10 re f\n");
+    assert!(page_may_draw_images(vector, None, 3));
 }
 
 #[test]
 fn second_pass_scale_is_capped_and_total() {
     // A4 and Letter scan at 300 DPI.
     assert_eq!(fine_scale(612.0, 792.0), Some((300.0f64 / 72.0) as f32));
+    assert_eq!(fine_scale(595.0, 842.0), Some((300.0f64 / 72.0) as f32));
     // A poster is scanned at fewer than 300 DPI, within the pixel cap.
     let s = fine_scale(1200.0, 1600.0).expect("finer than 150 DPI");
     assert!(s < 300.0 / 72.0 && f64::from(s) * f64::from(s) * 1.92e6 <= QR_FINE_MAX_PIXELS * 1.0001, "{s}");
@@ -349,14 +426,43 @@ fn second_pass_scale_is_capped_and_total() {
     assert_eq!(fine_scale(f32::NAN, 792.0), None);
 }
 
+/// The 3 × 3 average of every pixel, window clipped at the edges, the plain way.
+fn naive_blur(width: usize, height: usize, grey: &[u8]) -> Vec<u8> {
+    let mut out = Vec::new();
+    for y in 0..height {
+        for x in 0..width {
+            let (mut sum, mut n) = (0u32, 0u32);
+            for yy in y.saturating_sub(1)..(y + 2).min(height) {
+                for xx in x.saturating_sub(1)..(x + 2).min(width) {
+                    sum += u32::from(grey[yy * width + xx]);
+                    n += 1;
+                }
+            }
+            out.push((sum / n) as u8);
+        }
+    }
+    out
+}
+
 #[test]
 fn binarize_helpers_take_any_buffer() {
     assert!(box_blur(0, &[1, 2, 3]).is_empty());
     assert_eq!(box_blur(3, &[0, 90, 0]), vec![45, 30, 45]);
+    let mut seed = 7;
+    for (w, h) in [(1, 1), (1, 5), (5, 1), (2, 2), (7, 5), (16, 9)] {
+        let grey: Vec<u8> = (0..w * h).map(|_| (lcg(&mut seed) * 256.0) as u8).collect();
+        assert_eq!(box_blur(w, &grey), naive_blur(w, h, &grey), "{w} x {h}");
+    }
+    // A trailing partial row is left out, never read past.
+    assert_eq!(box_blur(3, &[3, 3, 3, 9]).len(), 3);
     assert_eq!(otsu_threshold(&[]), 128);
     assert_eq!(otsu_threshold(&[7; 10]), 128);
     let t = otsu_threshold(&[10, 12, 11, 240, 245, 250]);
     assert!((12..240).contains(&t), "{t}");
-    assert!(scan_qr_binarized(5, 5, &[0; 7]).is_empty());
-    assert!(scan_qr_binarized(usize::MAX, 2, &[]).is_empty());
+    assert!(scan_qr_binarized(5, 5, vec![0; 7]).is_empty());
+    assert!(scan_qr_binarized(usize::MAX, 2, Vec::new()).is_empty());
+    assert!(scan_qr_from_rgba(usize::MAX, usize::MAX, &[0; 16]).is_empty());
+    let q = QrCodeInfo { content: "x".into(), bounds: [10, 20, 30, 40], corners: [[10, 20], [30, 20], [30, 40], [10, 40]] };
+    assert_eq!(rescaled(q.clone(), [200, 400], [100, 200]).bounds, [5, 10, 15, 20]);
+    assert_eq!(rescaled(q, [0, 0], [100, 200]).bounds, [100, 200, 100, 200]);
 }

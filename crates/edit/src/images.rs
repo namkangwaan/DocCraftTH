@@ -279,6 +279,16 @@ impl ImageState {
     }
 }
 
+/// Whether page `page` (0-based) may draw a raster image: its content paints an XObject (`Do`:
+/// an image, or Form artwork that may hold one) or an inline image (`BI`). Only the page's own
+/// content is read, without resolving resources or drawing anything, so a page of nothing but
+/// text and paths answers `false` cheaply.
+pub fn may_draw_images(doc: &Document, page: usize) -> Result<bool, EditError> {
+    let p = page_of(doc, page)?;
+    let pieces = joined(&content_streams(doc, &p.dict)?);
+    Ok(pieces.parse().ops.iter().any(|op| op.is("Do") || op.is("BI")))
+}
+
 /// The images and Form artwork page `page` (0-based) draws, in drawing order.
 /// Forms stay intact: no traversal or rewriting of their internal objects is needed.
 pub fn page_images(doc: &Document, page: usize) -> Result<Vec<PageImage>, EditError> {

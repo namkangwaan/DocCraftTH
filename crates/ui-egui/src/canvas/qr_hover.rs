@@ -5,11 +5,13 @@
 //! state: an edit or a change to what the page shows (layers, hidden comments) makes every cached
 //! page stale. Scrolling past pages, or passing over one on the way elsewhere, scans nothing.
 //! Natively the scan (`pdfcraft_engine::qr::scan_page_qr_regions`: a 150 DPI page render and a
-//! QR search, then a binarized pass at up to 300 DPI within a 12-megapixel cap) runs on a worker
-//! thread and the frame that asks gets nothing until it is done; the worker wakes the UI when it
-//! finishes. The web build has no threads, so there the scan runs on the UI thread: one page,
-//! bounded by that cap, after the pointer has stopped on it — a one-off pause for the web app
-//! (about a quarter of a second for a scanned A4 page natively).
+//! QR search, then, only on a page that draws an image, a binarized pass at up to 300 DPI within
+//! a 9-megapixel cap) runs on a worker thread and the frame that asks gets nothing until it is
+//! done; the worker wakes the UI when it finishes. The web build has no threads, so there the
+//! scan runs on the UI thread: one page, bounded by that cap, after the pointer has stopped on
+//! it — a one-off pause for the web app. Measured natively (release build) on a scanned A4 page:
+//! about 0.08 s for the first pass, 0.26 s for both; the web build was not measured and is
+//! expected to be slower.
 
 use std::collections::HashMap;
 use std::sync::Arc;

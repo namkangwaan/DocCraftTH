@@ -16,7 +16,8 @@ pub struct QrCodeInfo {
 
 /// Detect and decode all QR codes present in a raw premultiplied RGBA8 pixel buffer.
 pub fn scan_qr_from_rgba(width: usize, height: usize, rgba_bytes: &[u8]) -> Vec<QrCodeInfo> {
-    if width == 0 || height == 0 || rgba_bytes.len() < width * height * 4 {
+    let too_short = width.checked_mul(height).and_then(|n| n.checked_mul(4)).is_none_or(|n| rgba_bytes.len() < n);
+    if width == 0 || height == 0 || too_short {
         return Vec::new();
     }
 
@@ -65,15 +66,10 @@ fn scan_qr_from_grey(width: usize, height: usize, grey: &[u8]) -> Vec<QrCodeInfo
     results
 }
 
-/// Scan QR codes on a given page of a document.
+/// Scan QR codes on a given page of a document, as [`scan_page_qr_regions`] does (both passes),
+/// with bounds in the pixels of the page rendered at 150 DPI.
 pub fn scan_page_qr(bytes: std::sync::Arc<Vec<u8>>, config: pdfcraft_render::RenderConfig, page: usize) -> Result<Vec<QrCodeInfo>, String> {
-    let mut renderer = PageRenderer::new(bytes, config);
-    // Render at 150 DPI for sharp QR code detection
-    let r = renderer.render(RenderRequest { page, scale: QR_SCAN_SCALE, ..Default::default() });
-    if let Some(err) = r.error {
-        return Err(err);
-    }
-    Ok(scan_qr_from_rgba(r.width as usize, r.height as usize, &r.rgba))
+    scan_page(bytes, config, page).map(|(found, _)| found)
 }
 
 /// A decoded QR code with its position on the page in user space.
@@ -85,7 +81,7 @@ pub struct QrRegion {
     pub rect_user: [f64; 4],
 }
 
-/// Render scale of the first scan pass (and of [`scan_page_qr`]): 150 DPI.
+/// Render scale of the first scan pass: 150 DPI.
 const QR_SCAN_SCALE: f32 = 150.0 / 72.0;
 
 /// Smallest side, in user-space units, of a mapped region (keeps `x0 < x1` and `y0 < y1`).
@@ -155,9 +151,11 @@ pub fn pixel_bounds_to_user(bounds: [u32; 4], px_size: [u32; 2], crop: [f32; 4],
 const QR_FINE_SCALE: f64 = 300.0 / 72.0;
 
 /// Most pixels the second pass renders. A larger page is rendered at a lower scale; an A4 or US
-/// Letter page fits at 300 DPI (about 8.7 million pixels). At the cap the pass holds the RGBA
-/// render (4 bytes a pixel), two greyscale copies and the decoder's own copy: about 84 MB.
-const QR_FINE_MAX_PIXELS: f64 = 12.0e6;
+/// Letter page fits at 300 DPI (about 8.7 and 8.4 million pixels). At the cap the pass briefly
+/// holds the RGBA render (4 bytes a pixel) and its greyscale copy (1 byte), about 45 MB; the
+/// render is dropped before the blur, which then holds two greyscale images (about 18 MB), and
+/// decoding holds the thresholded image and the decoder's copy (about 18 MB).
+const QR_FINE_MAX_PIXELS: f64 = 9.0e6;
 
 /// The second pass's render scale for a page shown `width` × `height` points: 300 DPI, or less
 /// to stay within [`QR_FINE_MAX_PIXELS`]. `None` when that is no finer than the first pass, or
@@ -171,25 +169,35 @@ fn fine_scale(width: f32, height: f32) -> Option<f32> {
     (scale.is_finite() && scale > f64::from(QR_SCAN_SCALE)).then_some(scale as f32)
 }
 
-/// A 3 × 3 box blur of a greyscale image `width` pixels wide (edges average what is there).
+/// The sums of each pixel of `row` with its left and right neighbours (those that exist).
+fn row_sums(row: &[u8]) -> Vec<u16> {
+    (0..row.len())
+        .map(|x| x.checked_sub(1).and_then(|i| row.get(i)).into_iter().chain(row.get(x)).chain(row.get(x + 1)).map(|&v| u16::from(v)).sum())
+        .collect()
+}
+
+/// A 3 × 3 box blur of a greyscale image `width` pixels wide (edges average what is there):
+/// sums along each row, then down the columns of three rows of those sums.
 fn box_blur(width: usize, grey: &[u8]) -> Vec<u8> {
     if width == 0 {
         return Vec::new();
     }
     let rows: Vec<&[u8]> = grey.chunks_exact(width).collect();
+    let across = |x: usize| 1 + u32::from(x > 0) + u32::from(x + 1 < width);
     let mut out = Vec::with_capacity(rows.len().saturating_mul(width));
-    for (y, row) in rows.iter().enumerate() {
-        let near = [y.checked_sub(1).and_then(|i| rows.get(i)), Some(row), rows.get(y.saturating_add(1))];
-        for x in 0..width {
-            let (mut sum, mut n) = (0u32, 0u32);
-            for r in near.into_iter().flatten() {
-                for v in (x.saturating_sub(1)..=x.saturating_add(1)).filter_map(|xx| r.get(xx)) {
-                    sum += u32::from(*v);
-                    n += 1;
-                }
+    let (mut above, mut here): (Option<Vec<u16>>, Option<Vec<u16>>) = (None, rows.first().map(|r| row_sums(r)));
+    for y in 0..rows.len() {
+        let below = rows.get(y + 1).map(|r| row_sums(r));
+        if let Some(sums) = &here {
+            let down = 1 + u32::from(above.is_some()) + u32::from(below.is_some());
+            let near = |line: &Option<Vec<u16>>, x: usize| line.as_ref().and_then(|l| l.get(x)).map_or(0, |&v| u32::from(v));
+            for (x, &s) in sums.iter().enumerate() {
+                let sum = u32::from(s) + near(&above, x) + near(&below, x);
+                out.push(u8::try_from(sum / (down * across(x))).unwrap_or(u8::MAX));
             }
-            out.push(u8::try_from(sum / n.max(1)).unwrap_or(u8::MAX));
         }
+        above = here;
+        here = below;
     }
     out
 }
@@ -226,60 +234,111 @@ fn otsu_threshold(grey: &[u8]) -> u8 {
     threshold
 }
 
-/// The second pass over an RGBA render: blurred, then split into black and white at the
-/// page's Otsu level. On scanned pages, noise and uneven ink make the decoder miss a QR code's
-/// finder patterns; this pass finds many of those.
-fn scan_qr_binarized(width: usize, height: usize, rgba: &[u8]) -> Vec<QrCodeInfo> {
-    let mut grey = box_blur(width, &grey_of(width, height, rgba));
-    let threshold = otsu_threshold(&grey);
-    grey.iter_mut().for_each(|v| *v = if *v > threshold { u8::MAX } else { 0 });
-    scan_qr_from_grey(width, height, &grey)
+/// The second pass over a greyscale render: blurred, then split into black and white at the
+/// page's Otsu level. On scanned pages the decoder misses some QR codes' finder patterns in the
+/// render as it is (seen on a real 150 DPI scan); this pass finds many of those.
+///
+/// Known limit: one Otsu level for the whole page can split badly where a page is mostly a large
+/// photograph or a dark background; then this pass finds less, but the first pass's results are
+/// kept whatever it finds, so nothing is lost.
+fn scan_qr_binarized(width: usize, height: usize, grey: Vec<u8>) -> Vec<QrCodeInfo> {
+    let mut blurred = box_blur(width, &grey);
+    drop(grey);
+    let threshold = otsu_threshold(&blurred);
+    blurred.iter_mut().for_each(|v| *v = if *v > threshold { u8::MAX } else { 0 });
+    scan_qr_from_grey(width, height, &blurred)
 }
 
-/// Whether two user-space rectangles are the same QR code found twice: either's centre lies in
-/// the other.
-fn same_spot(a: [f64; 4], b: [f64; 4]) -> bool {
-    let inside = |r: [f64; 4], p: (f64, f64)| r[0] <= p.0 && p.0 <= r[2] && r[1] <= p.1 && p.1 <= r[3];
-    let centre = |r: [f64; 4]| ((r[0] + r[2]) / 2.0, (r[1] + r[3]) / 2.0);
+/// Whether two pixel boxes are the same QR code found twice: either's centre lies in the other.
+fn same_spot(a: [u32; 4], b: [u32; 4]) -> bool {
+    let inside = |r: [u32; 4], p: (f64, f64)| f64::from(r[0]) <= p.0 && p.0 <= f64::from(r[2]) && f64::from(r[1]) <= p.1 && p.1 <= f64::from(r[3]);
+    let centre = |r: [u32; 4]| ((f64::from(r[0]) + f64::from(r[2])) / 2.0, (f64::from(r[1]) + f64::from(r[3])) / 2.0);
     inside(a, centre(b)) || inside(b, centre(a))
+}
+
+/// `q`, found in a render `from` pixels in size, in the pixels of a render of the same page
+/// `to` pixels in size.
+fn rescaled(q: QrCodeInfo, from: [u32; 2], to: [u32; 2]) -> QrCodeInfo {
+    let ([fw, fh], [tw, th]) = (from, to);
+    let axis = |v: u32, f: u32, t: u32| (f64::from(v) * f64::from(t) / f64::from(f.max(1))).round().clamp(0.0, f64::from(t)) as u32;
+    let [x0, y0, x1, y1] = q.bounds;
+    QrCodeInfo {
+        bounds: [axis(x0, fw, tw), axis(y0, fh, th), axis(x1, fw, tw), axis(y1, fh, th)],
+        corners: q.corners.map(|[x, y]| [axis(x, fw, tw), axis(y, fh, th)]),
+        content: q.content,
+    }
+}
+
+/// Whether page `page` may draw a raster image (see `pdfcraft_edit::may_draw_images`); `true`
+/// when that can't be read, so a page is never wrongly left out of the second pass.
+fn page_may_draw_images(bytes: std::sync::Arc<Vec<u8>>, password: Option<&str>, page: usize) -> bool {
+    pdfcraft_cos::Document::open_with_password(bytes, password).ok().and_then(|doc| pdfcraft_edit::may_draw_images(&doc, page).ok()).unwrap_or(true)
+}
+
+/// Both scan passes over one page: the QR codes found, with bounds in the pixels of the page
+/// rendered at 150 DPI, and that render's size.
+///
+/// 1. The page at 150 DPI as rendered.
+/// 2. Only on a page that draws an image or an XObject (a scan; a page of text and paths alone
+///    gains nothing from it): the page at 300 DPI (fewer pixels on a large page, see
+///    [`QR_FINE_MAX_PIXELS`]), blurred and binarized. A code it finds where the first pass
+///    already found one is dropped, so every first-pass result is kept as it was; a failed
+///    render only skips this pass.
+///
+/// Both render in the document's own colours, without reading colours or installed fonts.
+/// Measured natively (release build) on a scanned A4 page: about 0.08 s for the first pass and
+/// 0.26 s for both. Not measured in the web build, where it runs on the UI thread; expect more.
+fn scan_page(bytes: std::sync::Arc<Vec<u8>>, config: pdfcraft_render::RenderConfig, page: usize) -> Result<(Vec<QrCodeInfo>, [u32; 2]), String> {
+    let config = pdfcraft_render::RenderConfig {
+        reading_colors: pdfcraft_render::ReadingColors::default(),
+        system_fonts: false,
+        transparent: false,
+        ..config
+    };
+    let password = config.password.clone();
+    let mut renderer = PageRenderer::new(bytes.clone(), config);
+    let r = renderer.render(RenderRequest { page, scale: QR_SCAN_SCALE, ..Default::default() });
+    if let Some(err) = r.error {
+        return Err(err);
+    }
+    let size = [r.width, r.height];
+    let mut found = scan_qr_from_rgba(r.width as usize, r.height as usize, &r.rgba);
+    drop(r);
+    let points = |px: u32| px as f32 / QR_SCAN_SCALE;
+    if let Some(scale) = fine_scale(points(size[0]), points(size[1]))
+        && page_may_draw_images(bytes, password.as_deref(), page)
+    {
+        let fine = renderer.render(RenderRequest { page, scale, ..Default::default() });
+        if fine.error.is_none() {
+            let fine_size = [fine.width, fine.height];
+            let grey = grey_of(fine.width as usize, fine.height as usize, &fine.rgba);
+            drop(fine);
+            for q in scan_qr_binarized(fine_size[0] as usize, fine_size[1] as usize, grey) {
+                let q = rescaled(q, fine_size, size);
+                if !found.iter().any(|f| same_spot(f.bounds, q.bounds)) {
+                    found.push(q);
+                }
+            }
+        }
+    }
+    Ok((found, size))
 }
 
 /// Scan a page for QR codes and return each with its user-space rectangle. `info` is the page's
 /// [`pdfcraft_render::PageInfo`] (crop box and `/Rotate`); the rectangles are in unrotated user
-/// space, ready for the same view transform as any other user-space rectangle.
-///
-/// Two passes: the page at 150 DPI as rendered, then at 300 DPI (fewer pixels on a large page,
-/// see [`QR_FINE_MAX_PIXELS`]) blurred and binarized, which finds QR codes on scanned pages the
-/// first pass misses. A code the second pass finds where the first already found one is dropped,
-/// so every first-pass result is kept as it was. A failed second render only skips that pass.
+/// space, ready for the same view transform as any other user-space rectangle. Two passes, as
+/// `scan_page` describes.
 pub fn scan_page_qr_regions(
     bytes: std::sync::Arc<Vec<u8>>,
     config: pdfcraft_render::RenderConfig,
     page: usize,
     info: &pdfcraft_render::PageInfo,
 ) -> Result<Vec<QrRegion>, String> {
-    let mut renderer = PageRenderer::new(bytes, config);
-    let r = renderer.render(RenderRequest { page, scale: QR_SCAN_SCALE, ..Default::default() });
-    if let Some(err) = r.error {
-        return Err(err);
-    }
-    let to_user =
-        |q: QrCodeInfo, px: [u32; 2]| QrRegion { rect_user: pixel_bounds_to_user(q.bounds, px, info.crop, info.rotation), content: q.content };
-    let mut regions: Vec<QrRegion> =
-        scan_qr_from_rgba(r.width as usize, r.height as usize, &r.rgba).into_iter().map(|q| to_user(q, [r.width, r.height])).collect();
-    drop(r);
-    if let Some(scale) = fine_scale(info.width, info.height) {
-        let fine = renderer.render(RenderRequest { page, scale, ..Default::default() });
-        if fine.error.is_none() {
-            for q in scan_qr_binarized(fine.width as usize, fine.height as usize, &fine.rgba) {
-                let found = to_user(q, [fine.width, fine.height]);
-                if !regions.iter().any(|r| same_spot(r.rect_user, found.rect_user)) {
-                    regions.push(found);
-                }
-            }
-        }
-    }
-    Ok(regions)
+    let (found, size) = scan_page(bytes, config, page)?;
+    Ok(found
+        .into_iter()
+        .map(|q| QrRegion { rect_user: pixel_bounds_to_user(q.bounds, size, info.crop, info.rotation), content: q.content })
+        .collect())
 }
 
 /// Keep at most `max_chars` characters of `text`, adding `…` when it was cut.
