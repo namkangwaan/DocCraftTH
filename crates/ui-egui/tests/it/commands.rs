@@ -100,6 +100,26 @@ fn every_registered_command_is_implemented() {
         if spec.id == "edit.redo" {
             app.undo();
         }
+        if spec.id == "prepress.marks.remove" {
+            use pdfcraft_engine::{Edit, PrinterMarks};
+            app.apply_edit(Edit::AddPrinterMarks { pages: vec![0], settings: PrinterMarks::default(), replace: false });
+        }
+        // Copying comments needs a selected comment; pasting needs copied ones.
+        if matches!(spec.id, "comment.copy" | "comment.paste") {
+            let shape = pdfcraft_engine::Shape::Rectangle { rect: [10.0, 10.0, 50.0, 50.0] };
+            let style = pdfcraft_engine::Style::default_for(&shape);
+            assert!(app.apply_edit(pdfcraft_engine::Edit::AddAnnotation(pdfcraft_engine::NewAnnotation {
+                page: 0,
+                shape,
+                style,
+                contents: String::new(),
+                author: String::new(),
+            })));
+            app.views[0].comments.select_only((0, 0));
+            if spec.id == "comment.paste" {
+                assert!(app.copy_selected_comments(0));
+            }
+        }
         if spec.id.starts_with("edit.") && (spec.id.ends_with(".update") || spec.id.ends_with(".remove")) {
             use pdfcraft_engine::{Background, Edit, HeaderFooter, Watermark};
             let mut hf = HeaderFooter::default();
@@ -411,6 +431,23 @@ fn the_shortcuts_dialog_lists_the_real_bindings() {
     h.get_by_label("⇧⌘S");
     h.get_by_label("⌘1");
     h.get_by_label("Zoom in / out (also pinch or ⌘-scroll)");
+}
+
+#[test]
+fn the_user_guide_opens_from_the_help_menu_and_covers_the_main_tools() {
+    let mut h = harness();
+    assert!(h.state_mut().execute("help.user_guide"));
+    h.run_steps(3);
+    assert_eq!(h.state_mut().dialog, Some(pdfcraft_ui_egui::Dialog::UserGuide));
+    h.get_by_label("User guide");
+    h.get_by_label("Getting started");
+    h.get_by_label("Scanned documents");
+    // The guide names the tools as the interface does.
+    assert!(h.query_all_by_label_contains("Scan & OCR").count() > 0);
+    assert!(h.query_all_by_label_contains("Prepare a form").count() > 0);
+    // It is reachable from the Help menu, ahead of the shortcuts.
+    let help: Vec<_> = pdfcraft_engine::commands::COMMANDS.iter().filter(|c| c.menu == Some("Help")).map(|c| c.id).collect();
+    assert!(help.contains(&"help.user_guide"), "{help:?}");
 }
 
 #[test]
