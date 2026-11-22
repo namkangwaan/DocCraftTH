@@ -269,3 +269,94 @@ fn vector_qr_on_a_turned_page_is_found_in_user_space() {
     assert_eq!(regions[0].content, "QR-ONE");
     assert_box(regions[0].rect_user, left, top);
 }
+
+/// A deterministic pseudo-random sequence in 0..1 (a linear congruential generator).
+fn lcg(seed: &mut u64) -> f64 {
+    *seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+    (*seed >> 11) as f64 / (1u64 << 53) as f64
+}
+
+/// A greyscale scan of `payload`'s QR code: `px` pixels a module, a 4-module quiet zone, and
+/// noise: every pixel's grey moves by up to ±`jitter` levels from a dark 30 or a light 225 (a
+/// scan's ink and paper, not pure black and white).
+fn noisy_scan(payload: &str, px: usize, jitter: f64, seed: u64) -> (usize, Vec<u8>) {
+    let side = (SIZE + 8) * px;
+    let modules = encode(payload.as_bytes());
+    let mut seed = seed;
+    let mut grey = Vec::with_capacity(side * side);
+    for y in 0..side {
+        for x in 0..side {
+            let (row, col) = ((y / px).wrapping_sub(4), (x / px).wrapping_sub(4));
+            let dark = modules.get(row).and_then(|r| r.get(col)).copied().unwrap_or(false);
+            let base = if dark { 30.0 } else { 225.0 };
+            grey.push((base + (lcg(&mut seed) * 2.0 - 1.0) * jitter).clamp(0.0, 255.0) as u8);
+        }
+    }
+    (side, grey)
+}
+
+/// A one-page US Letter PDF showing a square greyscale image `side` pixels wide, drawn at 150 DPI
+/// with its top-left corner at (`left`, `top`).
+fn image_page_pdf(side: usize, grey: &[u8], left: f64, top: f64) -> std::sync::Arc<Vec<u8>> {
+    let pt = side as f64 * 72.0 / 150.0;
+    let content = format!("q {pt} 0 0 {pt} {left} {} cm /Im0 Do Q\n", top - pt);
+    let bytes = pdfcraft_testkit::Pdf::new()
+        .obj("<< /Type /Catalog /Pages 2 0 R >>")
+        .obj("<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
+        .obj("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>")
+        .stream("", content)
+        .stream(&format!("/Type /XObject /Subtype /Image /Width {side} /Height {side} /ColorSpace /DeviceGray /BitsPerComponent 8"), grey)
+        .build();
+    std::sync::Arc::new(bytes)
+}
+
+/// A scanned QR code (an embedded greyscale image at 150 DPI, 6 pixels a module, ink and paper
+/// grey and noisy) that the plain 150 DPI pass misses is found by the binarized second pass,
+/// where it was drawn.
+#[test]
+fn scanned_qr_the_plain_pass_misses_is_found() {
+    let (left, top) = (100.0, 700.0);
+    let (side, grey) = noisy_scan("QR-ONE", 6, 40.0, 1);
+    let bytes = image_page_pdf(side, &grey, left, top);
+    // The first pass alone, as the scan was before the second pass: nothing.
+    let mut renderer = PageRenderer::new(bytes.clone(), pdfcraft_render::RenderConfig::default());
+    let r = renderer.render(RenderRequest { page: 0, scale: QR_SCAN_SCALE, ..Default::default() });
+    assert!(scan_qr_from_rgba(r.width as usize, r.height as usize, &r.rgba).is_empty(), "the plain pass finds this one: the test proves nothing");
+    let info = pdfcraft_render::PageInfo { width: 612.0, height: 792.0, label: String::new(), crop: [0.0, 0.0, 612.0, 792.0], rotation: 0 };
+    let regions = scan_page_qr_regions(bytes, pdfcraft_render::RenderConfig::default(), 0, &info).expect("page renders");
+    assert_eq!(regions.iter().map(|r| r.content.as_str()).collect::<Vec<_>>(), vec!["QR-ONE"]);
+    // The symbol (without its quiet zone) spans 21 modules of 6 pixels at 150 DPI.
+    let module = 6.0 * 72.0 / 150.0;
+    let (sx, sy) = (left + 4.0 * module, top - 4.0 * module);
+    let want = [sx, sy - SIZE as f64 * module, sx + SIZE as f64 * module, sy];
+    let tolerance = (1.5 * module).max(2.0);
+    assert!(regions[0].rect_user.iter().zip(want).all(|(g, w)| (g - w).abs() <= tolerance), "got {:?}, drawn {want:?}", regions[0].rect_user);
+}
+
+#[test]
+fn second_pass_scale_is_capped_and_total() {
+    // A4 and Letter scan at 300 DPI.
+    assert_eq!(fine_scale(612.0, 792.0), Some((300.0f64 / 72.0) as f32));
+    // A poster is scanned at fewer than 300 DPI, within the pixel cap.
+    let s = fine_scale(1200.0, 1600.0).expect("finer than 150 DPI");
+    assert!(s < 300.0 / 72.0 && f64::from(s) * f64::from(s) * 1.92e6 <= QR_FINE_MAX_PIXELS * 1.0001, "{s}");
+    // So big that the cap is at or below 150 DPI: no second pass. Nonsense sizes: none.
+    assert_eq!(fine_scale(14400.0, 14400.0), None);
+    for (w, h) in [(0.0, 792.0), (f32::NAN, 792.0), (f32::INFINITY, 1.0), (-612.0, 792.0)] {
+        assert!(fine_scale(w, h).is_none_or(|s| s.is_finite() && s > 0.0), "{w} x {h}");
+    }
+    assert_eq!(fine_scale(0.0, 792.0), None);
+    assert_eq!(fine_scale(f32::NAN, 792.0), None);
+}
+
+#[test]
+fn binarize_helpers_take_any_buffer() {
+    assert!(box_blur(0, &[1, 2, 3]).is_empty());
+    assert_eq!(box_blur(3, &[0, 90, 0]), vec![45, 30, 45]);
+    assert_eq!(otsu_threshold(&[]), 128);
+    assert_eq!(otsu_threshold(&[7; 10]), 128);
+    let t = otsu_threshold(&[10, 12, 11, 240, 245, 250]);
+    assert!((12..240).contains(&t), "{t}");
+    assert!(scan_qr_binarized(5, 5, &[0; 7]).is_empty());
+    assert!(scan_qr_binarized(usize::MAX, 2, &[]).is_empty());
+}
