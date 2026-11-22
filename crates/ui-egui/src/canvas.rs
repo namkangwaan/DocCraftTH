@@ -31,6 +31,7 @@ pub(super) mod page_cursor;
 mod page_input;
 pub(super) mod page_pointer;
 pub(super) mod page_router;
+pub(crate) mod qr_fx;
 pub(crate) mod qr_hover;
 pub mod scroll_speed;
 mod selection;
@@ -619,6 +620,8 @@ pub struct DocView {
     pub(crate) text_background: crate::edit_text_ui::TextBackground,
     /// QR codes found on each page, for the hover frame and the context menu.
     pub(crate) qr_cache: qr_hover::QrCache,
+    /// The sweep that plays over a QR code when it is right-clicked.
+    pub(crate) qr_fx: qr_fx::ScanFx,
     pub(crate) move_background: crate::content_ui::MoveBackground,
     /// Edit text & images: the images per page (by document generation), and the selected one.
     pub(crate) edit_images: HashMap<usize, (u64, Vec<pdfcraft_engine::PageImage>)>,
@@ -997,6 +1000,7 @@ impl DocView {
             pending_text_open: None,
             text_background: Default::default(),
             qr_cache: Default::default(),
+            qr_fx: Default::default(),
             move_background: Default::default(),
             edit_images: HashMap::new(),
             objects: Default::default(),
@@ -1557,7 +1561,17 @@ fn draw_page(ui: &mut egui::Ui, view: &mut DocView, frame: &mut PageFrame<'_>, i
             let [cr, cg, cb] = prefs.qr_highlight_color;
             qr_hover::paint_frame(painter, xf.user_rect_f64(info, i, rect), Color32::from_rgb(cr, cg, cb));
             view.cursor.claim_with_tip(crate::page_cursor::Layer::Link, egui::CursorIcon::PointingHand, Some(tip));
+            // A right-click on the code: the scan sweep plays over it while the menu opens.
+            if frame.resp.secondary_clicked() {
+                view.qr_fx.start(i, rect, ui.ctx().input(|input| input.time));
+            }
         }
+    }
+    // The scan sweep, over the code that was right-clicked (and only that one).
+    if let Some((rect, progress)) = view.qr_fx.step(i, ui.ctx().input(|input| input.time)) {
+        let [cr, cg, cb] = prefs.qr_highlight_color;
+        qr_fx::paint_sweep(painter, xf.user_rect_f64(info, i, rect), progress, Color32::from_rgb(cr, cg, cb));
+        ui.ctx().request_repaint();
     }
 
     let slot = PageSlot { i, r, xf };
@@ -1993,7 +2007,11 @@ fn draw_pages(
 
                 match menu {
                     qr_hover::QrMenu::Link(url) => {
-                        if ui.button(egui::RichText::new(format!("🌐 {}", tl!("Open in Browser"))).color(ui.visuals().hyperlink_color)).clicked() {
+                        let open_label = match pdfcraft_engine::links::display_host(&url) {
+                            Some(host) => format!("🌐 {} ({})", tl!("Open in Browser"), host.ascii),
+                            None => format!("🌐 {}", tl!("Open in Browser")),
+                        };
+                        if ui.button(egui::RichText::new(open_label).color(ui.visuals().hyperlink_color)).clicked() {
                             // A document's address: the user is asked first, as for a link.
                             page_action = Some(PageMenuAction::OpenQrUrl(url.clone()));
                             ui.close();

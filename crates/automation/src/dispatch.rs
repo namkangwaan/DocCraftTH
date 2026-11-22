@@ -396,6 +396,32 @@ impl Automation {
                     .collect();
                 json!({ "page": page + 1, "count": list.len(), "images": list })
             }
+            "page_qr_codes" => {
+                let page = self.page(&a)?;
+                let doc = self.doc(&a)?;
+                let info = &doc.info.pages[page];
+                let mut config = doc.render_config().clone();
+                config.reading_colors = pdfcraft_render::ReadingColors::default();
+                config.transparent = false;
+                config.system_fonts = false;
+                let regions = pdfcraft_engine::qr::scan_page_qr_regions(doc.display.clone(), config, page, info).map_err(failed)?;
+                let r = |x: f32| (x as f64 * 100.0).round() / 100.0;
+                let codes: Vec<Value> = regions
+                    .into_iter()
+                    .map(|q| {
+                        let (u, v) = (
+                            info.user_to_view(q.rect_user[0] as f32, q.rect_user[1] as f32),
+                            info.user_to_view(q.rect_user[2] as f32, q.rect_user[3] as f32),
+                        );
+                        let rect = [r(u[0].min(v[0])), r(u[1].min(v[1])), r(u[0].max(v[0])), r(u[1].max(v[1]))];
+                        let url = pdfcraft_engine::qr::is_url(&q.content)
+                            .then(|| pdfcraft_engine::links::document_url(&pdfcraft_engine::qr::normalize_url(&q.content)).ok())
+                            .flatten();
+                        json!({ "content": q.content, "rect": rect, "url": url })
+                    })
+                    .collect();
+                json!({ "page": page + 1, "count": codes.len(), "codes": codes })
+            }
             "image_edit" | "image_save" => {
                 let page = self.page(&a)?;
                 let n = self.doc(&a)?.page_images(page).len();
