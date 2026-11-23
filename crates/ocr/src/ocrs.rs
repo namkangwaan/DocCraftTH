@@ -177,6 +177,9 @@ enum Engine {
 /// A loaded recogniser. Loading takes a moment; keep one and reuse it.
 pub struct Ocr {
     engine: Engine,
+    /// The detection model's fixed input size, (width, height) pixels, when it declares one: a
+    /// page much larger than that is detected in tiles. Only the English (ocrs) reader tiles.
+    pub(crate) detector_input: Option<(u32, u32)>,
 }
 
 impl Ocr {
@@ -192,7 +195,7 @@ impl Ocr {
             // PaddleOCR's `use_space_char: true` appends the space class after the dictionary entries.
             dict.push(' ');
             let fixed_width = parse_model_meta_width(&models.recognition);
-            Ok(Ocr { engine: Engine::Ctc { detector, model, dict, fixed_width } })
+            Ok(Ocr { engine: Engine::Ctc { detector, model, dict, fixed_width }, detector_input: None })
         } else {
             Self::with_models(load(&models.detection)?, load(&models.recognition)?)
         }
@@ -229,10 +232,11 @@ impl Ocr {
         // As in `load`: one class per line, then the space class PaddleOCR appends.
         let mut dict: Vec<char> = raw.lines().filter_map(|line| line.chars().next()).collect();
         dict.push(' ');
-        Ok(Ocr { engine: Engine::Ctc { detector, model, dict, fixed_width: None } })
+        Ok(Ocr { engine: Engine::Ctc { detector, model, dict, fixed_width: None }, detector_input: None })
     }
 
     fn with_models(detection: rten::Model, recognition: rten::Model) -> Result<Ocr, OcrError> {
+        let detector_input = detector_input(&detection);
         let params = ocrs::OcrEngineParams {
             detection_model: Some(detection),
             recognition_model: Some(recognition),
@@ -240,7 +244,7 @@ impl Ocr {
             ..Default::default()
         };
         let engine = ocrs::OcrEngine::new(params).map_err(|e| OcrError::Load("ocr engine".into(), e.to_string()))?;
-        Ok(Ocr { engine: Engine::Ocrs(engine) })
+        Ok(Ocr { engine: Engine::Ocrs(engine), detector_input })
     }
 
     /// Load the models found by [`Models::find`].
@@ -274,7 +278,7 @@ impl Ocr {
             Engine::Ocrs(engine) => {
                 let source = ocrs::ImageSource::from_bytes(&rgb, (width, height)).map_err(|e| err(&e))?;
                 let input = engine.prepare_input(source).map_err(|e| err(&e))?;
-                let found = engine.detect_words(&input).map_err(|e| err(&e))?;
+                let found = self.detect_words(engine, &rgb, width, height, &input)?;
                 let mut lines = engine.find_text_lines(&input, &found);
                 let before: Vec<Option<RectF>> = lines.iter_mut().map(|l| pad_line(l)).collect();
                 let read = engine.recognize_text(&input, &lines).map_err(|e| err(&e))?;
@@ -312,6 +316,51 @@ impl Ocr {
             Engine::Ocrs(_) => Ok(None),
             Engine::Ctc { model, dict, fixed_width, .. } => Ok(recognize_ctc_crop(&rgb, width, height, rect, model, dict, *fixed_width)?.map(|(text, _)| text)),
         }
+    }
+
+    /// The words in a page, `rgb` (1 or 3 bytes per pixel) prepared as `page`. A page at least
+    /// twice the detector's input along an axis whose text is small once shrunk to that input
+    /// ([`crate::pitch`]) is detected in overlapping tiles ([`crate::tiles`]), each word kept by the
+    /// tile whose core holds its centre and moved back to page pixels.
+    fn detect_words(&self, engine: &ocrs::OcrEngine, rgb: &[u8], width: u32, height: u32, page: &ocrs::OcrInput) -> Result<Vec<RotatedRect>, OcrError> {
+        let err = |e: &dyn std::fmt::Display| OcrError::Recognize(e.to_string());
+        let tiles = self.detector_input.map(|input| crate::tiles::tiles(width, height, input)).unwrap_or_default();
+        let area = (width as usize).checked_mul(height as usize).filter(|&a| a > 0);
+        let channels = area.and_then(|a| rgb.len().is_multiple_of(a).then(|| rgb.len() / a)).filter(|c| matches!(c, 1 | 3));
+        let (Some(channels), Some(input), true) = (channels, self.detector_input, tiles.len() > 1) else {
+            return engine.detect_words(page).map_err(|e| err(&e));
+        };
+        // Large print reads as well whole, at a quarter of the detection time.
+        if !crate::pitch::lines(rgb, width, height, channels, input).wants_tiles() {
+            return engine.detect_words(page).map_err(|e| err(&e));
+        }
+        let mut words = Vec::new();
+        for tile in &tiles {
+            let pixels = crate::tiles::crop(rgb, width, channels, tile.crop)
+                .ok_or_else(|| OcrError::Recognize("a detection tile lies outside the page".into()))?;
+            let source = ocrs::ImageSource::from_bytes(&pixels, (tile.width(), tile.height())).map_err(|e| err(&e))?;
+            let input = engine.prepare_input(source).map_err(|e| err(&e))?;
+            let (dx, dy) = (tile.crop[0] as f32, tile.crop[1] as f32);
+            for word in engine.detect_words(&input).map_err(|e| err(&e))? {
+                let centre = word.center();
+                let (x, y) = (centre.x + dx, centre.y + dy);
+                if tile.owns(x, y) {
+                    words.push(RotatedRect::new(rten_imageproc::PointF::from_yx(y, x), word.up_axis(), word.width(), word.height()));
+                }
+            }
+        }
+        Ok(words)
+    }
+}
+
+/// The detection model's input size, (width, height) pixels, if its input is an NCHW image of a
+/// fixed size.
+fn detector_input(model: &rten::Model) -> Option<(u32, u32)> {
+    let id = *model.input_ids().first()?;
+    let shape = model.node_info(id)?.shape()?;
+    match shape.as_slice() {
+        [_, _, rten::Dimension::Fixed(h), rten::Dimension::Fixed(w)] => Some((u32::try_from(*w).ok()?, u32::try_from(*h).ok()?)),
+        _ => None,
     }
 }
 
