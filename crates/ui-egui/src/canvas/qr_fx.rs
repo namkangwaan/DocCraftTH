@@ -57,20 +57,20 @@ pub(crate) fn paint_sweep(painter: &Painter, rect: Rect, progress: f32, color: C
     let edge = (progress.clamp(0.0, 1.0) * 2.0).min((1.0 - progress.clamp(0.0, 1.0)) * 2.0).min(1.0);
     let [r, g, b, _] = color.to_srgba_unmultiplied();
     let going_down = progress < 0.5;
-    for step in 1..=6u8 {
-        // The trail is behind the line: above it going down, below it coming back.
-        let offset = f32::from(step) * 3.0 * if going_down { -1.0 } else { 1.0 };
-        let alpha = (60.0 * edge / f32::from(step)) as u8;
-        let ty = y + offset;
-        painter.line_segment(
-            [Pos2::new(rect.left(), ty), Pos2::new(rect.right(), ty)],
-            Stroke::new(2.0, Color32::from_rgba_unmultiplied(r, g, b, alpha)),
-        );
+    let (left, right) = (rect.left() - 2.0, rect.right() + 2.0);
+    // A band of light behind the line, so it shows on black squares as on white paper: the trail
+    // fades away from the line, above it going down and below it coming back.
+    let trail = (rect.height() * 0.35).clamp(10.0, 60.0);
+    for step in 0..8u8 {
+        let (from, to) = (f32::from(step) / 8.0 * trail, f32::from(step + 1) / 8.0 * trail);
+        let (a, b_) = if going_down { (y - to, y - from) } else { (y + from, y + to) };
+        let alpha = (110.0 * edge * (1.0 - f32::from(step) / 8.0)) as u8;
+        painter.rect_filled(Rect::from_min_max(Pos2::new(left, a), Pos2::new(right, b_)), 0.0, Color32::from_rgba_unmultiplied(r, g, b, alpha));
     }
-    painter.line_segment(
-        [Pos2::new(rect.left() - 2.0, y), Pos2::new(rect.right() + 2.0, y)],
-        Stroke::new(2.5, Color32::from_rgba_unmultiplied(r, g, b, (255.0 * edge) as u8)),
-    );
+    // The line itself: the colour, thick, with a white core so it stands out on either.
+    let line = [Pos2::new(left, y), Pos2::new(right, y)];
+    painter.line_segment(line, Stroke::new(5.0, Color32::from_rgba_unmultiplied(r, g, b, (255.0 * edge) as u8)));
+    painter.line_segment(line, Stroke::new(2.0, Color32::from_rgba_unmultiplied(255, 255, 255, (255.0 * edge) as u8)));
 }
 
 #[cfg(test)]
