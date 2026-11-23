@@ -189,6 +189,7 @@ impl PdfCraftApp {
         v["update_check_at_start"] = self.update_check_at_start.into();
         v["hotbar"] = serde_json::to_value(&self.hotbar).unwrap_or_default();
         v["comment_tool_pinned"] = serde_json::Value::Bool(self.comment_prefs.pinned);
+        v["qr_highlight_color"] = serde_json::json!(self.comment_prefs.qr_highlight_color);
         v["show_secured_notice"] = serde_json::Value::Bool(self.show_secured_notice);
         v["text_links"] = serde_json::Value::Bool(self.text_links);
         v["organize_zoom"] = serde_json::json!(self.organize_zoom);
@@ -502,6 +503,10 @@ impl PdfCraftApp {
         }
         if let Some(pinned) = v["comment_tool_pinned"].as_bool() {
             self.comment_prefs.pinned = pinned;
+        }
+        // Anything but three bytes (a channel over 255, say) keeps the colour it had.
+        if let Ok(color) = serde_json::from_value::<[u8; 3]>(v["qr_highlight_color"].clone()) {
+            self.comment_prefs.qr_highlight_color = color;
         }
     }
 

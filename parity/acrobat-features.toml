@@ -10495,3 +10495,15 @@ commands = []
 tools = []
 evidence = []
 notes = ""
+
+[[feature]]
+id = "misc.qr-scanner"
+title = "Scan and open QR codes on pages"
+area = "N"
+tier = "P2"
+milestone = "M14"
+status = "shipped"
+commands = []
+tools = ["page_qr_codes"]
+evidence = ["crates/engine/src/qr/encode_tests.rs::vector_qr_on_a_page_is_found_where_it_is_drawn", "crates/automation/tests/it/automation.rs::page_qr_codes_scans_and_reports_view_rect_and_url"]
+notes = "Hovering or right-clicking a QR code on a page highlights its bounds, previews the payload, and offers Copy or guarded Open in Browser (showing the destination host); the QR Scanner dialog lists codes across pages, and `page_qr_codes` exposes them headless."

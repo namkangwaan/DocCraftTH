@@ -34,6 +34,8 @@ pub(super) mod page_keys;
 pub(super) mod page_pointer;
 pub(super) mod page_router;
 mod presenter;
+pub(crate) mod qr_fx;
+pub(crate) mod qr_hover;
 pub mod scroll_speed;
 mod selection;
 pub(super) mod signature_drag;
@@ -699,6 +701,10 @@ pub struct DocView {
     /// It is held as the paragraph's text and box, not an index: the edit can regroup the page.
     pub(crate) pending_text_open: Option<(usize, pdfcraft_engine::BlockKey)>,
     pub(crate) text_background: crate::edit_text_ui::TextBackground,
+    /// QR codes found on each page, for the hover frame and the context menu.
+    pub(crate) qr_cache: qr_hover::QrCache,
+    /// The sweep that plays over a QR code when it is right-clicked.
+    pub(crate) qr_fx: qr_fx::ScanFx,
     pub(crate) move_background: crate::content_ui::MoveBackground,
     /// Edit text & images: the images per page (by document generation), and the selected one.
     pub(crate) edit_images: HashMap<usize, (u64, Vec<pdfcraft_engine::PageImage>)>,
@@ -929,6 +935,8 @@ pub(crate) enum PageMenuAction {
     DocProperties,
     FlattenComments,
     QrScanner,
+    /// Open a QR code's web address, after the user allows it (`request_document_url`).
+    OpenQrUrl(String),
 }
 
 pub(crate) struct PageMenuPerms {
@@ -1159,6 +1167,8 @@ impl DocView {
             applied_editor: None,
             pending_text_open: None,
             text_background: Default::default(),
+            qr_cache: Default::default(),
+            qr_fx: Default::default(),
             move_background: Default::default(),
             edit_images: HashMap::new(),
             objects: Default::default(),
@@ -1801,45 +1811,29 @@ fn draw_page(ui: &mut egui::Ui, view: &mut DocView, frame: &mut PageFrame<'_>, i
         painter.rect_stroke(r, CornerRadius::ZERO, Stroke::new(0.5, t.border.gamma_multiply(0.8)), egui::StrokeKind::Outside);
     }
 
-    // QR Code hover detection and highlight
-    if let Some(p) = pointer.filter(|p| r.contains(*p)) {
+    // The QR code under the pointer (image or vector, from the page's scan): its frame and tip.
+    if let Some(p) = pointer.filter(|p| r.contains(*p))
+        && let Some(page) = info.pages.get(i)
+    {
         let (vx, vy) = xf.screen_to_view(p);
-        let u_pt = info.pages[i].view_to_user(vx, vy);
-        let at = [u_pt[0] as f64, u_pt[1] as f64];
-        if let Some(img_idx) = doc.page_image_at(i, at) {
-            let qr_cache_id = egui::Id::unique("qr_hover_image").with((i, img_idx));
-            let qr_cached: Option<Option<String>> = ui.data(|d| d.get_temp(qr_cache_id));
-            let qr_text = match qr_cached {
-                Some(cached) => cached,
-                None => {
-                    let decoded = match doc.page_image_rgba(i, img_idx) {
-                        Ok((w, h, rgba)) => {
-                            let list = pdfcraft_engine::qr::scan_qr_from_rgba(w as usize, h as usize, &rgba);
-                            list.into_iter().next().map(|q| q.content)
-                        }
-                        Err(_) => None,
-                    };
-                    ui.data_mut(|d| d.insert_temp(qr_cache_id, decoded.clone()));
-                    decoded
-                }
-            };
-            if let Some(ref text) = qr_text {
-                let is_url = pdfcraft_engine::qr::is_url(text);
-                let preview = if text.len() > 64 { format!("{}…", &text[..61]) } else { text.clone() };
-                let tip = if is_url {
-                    format!("📷 QR Code Link: {}\n(คลิกขวาเพื่อเปิดในเบราว์เซอร์หรือคัดลอก)", preview)
-                } else {
-                    format!("📷 QR Code: {}\n(คลิกขวาเพื่อคัดลอกหรือตรวจสอบ)", preview)
-                };
-                view.cursor.claim_with_tip(crate::page_cursor::Layer::Link, egui::CursorIcon::PointingHand, Some(tip));
-                let images = cached_edit_images(view, doc, i);
-                if let Some(img) = images.get(img_idx) {
-                    let img_rect = xf.user_rect_f64(info, i, img.rect);
-                    painter.rect_stroke(img_rect.expand(2.0), CornerRadius::same(4), Stroke::new(2.5, Color32::from_rgb(0, 160, 255)), egui::StrokeKind::Outside);
-                    painter.rect_filled(img_rect.expand(2.0), CornerRadius::same(4), Color32::from_rgba_unmultiplied(0, 160, 255, 30));
-                }
+        let [ux, uy] = page.view_to_user(vx, vy);
+        let regions = view.qr_cache.regions(doc, info, i, ui.ctx());
+        let hit = qr_hover::region_at(regions, [f64::from(ux), f64::from(uy)]).map(|q| (q.rect_user, qr_hover::tip_for(&q.content)));
+        if let Some((rect, tip)) = hit {
+            let [cr, cg, cb] = prefs.qr_highlight_color;
+            qr_hover::paint_frame(painter, xf.user_rect_f64(info, i, rect), Color32::from_rgb(cr, cg, cb));
+            view.cursor.claim_with_tip(crate::page_cursor::Layer::Link, egui::CursorIcon::PointingHand, Some(tip));
+            // A right-click on the code: the scan sweep plays over it while the menu opens.
+            if frame.resp.secondary_clicked() {
+                view.qr_fx.start(i, rect, ui.ctx().input(|input| input.time));
             }
         }
+    }
+    // The scan sweep, over the code that was right-clicked (and only that one).
+    if let Some((rect, progress)) = view.qr_fx.step(i, ui.ctx().input(|input| input.time)) {
+        let [cr, cg, cb] = prefs.qr_highlight_color;
+        qr_fx::paint_sweep(painter, xf.user_rect_f64(info, i, rect), progress, Color32::from_rgb(cr, cg, cb));
+        ui.ctx().request_repaint();
     }
 
     let slot = PageSlot { i, r, xf };
@@ -2268,59 +2262,40 @@ fn draw_pages(
         if let Some((page, at)) = view.comments.context_at {
             // On a page still being read, these items appear when the answer comes.
             let hit = view.pictures.get(ui.ctx(), doc, page).and_then(|pictures| pdfcraft_engine::picture_at(pictures, at)).map(|(index, _)| *index);
-            // QR Code detection under right-click position (image or page)
-            let qr_key = egui::Id::unique("qr-under-context-menu");
-            let cached_qr = ui.data(|d| d.get_temp::<(usize, [f64; 2], Option<String>)>(qr_key)).filter(|c| c.0 == page && c.1 == at);
-            let qr_content: Option<String> = match cached_qr {
-                Some(c) => c.2,
-                None => {
-                    let mut found = None;
-                    if let Some(image) = hit
-                        && let Ok((w, h, rgba)) = doc.page_image_rgba(page, image)
-                    {
-                        let list = pdfcraft_engine::qr::scan_qr_from_rgba(w as usize, h as usize, &rgba);
-                        found = list.into_iter().next().map(|q| q.content);
-                    }
-                    if found.is_none()
-                        && let Ok(list) = pdfcraft_engine::qr::scan_page_qr(doc.display.clone(), pdfcraft_render::RenderConfig::default(), page)
-                    {
-                        found = list.into_iter().next().map(|q| q.content);
-                    }
-                    ui.data_mut(|d| d.insert_temp(qr_key, (page, at, found.clone())));
-                    found
-                }
-            };
+            // The QR code under the right-click point, from the same per-page scan the hover frame uses.
+            let qr_content = qr_hover::region_at(view.qr_cache.regions(doc, info, page, ui.ctx()), at).map(|r| r.content.clone());
             if let Some(qr_text) = qr_content {
-                let is_url = pdfcraft_engine::qr::is_url(&qr_text);
+                let menu = qr_hover::menu_for(&qr_text);
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new("📷 QR Code:").strong());
-                    if is_url {
-                        ui.label(egui::RichText::new("Link").small().color(ui.visuals().hyperlink_color));
+                    ui.label(egui::RichText::new(format!("📷 {}", tl!("QR Code:"))).strong());
+                    if matches!(menu, qr_hover::QrMenu::Link(_)) {
+                        ui.label(egui::RichText::new(tl!("Link")).small().color(ui.visuals().hyperlink_color));
                     }
                 });
-                let preview = if qr_text.len() > 64 {
-                    format!("{}…", &qr_text[..61])
-                } else {
-                    qr_text.clone()
-                };
-                ui.label(egui::RichText::new(preview).italics());
+                ui.label(egui::RichText::new(pdfcraft_engine::qr::preview_text(&qr_text, 64)).italics());
                 ui.add_space(2.0);
 
-                if is_url {
-                    let url = pdfcraft_engine::qr::normalize_url(&qr_text);
-                    if ui.button(egui::RichText::new(format!("🌐 {}", tl!("Open in Browser"))).color(ui.visuals().hyperlink_color)).clicked() {
-                        ui.ctx().open_url(egui::OpenUrl::new_tab(&url));
-                        ui.close();
+                match menu {
+                    qr_hover::QrMenu::Link(url) => {
+                        let open_label = match pdfcraft_engine::links::display_host(&url) {
+                            Some(host) => format!("🌐 {} ({})", tl!("Open in Browser"), host.ascii),
+                            None => format!("🌐 {}", tl!("Open in Browser")),
+                        };
+                        if ui.button(egui::RichText::new(open_label).color(ui.visuals().hyperlink_color)).clicked() {
+                            // A document's address: the user is asked first, as for a link.
+                            page_action = Some(PageMenuAction::OpenQrUrl(url.clone()));
+                            ui.close();
+                        }
+                        if ui.button(tl!("Copy Link")).clicked() {
+                            ui.ctx().copy_text(url);
+                            ui.close();
+                        }
                     }
-                    if ui.button(tl!("Copy Link")).clicked() {
-                        ui.ctx().copy_text(url);
-                        ui.close();
-                    }
-                } else {
-                    let copy_val = qr_text.clone();
-                    if ui.button(tl!("Copy text")).clicked() {
-                        ui.ctx().copy_text(copy_val);
-                        ui.close();
+                    qr_hover::QrMenu::Text(text) => {
+                        if ui.button(tl!("Copy text")).clicked() {
+                            ui.ctx().copy_text(text);
+                            ui.close();
+                        }
                     }
                 }
 
@@ -3987,6 +3962,9 @@ fn apply_frame_requests(app: &mut PdfCraftApp, index: usize, ui: &mut egui::Ui, 
         }
         Some(PageMenuAction::QrScanner) => {
             app.dialog = Some(crate::Dialog::QrScanner);
+        }
+        Some(PageMenuAction::OpenQrUrl(url)) => {
+            app.request_document_url(&url, crate::LinkOrigin::QrCode);
         }
         None => {}
     }

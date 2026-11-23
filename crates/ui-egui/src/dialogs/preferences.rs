@@ -690,6 +690,12 @@ fn card_appearance(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, ctx: &m
     crate::thai_fonts::preferences_section(ui, app, t);
     ui.add_space(8.0);
     reading_colours_section(ui, app, t, ctx);
+    ui.add_space(8.0);
+    ui.horizontal(|ui| {
+        let label = ctx.label_primary(ui, tl!("QR Code highlight colour"), t);
+        ui.color_edit_button_srgb(&mut app.comment_prefs.qr_highlight_color).labelled_by(label.id);
+    });
+    ctx.label_secondary(ui, tl!("Frames a QR Code on the page while the pointer is over it."), t);
 }
 
 #[derive(Clone, Copy, Default)]
