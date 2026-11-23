@@ -7,9 +7,11 @@
 //!
 //! - `ready` (to the page): the worker is listening; send the models now.
 //! - `models` (from the page): `{ detection, recognition }`, each a `Uint8Array` holding a model
-//!   file. Answered with `loaded`, or `failed` with an `error`.
-//! - `page` (from the page): `{ id, width, height, pixels }`, the RGBA pixels of a rendered page
-//!   as a `Uint8Array`. Answered with `lines` `{ id, lines }`, the recognised lines as
+//!   file, and for Thai also `thai_recognition` and `thai_dictionary` (both or neither). Answered
+//!   with `loaded`, or `failed` with an `error`.
+//! - `page` (from the page): `{ id, width, height, language, pixels }`, the RGBA pixels of a
+//!   rendered page as a `Uint8Array` and the language code to read it in (`th` for Thai, anything
+//!   else, or none, for English). Answered with `lines` `{ id, lines }`, the recognised lines as
 //!   `pdfcraft_ocr::lines_to_json` writes them, or `failed` `{ id, error }`.
 
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
@@ -42,7 +44,7 @@ mod worker {
     use pdfcraft_ocr::Ocr;
     use wasm_bindgen::{JsCast, JsValue};
 
-    /// The models are about 12 MB together.
+    /// The models are about 20 MB together with the Thai ones.
     const MAX_MODEL_BYTES: u32 = 64 << 20;
     /// The renderer keeps pages far smaller; anything larger isn't a page.
     const MAX_PIXEL_BYTES: u64 = 1 << 30;
@@ -55,18 +57,24 @@ mod worker {
         o.into()
     }
 
+    /// What the worker reads with: the English models, and the Thai ones when the page sent them.
+    pub struct Reader {
+        english: Ocr,
+        thai: Option<Ocr>,
+    }
+
     /// Answer one message from the page.
-    pub fn handle(ocr: &mut Option<Ocr>, data: &JsValue) -> JsValue {
+    pub fn handle(ocr: &mut Option<Reader>, data: &JsValue) -> JsValue {
         let get = |k: &str| js_sys::Reflect::get(data, &k.into()).unwrap_or(JsValue::UNDEFINED);
         let id = get("id");
         let reply = match get("type").as_string().as_deref() {
-            Some("models") => load(&get("detection"), &get("recognition")).map(|o| {
+            Some("models") => load(&get("detection"), &get("recognition"), &get("thai_recognition"), &get("thai_dictionary")).map(|o| {
                 *ocr = Some(o);
                 message(&[("type", "loaded".into())])
             }),
             Some("page") => match ocr.as_ref() {
                 None => Err("the text recognition models aren't loaded".into()),
-                Some(o) => recognize(o, &get("width"), &get("height"), &get("pixels"))
+                Some(o) => recognize(o, &get("language"), &get("width"), &get("height"), &get("pixels"))
                     .map(|lines| message(&[("type", "lines".into()), ("id", id.clone()), ("lines", lines.into())])),
             },
             _ => Err("unknown message".into()),
@@ -82,12 +90,24 @@ mod worker {
         Ok(a.to_vec())
     }
 
-    fn load(detection: &JsValue, recognition: &JsValue) -> Result<Ocr, String> {
+    fn load(detection: &JsValue, recognition: &JsValue, thai_recognition: &JsValue, thai_dictionary: &JsValue) -> Result<Reader, String> {
         let max = u64::from(MAX_MODEL_BYTES);
-        Ocr::from_bytes(bytes(detection, max)?, bytes(recognition, max)?).map_err(|e| e.to_string())
+        let (detection, recognition) = (bytes(detection, max)?, bytes(recognition, max)?);
+        let thai = if thai_recognition.is_undefined() && thai_dictionary.is_undefined() {
+            None
+        } else {
+            let (thai_recognition, thai_dictionary) = (bytes(thai_recognition, max)?, bytes(thai_dictionary, max)?);
+            Some(Ocr::from_bytes_thai(detection.clone(), thai_recognition, &thai_dictionary).map_err(|e| e.to_string())?)
+        };
+        let english = Ocr::from_bytes(detection, recognition).map_err(|e| e.to_string())?;
+        Ok(Reader { english, thai })
     }
 
-    fn recognize(ocr: &Ocr, width: &JsValue, height: &JsValue, pixels: &JsValue) -> Result<String, String> {
+    fn recognize(reader: &Reader, language: &JsValue, width: &JsValue, height: &JsValue, pixels: &JsValue) -> Result<String, String> {
+        let ocr = match language.as_string().as_deref() {
+            Some("th" | "tha") => reader.thai.as_ref().ok_or("the Thai text recognition model isn't loaded")?,
+            _ => &reader.english,
+        };
         let side = |v: &JsValue| v.as_f64().filter(|v| v.fract() == 0.0 && (1.0..=f64::from(u32::MAX)).contains(v)).map(|v| v as u32);
         let (Some(w), Some(h)) = (side(width), side(height)) else {
             return Err("the page size is not a positive whole number".into());

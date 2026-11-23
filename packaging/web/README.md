@@ -10,7 +10,7 @@ static site in `pdfcraft-web-<version>/`:
 | `pdfcraft-web-<hash>_bg.wasm` | The app, about 13 MB, or 5 MB with compression |
 | `pdfcraft-ocr-worker-<hash>.js`, `_bg.wasm`, `_loader.js` | The text recognition worker (about 3 MB), started only when OCR runs |
 | `_headers`, `.htaccess` | Sample header rules for Netlify/Cloudflare Pages and Apache |
-| `models/` | The text recognition (OCR) models, about 12 MB, with their licences (CC-BY-SA-4.0) |
+| `models/` | The text recognition (OCR) models, about 20 MB with the Thai ones, with their licences |
 
 There is no server-side code. Upload the folder's contents anywhere that serves static files.
 
@@ -38,10 +38,17 @@ workspace and Save target stay selected. Click the downloaded file's tab to swit
   `.js` files, and `no-cache` on `index.html`.
 - **HTTPS:** WebGPU (and the clipboard) only work in a secure context, which means `https://`
   or `http://localhost`. Over plain HTTP elsewhere, the app falls back to WebGL2.
-- **No special isolation headers:** PdfCraft doesn't use `SharedArrayBuffer`, so it doesn't
-  need `Cross-Origin-Opener-Policy` or `Cross-Origin-Embedder-Policy`. If your site already sends
-  COEP `require-corp`, also send `Cross-Origin-Resource-Policy: same-origin` (or `cross-origin`
-  when the files live on a CDN) on the app's files.
+- **Opener isolation:** send `Cross-Origin-Opener-Policy: same-origin` (the sample `_headers`
+  and `.htaccess` do; Apache needs `mod_headers` for it). Pages opened from a document's links
+  then can't reach or navigate the PdfCraft tab. The app opens links with `noopener` already;
+  the header also cuts the opener for pages on another origin opened by any other means. A page
+  on the same origin that sends the same policy keeps its opener. The header has no effect
+  inside an iframe, so the embedding bridge below is unaffected, but a page on another origin
+  that opens PdfCraft with `window.open` loses its handle to that window.
+- **No cross-origin isolation:** PdfCraft doesn't use `SharedArrayBuffer`, so it doesn't need
+  `Cross-Origin-Embedder-Policy`. If your site already sends COEP `require-corp`, also send
+  `Cross-Origin-Resource-Policy: same-origin` (or `cross-origin` when the files live on a CDN) on
+  the app's files.
 
 nginx example:
 
@@ -50,8 +57,10 @@ location /pdfcraft/ {
     types { application/wasm wasm; text/javascript js; text/html html; }
     gzip on;
     gzip_types application/wasm text/javascript text/html;
+    add_header Cross-Origin-Opener-Policy "same-origin";
     location ~* \.(wasm|js)$ { add_header Cache-Control "public, max-age=31536000, immutable"; }
-    location ~* index\.html$ { add_header Cache-Control "no-cache"; }
+    # A location with its own add_header drops the outer ones, so the page repeats COOP.
+    location ~* index\.html$ { add_header Cache-Control "no-cache"; add_header Cross-Origin-Opener-Policy "same-origin"; }
 }
 ```
 
@@ -60,9 +69,11 @@ Local test: `python3 -m http.server 8765` inside the folder, then open http://lo
 ## Text recognition (OCR)
 
 Scan & OCR ▸ Recognize Text downloads `models/text-detection.onnx` and
-`models/text-recognition.onnx`, relative to the page, the first time it is opened in a visit.
-Keep `models/` beside `index.html`. The app loads only the files whose SHA-256 matches
-`ATTRIBUTION.toml`, so a wrong file fails like a missing one. Their file names carry no content
+`models/text-recognition.onnx` (English), then `models/text-recognition-th.rten` and
+`models/dict-th.txt` (Thai, about 8 MB more), relative to the page, the first time it is opened in
+a visit. Keep `models/` beside `index.html`. The app loads only the files whose SHA-256 matches
+`ATTRIBUTION.toml`, so a wrong file fails like a missing one. The Thai files are optional: without
+them (or with wrong ones) English still works and the dialog says Thai isn't installed. Their file names carry no content
 hash, so the app asks the server before using a cached copy (`no-cache`): the server must answer
 that check correctly (an ETag, or a `Last-Modified` that changes whenever the file does). Without
 the models, everything else works and the Recognize Text dialog says the download failed.

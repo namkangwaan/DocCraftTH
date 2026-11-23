@@ -43,6 +43,8 @@ pub const THAI_DICT: &str = "dict-th.txt";
 /// parser can spin forever on bytes that aren't a model (64 × 0xff does).
 pub const DETECTION_MODEL_SHA256: &str = "a917b23dbd9524b465df7e922641b3ff2981623df4ded5a0234004ef2fee7cfe";
 pub const RECOGNITION_MODEL_SHA256: &str = "86c145c2edb96c8caed5b1ebb8f44d706408922211451c309c625157dd6061c5";
+pub const THAI_RECOGNITION_MODEL_SHA256: &str = "8b70e6d18967e93fccb32e045e0f80ee3859efe7ccdd67586a9d136a284e834a";
+pub const THAI_DICT_SHA256: &str = "57f5406f94bb6688fb7077f7be65f08bbd71cecf48c01ea26c522cb5c4836b7a";
 
 fn sha256_hex(bytes: &[u8]) -> String {
     use sha2::{Digest, Sha256};
@@ -175,6 +177,9 @@ enum Engine {
 /// A loaded recogniser. Loading takes a moment; keep one and reuse it.
 pub struct Ocr {
     engine: Engine,
+    /// The detection model's fixed input size, (width, height) pixels, when it declares one: a
+    /// page much larger than that is detected in tiles. Only the English (ocrs) reader tiles.
+    pub(crate) detector_input: Option<(u32, u32)>,
 }
 
 impl Ocr {
@@ -190,7 +195,7 @@ impl Ocr {
             // PaddleOCR's `use_space_char: true` appends the space class after the dictionary entries.
             dict.push(' ');
             let fixed_width = parse_model_meta_width(&models.recognition);
-            Ok(Ocr { engine: Engine::Ctc { detector, model, dict, fixed_width } })
+            Ok(Ocr { engine: Engine::Ctc { detector, model, dict, fixed_width }, detector_input: None })
         } else {
             Self::with_models(load(&models.detection)?, load(&models.recognition)?)
         }
@@ -208,7 +213,30 @@ impl Ocr {
         Self::with_models(load(DETECTION_MODEL, DETECTION_MODEL_SHA256, detection)?, load(RECOGNITION_MODEL, RECOGNITION_MODEL_SHA256, recognition)?)
     }
 
+    /// The Thai (CTC) recogniser from the contents of its files, where there is no file system:
+    /// the same detection model as [`Ocr::from_bytes`], [`THAI_RECOGNITION_MODEL`] and
+    /// [`THAI_DICT`]. Each is checked against its SHA-256 first, like the English models.
+    pub fn from_bytes_thai(detection: Vec<u8>, recognition: Vec<u8>, dictionary: &[u8]) -> Result<Ocr, OcrError> {
+        let checked = |name: &str, sha256: &str, data: &[u8]| {
+            if sha256_hex(data) == sha256 { Ok(()) } else { Err(OcrError::Load(name.into(), "not the expected model file (SHA-256 differs)".into())) }
+        };
+        checked(DETECTION_MODEL, DETECTION_MODEL_SHA256, &detection)?;
+        checked(THAI_RECOGNITION_MODEL, THAI_RECOGNITION_MODEL_SHA256, &recognition)?;
+        checked(THAI_DICT, THAI_DICT_SHA256, dictionary)?;
+        let load = |name: &str, data: Vec<u8>| rten::Model::load(data).map_err(|e| OcrError::Load(name.into(), e.to_string()));
+        let detector_params =
+            ocrs::OcrEngineParams { detection_model: Some(load(DETECTION_MODEL, detection)?), recognition_model: None, ..Default::default() };
+        let detector = ocrs::OcrEngine::new(detector_params).map_err(|e| OcrError::Load("ocr detector".into(), e.to_string()))?;
+        let model = Box::new(load(THAI_RECOGNITION_MODEL, recognition)?);
+        let raw = std::str::from_utf8(dictionary).map_err(|e| OcrError::Load(THAI_DICT.into(), e.to_string()))?;
+        // As in `load`: one class per line, then the space class PaddleOCR appends.
+        let mut dict: Vec<char> = raw.lines().filter_map(|line| line.chars().next()).collect();
+        dict.push(' ');
+        Ok(Ocr { engine: Engine::Ctc { detector, model, dict, fixed_width: None }, detector_input: None })
+    }
+
     fn with_models(detection: rten::Model, recognition: rten::Model) -> Result<Ocr, OcrError> {
+        let detector_input = detector_input(&detection);
         let params = ocrs::OcrEngineParams {
             detection_model: Some(detection),
             recognition_model: Some(recognition),
@@ -216,7 +244,7 @@ impl Ocr {
             ..Default::default()
         };
         let engine = ocrs::OcrEngine::new(params).map_err(|e| OcrError::Load("ocr engine".into(), e.to_string()))?;
-        Ok(Ocr { engine: Engine::Ocrs(engine) })
+        Ok(Ocr { engine: Engine::Ocrs(engine), detector_input })
     }
 
     /// Load the models found by [`Models::find`].
@@ -250,7 +278,7 @@ impl Ocr {
             Engine::Ocrs(engine) => {
                 let source = ocrs::ImageSource::from_bytes(&rgb, (width, height)).map_err(|e| err(&e))?;
                 let input = engine.prepare_input(source).map_err(|e| err(&e))?;
-                let found = engine.detect_words(&input).map_err(|e| err(&e))?;
+                let found = self.detect_words(engine, &rgb, width, height, &input)?;
                 let mut lines = engine.find_text_lines(&input, &found);
                 let before: Vec<Option<RectF>> = lines.iter_mut().map(|l| pad_line(l)).collect();
                 let read = engine.recognize_text(&input, &lines).map_err(|e| err(&e))?;
@@ -289,6 +317,51 @@ impl Ocr {
             Engine::Ctc { model, dict, fixed_width, .. } => Ok(recognize_ctc_crop(&rgb, width, height, rect, model, dict, *fixed_width)?.map(|(text, _)| text)),
         }
     }
+
+    /// The words in a page, `rgb` (1 or 3 bytes per pixel) prepared as `page`. A page at least
+    /// twice the detector's input along an axis whose text is small once shrunk to that input
+    /// ([`crate::pitch`]) is detected in overlapping tiles ([`crate::tiles`]), each word kept by the
+    /// tile whose core holds its centre and moved back to page pixels.
+    fn detect_words(&self, engine: &ocrs::OcrEngine, rgb: &[u8], width: u32, height: u32, page: &ocrs::OcrInput) -> Result<Vec<RotatedRect>, OcrError> {
+        let err = |e: &dyn std::fmt::Display| OcrError::Recognize(e.to_string());
+        let tiles = self.detector_input.map(|input| crate::tiles::tiles(width, height, input)).unwrap_or_default();
+        let area = (width as usize).checked_mul(height as usize).filter(|&a| a > 0);
+        let channels = area.and_then(|a| rgb.len().is_multiple_of(a).then(|| rgb.len() / a)).filter(|c| matches!(c, 1 | 3));
+        let (Some(channels), Some(input), true) = (channels, self.detector_input, tiles.len() > 1) else {
+            return engine.detect_words(page).map_err(|e| err(&e));
+        };
+        // Large print reads as well whole, at a quarter of the detection time.
+        if !crate::pitch::lines(rgb, width, height, channels, input).wants_tiles() {
+            return engine.detect_words(page).map_err(|e| err(&e));
+        }
+        let mut words = Vec::new();
+        for tile in &tiles {
+            let pixels = crate::tiles::crop(rgb, width, channels, tile.crop)
+                .ok_or_else(|| OcrError::Recognize("a detection tile lies outside the page".into()))?;
+            let source = ocrs::ImageSource::from_bytes(&pixels, (tile.width(), tile.height())).map_err(|e| err(&e))?;
+            let input = engine.prepare_input(source).map_err(|e| err(&e))?;
+            let (dx, dy) = (tile.crop[0] as f32, tile.crop[1] as f32);
+            for word in engine.detect_words(&input).map_err(|e| err(&e))? {
+                let centre = word.center();
+                let (x, y) = (centre.x + dx, centre.y + dy);
+                if tile.owns(x, y) {
+                    words.push(RotatedRect::new(rten_imageproc::PointF::from_yx(y, x), word.up_axis(), word.width(), word.height()));
+                }
+            }
+        }
+        Ok(words)
+    }
+}
+
+/// The detection model's input size, (width, height) pixels, if its input is an NCHW image of a
+/// fixed size.
+fn detector_input(model: &rten::Model) -> Option<(u32, u32)> {
+    let id = *model.input_ids().first()?;
+    let shape = model.node_info(id)?.shape()?;
+    match shape.as_slice() {
+        [_, _, rten::Dimension::Fixed(h), rten::Dimension::Fixed(w)] => Some((u32::try_from(*w).ok()?, u32::try_from(*h).ok()?)),
+        _ => None,
+    }
 }
 
 /// The ocrs engine as a [`Recognizer`] (the default engine).
@@ -311,6 +384,15 @@ impl OcrsRecognizer {
     /// models and loads them with [`Ocr::from_bytes`].
     pub fn from_ocr(engine: Ocr) -> OcrsRecognizer {
         OcrsRecognizer { engine, in_memory: true, thai: OnceLock::new() }
+    }
+
+    /// [`OcrsRecognizer::from_ocr`] with the Thai recogniser already loaded
+    /// ([`Ocr::from_bytes_thai`]), so Thai is read without looking for model files.
+    pub fn from_ocr_with_thai(engine: Ocr, thai: Ocr) -> OcrsRecognizer {
+        let recognizer = OcrsRecognizer { engine, in_memory: true, thai: OnceLock::new() };
+        // A fresh `OnceLock` is empty, so this always sets it.
+        let _ = recognizer.thai.set(Some(thai));
+        recognizer
     }
 
     /// Load the models found by [`Models::find`].
@@ -519,6 +601,34 @@ mod tests {
         }
     }
 
+    /// The web build loads Thai from downloaded bytes: anything but the three files
+    /// ATTRIBUTION.toml names is refused before it reaches the model parser.
+    #[test]
+    fn thai_from_bytes_refuses_files_that_are_not_the_models() {
+        let junk = || vec![0xffu8; 64];
+        assert!(matches!(Ocr::from_bytes_thai(junk(), junk(), b"a\nb\n"), Err(OcrError::Load(name, _)) if name == DETECTION_MODEL));
+        assert!(Ocr::from_bytes_thai(Vec::new(), Vec::new(), b"").is_err());
+    }
+
+    /// With the Thai models installed, loading them from bytes reads a page exactly as loading
+    /// them from files does (the same recogniser; only the way it is loaded differs).
+    #[test]
+    fn thai_from_bytes_reads_like_thai_from_files() {
+        let Some(models) = Models::find_for("th") else {
+            eprintln!("skipped: Thai OCR models not installed");
+            return;
+        };
+        let (Some(dict), true) = (models.dictionary.as_ref(), models.recognition.ends_with(THAI_RECOGNITION_MODEL)) else {
+            eprintln!("skipped: not the Thai model layout");
+            return;
+        };
+        let read = |p: &Path| std::fs::read(p).expect("a model file that was just found");
+        let from_bytes = Ocr::from_bytes_thai(read(&models.detection), read(&models.recognition), &read(dict)).expect("loads from bytes");
+        let from_files = Ocr::load(&models).expect("loads from files");
+        // A page with nothing on it: both read no lines, through the whole Thai pipeline.
+        let blank = vec![255u8; 400 * 120 * 4];
+        assert_eq!(from_bytes.recognize(&blank, 400, 120).expect("reads").len(), from_files.recognize(&blank, 400, 120).expect("reads").len());
+    }
 
     /// Writes `meta` as `model_meta.json` in a fresh per-test directory (unique per name and
     /// process, so parallel tests never share one) and returns the path of a model beside it.
