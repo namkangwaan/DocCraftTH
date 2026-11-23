@@ -472,12 +472,16 @@ pub(crate) fn body(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens) -> (boo
                 ui.add(crate::widgets::checkbox(&mut d.text_pages, tl!("Also recognize pages that already have text")))
                     .on_hover_text(tl!("Pictures on those pages are recognized too; words already in the page's text are not added again"));
                 // Pages that already have text include these, so the choice only matters without it.
-                ui.add_enabled(!d.text_pages, crate::widgets::checkbox(&mut d.read_unusable_text, tl!("Also recognize pages whose text is unusable")));
+                ui.add_enabled(
+                    !d.text_pages,
+                    crate::widgets::checkbox(&mut d.read_unusable_text, tl!("Also recognize pages whose text is unusable")),
+                );
                 ui.add(crate::widgets::checkbox(&mut d.auto_rotate, tl!("Straighten pages scanned sideways or upside down")));
                 ui.add(crate::widgets::checkbox(&mut d.deskew, tl!("Straighten skewed text lines")));
-                ui.add_enabled(d.deskew, crate::widgets::checkbox(&mut d.deskew_in_document, tl!("Also straighten the page in the document"))).on_hover_text(
-                    tl!("The scan is turned on the page (one undo step) before it is read; otherwise only the image that is read is straightened"),
-                );
+                ui.add_enabled(d.deskew, crate::widgets::checkbox(&mut d.deskew_in_document, tl!("Also straighten the page in the document")))
+                    .on_hover_text(tl!(
+                        "The scan is turned on the page (one undo step) before it is read; otherwise only the image that is read is straightened"
+                    ));
                 ui.add(crate::widgets::checkbox(&mut d.denoise, tl!("Remove scan speckle")));
                 ui.add(crate::widgets::checkbox(&mut d.binarize, tl!("Black and white (binarize)")));
             });

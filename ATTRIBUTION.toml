@@ -2191,7 +2191,7 @@ licence = "MIT OR Apache-2.0"
 licence_file = "LICENSE-MIT"
 kind = "translation"
 usage = "Thai UI strings, compiled in by crates/ui-egui/src/i18n.rs"
-sha256 = "d865d1cdc8e51c97631b246ae9eb54506c6d528316393aefb1c9a67e7d6f8ef8"
+sha256 = "aaba240e1211a7069fdccbdcf3ca2790bc9a87bc64a7d89083b4a1cd457f30e4"
 
 [[bundled]]
 crate = "epaint_default_fonts"

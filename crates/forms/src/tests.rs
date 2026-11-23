@@ -4613,8 +4613,12 @@ fn detection_names_check_boxes_from_the_nearer_neighbouring_label() {
     // An existing check-box widget still claims its own label so a neighbouring unlabelled box
     // does not steal it.
     let existing = [[100.0, 400.0, 110.0, 410.0]];
-    let remaining =
-        detect(&[w("Monsieur", 115.0, 400.0, 155.0)], &Shapes { boxes: vec![[178.0, 400.0, 188.0, 410.0]], rules: Vec::new(), leaders: Vec::new() }, &existing, &[]);
+    let remaining = detect(
+        &[w("Monsieur", 115.0, 400.0, 155.0)],
+        &Shapes { boxes: vec![[178.0, 400.0, 188.0, 410.0]], rules: Vec::new(), leaders: Vec::new() },
+        &existing,
+        &[],
+    );
     assert_eq!(remaining.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["Check Box1"]);
 
     // A stray punctuation token right after the first box does not pull the next box's label in.

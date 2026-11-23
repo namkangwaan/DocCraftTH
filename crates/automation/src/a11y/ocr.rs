@@ -141,7 +141,9 @@ impl Automation {
         found
             .iter()
             .map(|p| match &p.skipped {
-                Some(why) => json!({ "page": p.page + 1, "skipped": why }),
+                // A skipped page says whether its own text is usable too: a page whose text is
+                // unusable is not skipped (it is read), so this is `false` unless the engine said so.
+                Some(why) => json!({ "page": p.page + 1, "skipped": why, "unusable_text": p.unusable_text }),
                 None => {
                     let mut page =
                         json!({ "page": p.page + 1, "words": p.words.len(), "already_on_page": p.already_on_page, "unusable_text": p.unusable_text });
