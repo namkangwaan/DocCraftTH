@@ -61,8 +61,10 @@ jobs:
           Invoke-Cargo test --locked --lib -p pdfcraft-fonts -p pdfcraft-render -p pdfcraft-engine -p pdfcraft-ui-egui
           Invoke-Cargo test --locked -p pdfcraft-engine --test doc_title_names --test thai_ocr
           # `--test it fonts --test it thai_wrap` is not valid cargo (one test filter), and it always
-          # failed unseen; the filters belong after `--`, where libtest takes several.
-          Invoke-Cargo test --locked -p pdfcraft-ui-egui --test it -- fonts thai_wrap
+          # failed unseen. One filter per command: a `--` before libtest's filters is dropped by pwsh
+          # when it is passed to a function.
+          Invoke-Cargo test --locked -p pdfcraft-ui-egui --test it fonts
+          Invoke-Cargo test --locked -p pdfcraft-ui-egui --test it thai_wrap
           Invoke-Cargo test --locked -p pdfcraft --test help
           if ($failed.Count -gt 0) {
             $failed | ForEach-Object { Write-Host "::error::failed: $_" }
