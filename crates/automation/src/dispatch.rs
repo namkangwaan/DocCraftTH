@@ -64,6 +64,7 @@ impl Automation {
             }
             "doc_close" => self.doc_close(&a)?,
             "doc_save" => self.doc_save(&a)?,
+            "doc_rename" => self.doc_rename(&a)?,
             "doc_set_info" => {
                 let edit = Edit::SetInfo { key: a.str("key")?.into(), value: a.str("value")?.into() };
                 self.apply(&a, edit)?
@@ -315,6 +316,22 @@ impl Automation {
                 let at = self.opt_position(&a, "at")?;
                 self.apply(&a, Edit::DuplicatePages { pages, at })?
             }
+            "page_templates" => {
+                let templates: Vec<Value> = self.doc(&a)?.templates().into_iter().map(|t| json!({ "name": t.name, "hidden": t.hidden })).collect();
+                json!({ "templates": templates })
+            }
+            "page_template_spawn" => {
+                let at = self.opt_position(&a, "at")?.unwrap_or(self.doc(&a)?.info.pages.len());
+                let edit = Edit::SpawnTemplate { name: a.str("name")?.into(), at, rename: a.opt_bool("rename")?.unwrap_or(true) };
+                self.apply(&a, edit)?
+            }
+            "page_template_set_hidden" => self.apply(
+                &a,
+                Edit::SetTemplateHidden {
+                    name: a.str("name")?.into(),
+                    hidden: a.opt_bool("hidden")?.ok_or_else(|| ToolError::InvalidArgs("hidden is required".into()))?,
+                },
+            )?,
             "page_set_box" => self.page_set_box(&a)?,
             "page_transition_set" => self.page_transition_set(&a)?,
             "doc_create" => self.doc_create(&a)?,
@@ -397,6 +414,32 @@ impl Automation {
                     })
                     .collect();
                 json!({ "page": page + 1, "count": list.len(), "images": list })
+            }
+            "page_qr_codes" => {
+                let page = self.page(&a)?;
+                let doc = self.doc(&a)?;
+                let info = &doc.info.pages[page];
+                let mut config = doc.render_config().clone();
+                config.reading_colors = pdfcraft_render::ReadingColors::default();
+                config.transparent = false;
+                config.system_fonts = false;
+                let regions = pdfcraft_engine::qr::scan_page_qr_regions(doc.display.clone(), config, page, info).map_err(failed)?;
+                let r = |x: f32| (x as f64 * 100.0).round() / 100.0;
+                let codes: Vec<Value> = regions
+                    .into_iter()
+                    .map(|q| {
+                        let (u, v) = (
+                            info.user_to_view(q.rect_user[0] as f32, q.rect_user[1] as f32),
+                            info.user_to_view(q.rect_user[2] as f32, q.rect_user[3] as f32),
+                        );
+                        let rect = [r(u[0].min(v[0])), r(u[1].min(v[1])), r(u[0].max(v[0])), r(u[1].max(v[1]))];
+                        let url = pdfcraft_engine::qr::is_url(&q.content)
+                            .then(|| pdfcraft_engine::links::document_url(&pdfcraft_engine::qr::normalize_url(&q.content)).ok())
+                            .flatten();
+                        json!({ "content": q.content, "rect": rect, "url": url })
+                    })
+                    .collect();
+                json!({ "page": page + 1, "count": codes.len(), "codes": codes })
             }
             "image_edit" | "image_save" => {
                 let page = self.page(&a)?;
@@ -614,6 +657,7 @@ impl Automation {
                     size: a.opt_num("size")?,
                     underline: a.opt_bool("underline")?,
                     line_spacing: a.opt_num("line_spacing")?,
+                    paragraph_spacing: a.opt_num("paragraph_spacing")?,
                     char_spacing: a.opt_num("char_spacing")?,
                     scale: a.opt_num("scale")?,
                     width,
@@ -726,6 +770,7 @@ impl Automation {
             "redact_clear" => self.redact_clear(&a)?,
             "doc_hidden_info" => self.doc_hidden_info(&a)?,
             "printers" => self.printers()?,
+            "print_color_profiles" => self.print_color_profiles()?,
             "printer_options" => self.printer_options(&a)?,
             "printer_papers" => self.printer_papers(&a)?,
             "link_list" => self.link_list(&a)?,
@@ -733,6 +778,7 @@ impl Automation {
             "link_add" => self.link_add(&a)?,
             "link_edit" => self.link_edit(&a)?,
             "link_delete" => self.link_delete(&a)?,
+            "link_run_javascript" => self.link_run_javascript(&a)?,
             "links_from_urls" => self.links_from_urls(&a)?,
             "links_remove" => self.links_remove(&a)?,
             "object_list" => self.object_list(&a)?,
@@ -836,6 +882,8 @@ impl Automation {
             "ocr_recognize" => self.ocr_recognize(&a)?,
             "js_run" => self.js_run(&a)?,
             "js_event" => self.js_event(&a)?,
+            "js_page" => self.js_page(&a)?,
+            "js_advance" => self.js_advance(&a)?,
             "js_document_scripts" => self.js_document_scripts(&a)?,
             "js_set_document_script" => self.js_set_document_script(&a)?,
             "js_enabled" => self.js_enabled(&a)?,

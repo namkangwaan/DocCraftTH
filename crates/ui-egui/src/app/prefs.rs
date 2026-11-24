@@ -175,6 +175,8 @@ impl PdfCraftApp {
         v["default_page_gaps"] = serde_json::Value::Bool(self.view_defaults.show_page_gaps);
         v["recent_limit"] = serde_json::json!(self.recent_limit);
         v["fill_text_color"] = serde_json::json!(self.fill_text_color);
+        v["full_screen_fill"] = serde_json::Value::Bool(self.view_defaults.full_screen_fill);
+        v["full_screen_escape_exits"] = serde_json::Value::Bool(self.full_screen_escape_exits);
         v["redact_prefs"] = self.redact_defaults.to_json();
         v["pinned_tools"] = serde_json::json!(self.pinned_tools);
         // Set outside json! above, which is at serde_json's macro recursion limit.
@@ -187,6 +189,7 @@ impl PdfCraftApp {
         v["update_check_at_start"] = self.update_check_at_start.into();
         v["hotbar"] = serde_json::to_value(&self.hotbar).unwrap_or_default();
         v["comment_tool_pinned"] = serde_json::Value::Bool(self.comment_prefs.pinned);
+        v["qr_highlight_color"] = serde_json::json!(self.comment_prefs.qr_highlight_color);
         v["show_secured_notice"] = serde_json::Value::Bool(self.show_secured_notice);
         v["text_links"] = serde_json::Value::Bool(self.text_links);
         v["organize_zoom"] = serde_json::json!(self.organize_zoom);
@@ -310,6 +313,19 @@ impl PdfCraftApp {
         }
     }
 
+    /// The page gaps and full screen's switches: fill the screen, and whether Esc leaves it.
+    fn restore_page_display_prefs(&mut self, v: &serde_json::Value) {
+        if let Some(show) = v["default_page_gaps"].as_bool() {
+            self.view_defaults.show_page_gaps = show;
+        }
+        if let Some(fill) = v["full_screen_fill"].as_bool() {
+            self.view_defaults.full_screen_fill = fill;
+        }
+        if let Some(exits) = v["full_screen_escape_exits"].as_bool() {
+            self.full_screen_escape_exits = exits;
+        }
+    }
+
     /// The Print dialog's papers, each printer's setup and the choices it keeps (#2001).
     fn restore_print_prefs(&mut self, v: &serde_json::Value) {
         // The Print dialog's own paper sizes; settings are untrusted, so each custom paper is
@@ -386,9 +402,7 @@ impl PdfCraftApp {
 
     /// Switches for reopening, window chrome and file watching.
     fn restore_behavior_prefs(&mut self, v: &serde_json::Value) {
-        if let Some(show) = v["default_page_gaps"].as_bool() {
-            self.view_defaults.show_page_gaps = show;
-        }
+        self.restore_page_display_prefs(v);
         if let Ok(units) = serde_json::from_value::<units::Unit>(v["units"].clone()) {
             self.units = units;
         }
@@ -489,6 +503,10 @@ impl PdfCraftApp {
         }
         if let Some(pinned) = v["comment_tool_pinned"].as_bool() {
             self.comment_prefs.pinned = pinned;
+        }
+        // Anything but three bytes (a channel over 255, say) keeps the colour it had.
+        if let Ok(color) = serde_json::from_value::<[u8; 3]>(v["qr_highlight_color"].clone()) {
+            self.comment_prefs.qr_highlight_color = color;
         }
     }
 
