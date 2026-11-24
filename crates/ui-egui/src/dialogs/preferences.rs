@@ -690,6 +690,12 @@ fn card_appearance(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens, ctx: &m
     crate::thai_fonts::preferences_section(ui, app, t);
     ui.add_space(8.0);
     reading_colours_section(ui, app, t, ctx);
+    ui.add_space(8.0);
+    ui.horizontal(|ui| {
+        let label = ctx.label_primary(ui, tl!("QR Code highlight colour"), t);
+        ui.color_edit_button_srgb(&mut app.comment_prefs.qr_highlight_color).labelled_by(label.id);
+    });
+    ctx.label_secondary(ui, tl!("Frames a QR Code on the page while the pointer is over it."), t);
 }
 
 #[derive(Clone, Copy, Default)]
@@ -788,6 +794,10 @@ fn card_documents_and_view(ui: &mut egui::Ui, app: &mut PdfCraftApp, t: &Tokens,
         app.view_defaults.show_page_gaps = show_page_gaps;
     }
     ctx.label_secondary(ui, tl!("Hide gaps to join page edges. Margins inside the PDF remain unchanged."), t);
+    ctx.checkbox(ui, &mut app.view_defaults.full_screen_fill, tl!("Full screen fills the screen with one page at a time"), t);
+    ctx.label_secondary(ui, tl!("Turn off to keep the page display, such as continuous scrolling, in full screen."), t);
+    ctx.checkbox(ui, &mut app.full_screen_escape_exits, tl!("Esc leaves full screen"), t);
+    ctx.label_secondary(ui, tl!("Turn off so that only Ctrl+L (⌘L on macOS) leaves full screen, as for a kiosk display."), t);
     ui.add_space(6.0);
 
     let mut fit_changed = false;

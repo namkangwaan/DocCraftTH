@@ -54,7 +54,10 @@ mod flatten;
 pub use flatten::{flatten, flatten_fill_sign};
 pub mod images;
 mod ungroup;
-pub use images::{ArrangeOrder, ImageChange, PageImage, change_image, page_images, reading_images, rect_to_rect, turn_about_centre, turn_by_degrees};
+pub use images::{
+    ArrangeOrder, ImageChange, PageImage, change_image, may_draw_images, page_images, reading_images, rect_to_rect, turn_about_centre,
+    turn_by_degrees,
+};
 pub mod bidi;
 pub mod indic;
 mod linebreak;
@@ -98,5 +101,9 @@ pub use place::{add_type3_fonts, stamp, stamp_with_fonts, undrawable_message};
 mod find_replace_rows_tests;
 #[cfg(test)]
 mod marked_isolation_tests;
+#[cfg(test)]
+mod paragraph_spacing_break_tests;
+#[cfg(test)]
+mod paragraph_spacing_tests;
 #[cfg(test)]
 mod tests;

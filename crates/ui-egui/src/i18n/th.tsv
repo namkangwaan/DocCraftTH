@@ -2687,8 +2687,19 @@ key	Space	Space
 @id	file.word_count	นับจำนวนคำ…
 @id	file.qr_scanner	สแกน QR Code…
 	Scan QR Code…	สแกน QR Code…
+	QR Code link: {url}	ลิงก์ QR Code: {url}
+	QR Code text: {text}	ข้อความ QR Code: {text}
+	Right-click to open in a browser or copy	คลิกขวาเพื่อเปิดในเบราว์เซอร์หรือคัดลอก
+	Right-click to copy or check	คลิกขวาเพื่อคัดลอกหรือตรวจสอบ
+	QR Code highlight colour	สีกรอบเน้น QR Code
+	Frames a QR Code on the page while the pointer is over it.	แสดงกรอบรอบ QR Code บนหน้าเมื่อชี้เมาส์อยู่เหนือ QR Code นั้น
 	Open in Browser	เปิดในเบราว์เซอร์
 	Copy Link	คัดลอกลิงก์
+	QR Code Scanner	ตัวสแกน QR Code
+	No active document	ไม่มีเอกสารที่เปิดอยู่
+	QR Code:	รหัส QR:
+	A QR code	QR Code
+	Scanning page for QR codes…	กำลังสแกนหา QR Code ในหน้านี้…
 	Standard	มาตรฐาน
 	Mobile	อุปกรณ์พกพา
 	Merge image fragments	รวมชิ้นส่วนรูปภาพ
@@ -3222,3 +3233,14 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	Straight	ตรงอยู่แล้ว
 	turn	หมุน
 	skew	เอียง
+	Between paragraphs: press Enter in the box to start one	ระหว่างย่อหน้า: กด Enter ในกล่องเพื่อเริ่มย่อหน้าใหม่
+	Esc leaves full screen	กด Esc เพื่อออกจากโหมดเต็มหน้าจอ
+	Full screen fills the screen with one page at a time	โหมดเต็มหน้าจอแสดงเอกสารทีละหน้าเต็มหน้าจอ
+	No printers match.	ไม่พบเครื่องพิมพ์ที่ตรงกัน
+	Rename “{name}”	เปลี่ยนชื่อ “{name}”
+	Rename…	เปลี่ยนชื่อ…
+	Save and Rename	บันทึกและเปลี่ยนชื่อ
+	Search printers	ค้นหาเครื่องพิมพ์
+	This document has unsaved changes. They are saved first, then the file is renamed.	เอกสารนี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก ระบบจะบันทึกก่อน แล้วจึงเปลี่ยนชื่อไฟล์
+	Turn off so that only Ctrl+L (⌘L on macOS) leaves full screen, as for a kiosk display.	ปิดเพื่อให้ออกจากโหมดเต็มหน้าจอได้ด้วย Ctrl+L (⌘L บน macOS) เท่านั้น เหมือนจอแสดงผลแบบคีออสก์
+	Turn off to keep the page display, such as continuous scrolling, in full screen.	ปิดเพื่อคงรูปแบบการแสดงหน้า เช่น การเลื่อนต่อเนื่อง ไว้ในโหมดเต็มหน้าจอ
