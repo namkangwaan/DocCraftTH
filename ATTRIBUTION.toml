@@ -2291,6 +2291,50 @@ kind = "data"
 usage = "Word boundaries for wrapping Thai text in Edit text and Add text (crates/edit/src/linebreak.rs). Non-visual data; the line segmenter loads only these dictionaries, not the Chinese and Japanese one"
 sha256 = "cad3821ca44fdb88ed856ff3336444aa200afe7b9d19e34ac28ae6a4459d4c6d"
 
+[[asset]]
+path = "assets/models/openthai-det.rten"
+title = "OpenThai 2.1 Text: PP-OCRv6 tiny text detector (converted to rten)"
+author = "PaddlePaddle Authors (PP-OCRv6_tiny_det, distributed unchanged by iApp Technology in OpenThai2.1-OCR-Text)"
+source = "https://huggingface.co/iapp/OpenThai2.1-OCR-Text-20261118 (revision v2.1.4, det.onnx; converted with rten-convert 0.22.0 --no-infer-shapes, see docs/thai-ocr-model.md)"
+licence = "Apache-2.0"
+licence_file = "LICENSE-APACHE"
+kind = "model"
+usage = "Scan & OCR: finds Thai and Latin text lines (crates/ocr/src/openthai.rs)"
+sha256 = "1a1460534f3731ab88453cbf681ed2a006629937786b562c92217fcf0adf4a09"
+
+[[asset]]
+path = "assets/models/openthai-rec.rten"
+title = "OpenThai 2.1 Text: Thai line recognizer (converted to rten)"
+author = "iApp Technology (a fine-tune of PaddlePaddle Authors' PP-OCRv6_tiny_rec with a Thai classifier)"
+source = "https://huggingface.co/iapp/OpenThai2.1-OCR-Text-20261118 (revision v2.1.4, rec.onnx; converted with rten-convert 0.22.0 --no-infer-shapes, see docs/thai-ocr-model.md)"
+licence = "Apache-2.0"
+licence_file = "LICENSE-APACHE"
+kind = "model"
+usage = "Scan & OCR: reads each detected line (crates/ocr/src/openthai.rs)"
+sha256 = "c1e23e458ca7020ee758fbd6f592d590197bded276209a5762197d3759f6ab2b"
+
+[[asset]]
+path = "assets/models/openthai-rec2.rten"
+title = "OpenThai 2.1 Text: second Thai line recognizer (converted to rten)"
+author = "iApp Technology (a fine-tune of PaddlePaddle Authors' PP-OCRv6_tiny_rec with a Thai classifier)"
+source = "https://huggingface.co/iapp/OpenThai2.1-OCR-Text-20261118 (revision v2.1.4, rec2.onnx; converted with rten-convert 0.22.0 --no-infer-shapes, see docs/thai-ocr-model.md)"
+licence = "Apache-2.0"
+licence_file = "LICENSE-APACHE"
+kind = "model"
+usage = "Scan & OCR: re-reads lines in which the first recognizer mixed Latin letters into Thai words (crates/ocr/src/openthai.rs)"
+sha256 = "88a00c03add806ededeb89b88d526d4cdd35a74508b1e208f2657edf86eaf97b"
+
+[[asset]]
+path = "assets/models/openthai-dict.txt"
+title = "OpenThai 2.1 Text: character table of the recognizers"
+author = "iApp Technology; the character list derives from PaddlePaddle Authors' th_PP-OCRv5_mobile_rec"
+source = "https://huggingface.co/iapp/OpenThai2.1-OCR-Text-20261118 (revision v2.1.4, rec_dict.txt)"
+licence = "Apache-2.0"
+licence_file = "LICENSE-APACHE"
+kind = "model"
+usage = "Scan & OCR: class table for openthai-rec.rten and openthai-rec2.rten (crates/ocr/src/openthai.rs)"
+sha256 = "259ef2636cec0eeae225ae9fd9a63fa9305285650c22d7ec34fe8a82b24c2f1a"
+
 [[fetched]]
 file = "PlayfairDisplay[wght].ttf"
 url = "https://raw.githubusercontent.com/google/fonts/9710da1eacb3be272583c3224dcb70f9da6eadbb/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf"

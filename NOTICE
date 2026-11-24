@@ -42,6 +42,13 @@ list (author, source, license) is in ATTRIBUTION.md.
 - egui default fonts (epaint_default_fonts, via eframe) — Ubuntu Light (Ubuntu Font Licence 1.0),
   Hack (MIT / Bitstream Vera licence), Noto Emoji (SIL OFL 1.1), emoji-icon-font (MIT).
 - Colour profile in hayro-interpret — CGATS001Compat-v2-micro.icc (CC0-1.0, Clinton Ingram).
+- OpenThai 2.1 Text OCR models (assets/models/openthai-*), iApp Technology, Apache-2.0
+  (https://huggingface.co/iapp/OpenThai2.1-OCR-Text-20261118, revision v2.1.4), converted to the
+  .rten format for this project. They include or derive from the following Apache-2.0 work:
+  PP-OCRv6_tiny_det, PP-OCRv6_tiny_rec and the th_PP-OCRv5_mobile_rec character list, Copyright (c)
+  PaddlePaddle Authors (https://huggingface.co/PaddlePaddle; http://www.apache.org/licenses/LICENSE-2.0).
+  The detector is PP-OCRv6_tiny_det as distributed; the recognizers are fine-tunes of PP-OCRv6_tiny_rec
+  with a replaced Thai classifier, trained by iApp.
 - ICU4X line-breaking data (icu_segmenter_data, via crates.io) — Unicode-3.0. Its Thai, Lao, Khmer
   and Burmese word dictionaries are compiled in for wrapping Thai text; notice below, full licence in
   licenses/ICU4X-LICENSE.txt.

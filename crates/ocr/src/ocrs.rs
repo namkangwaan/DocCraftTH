@@ -372,26 +372,52 @@ pub struct OcrsRecognizer {
     in_memory: bool,
     /// The Thai recognizer, loaded on first use (`None` inside when its models are missing).
     thai: OnceLock<Option<Ocr>>,
+    /// The OpenThai 2.1 Text engine, which reads Thai in preference to `thai` when its models are
+    /// installed (`PDFCRAFT_THAI_ENGINE=legacy` turns that off).
+    openthai: OnceLock<Option<crate::openthai::OpenThai>>,
+}
+
+/// Whether the environment asks for the previous Thai engine (the PaddleOCR v5 recognizer).
+pub(crate) fn legacy_thai_requested() -> bool {
+    std::env::var("PDFCRAFT_THAI_ENGINE").is_ok_and(|v| v.eq_ignore_ascii_case("legacy"))
+}
+
+/// Whether the OpenThai 2.1 Text models are installed and not disabled by `PDFCRAFT_THAI_ENGINE=legacy`.
+pub fn openthai_available() -> bool {
+    !legacy_thai_requested() && crate::openthai::OpenThai::find_dir().is_some()
+}
+
+/// Whether Thai OCR models (either OpenThai 2.1 Text or the legacy PaddleOCR v5 set) are installed.
+pub fn thai_available() -> bool {
+    Models::find_for("th").is_some() || openthai_available()
 }
 
 impl OcrsRecognizer {
     /// Load the models from `models`.
     pub fn load(models: &Models) -> Result<OcrsRecognizer, OcrError> {
-        Ok(OcrsRecognizer { engine: Ocr::load(models)?, in_memory: false, thai: OnceLock::new() })
+        Ok(OcrsRecognizer { engine: Ocr::load(models)?, in_memory: false, thai: OnceLock::new(), openthai: OnceLock::new() })
     }
 
     /// A recogniser loaded some other way than from model files: the web build downloads the
     /// models and loads them with [`Ocr::from_bytes`].
     pub fn from_ocr(engine: Ocr) -> OcrsRecognizer {
-        OcrsRecognizer { engine, in_memory: true, thai: OnceLock::new() }
+        OcrsRecognizer { engine, in_memory: true, thai: OnceLock::new(), openthai: OnceLock::new() }
     }
 
     /// [`OcrsRecognizer::from_ocr`] with the Thai recogniser already loaded
     /// ([`Ocr::from_bytes_thai`]), so Thai is read without looking for model files.
     pub fn from_ocr_with_thai(engine: Ocr, thai: Ocr) -> OcrsRecognizer {
-        let recognizer = OcrsRecognizer { engine, in_memory: true, thai: OnceLock::new() };
+        let recognizer = OcrsRecognizer { engine, in_memory: true, thai: OnceLock::new(), openthai: OnceLock::new() };
         // A fresh `OnceLock` is empty, so this always sets it.
         let _ = recognizer.thai.set(Some(thai));
+        recognizer
+    }
+
+    /// [`OcrsRecognizer::from_ocr`] with an in-memory [`crate::openthai::OpenThai`] reader
+    /// (for the web build).
+    pub fn from_ocr_with_openthai(engine: Ocr, openthai: crate::openthai::OpenThai) -> OcrsRecognizer {
+        let recognizer = OcrsRecognizer { engine, in_memory: true, thai: OnceLock::new(), openthai: OnceLock::new() };
+        let _ = recognizer.openthai.set(Some(openthai));
         recognizer
     }
 
@@ -416,6 +442,16 @@ impl Recognizer for OcrsRecognizer {
 
     fn recognize(&self, image: &OcrImage, options: &RecognizeOptions) -> Result<Vec<Line>, OcrError> {
         if matches!(options.language.as_str(), "th" | "tha") {
+            if let Some(openthai) = self.openthai.get().and_then(Option::as_ref) {
+                return openthai.read(image);
+            }
+            // An in-memory recogniser (the web build) carries its own Thai models; files are for the desktop.
+            if !self.in_memory
+                && !legacy_thai_requested()
+                && let Some(openthai) = self.openthai.get_or_init(|| crate::openthai::OpenThai::find().ok())
+            {
+                return openthai.read(image);
+            }
             let Some(thai) = self.thai.get_or_init(|| Ocr::load_for("th").ok()) else {
                 return Err(OcrError::NoLanguageModel("th".into()));
             };

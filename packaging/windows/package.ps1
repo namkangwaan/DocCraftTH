@@ -154,6 +154,10 @@ Remove-Item -Force (Join-Path $Models '*.part') -ErrorAction SilentlyContinue
 if (-not (Test-Path (Join-Path $Models 'ATTRIBUTION.txt')) -or -not (Get-ChildItem (Join-Path $Models '*.LICENCE.txt'))) {
   throw "no OCR models in $Models after cargo xtask models"
 }
+$LocalOpenThai = Join-Path $Root 'assets\models\openthai-*'
+if (Test-Path $LocalOpenThai) {
+  Copy-Item -Path $LocalOpenThai -Destination $Models -Force
+}
 
 # ---- font notices for the MSI ------------------------------------------------------------------
 # The portable ZIP already carries these notices; stage the complete files before MSI creation too.

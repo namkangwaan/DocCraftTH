@@ -15,6 +15,7 @@ use pdfcraft_render::text::{TextFilter, unreadable};
 use pdfcraft_render::{PageInfo, PageRenderer, RenderConfig, RenderRequest, RequestKind};
 
 pub use pdfcraft_ocr::deskew::DeskewReport;
+pub use pdfcraft_ocr::openthai;
 pub use pdfcraft_ocr::{
     ConfidenceBand, DETECTION_MODEL, LANGUAGES, Line, MergeStrategy, Models, Ocr, OcrError, OcrImage, PlacedWord, RECOGNITION_MODEL, Recognizer,
     StrategyOutcome, THAI_DICT, THAI_RECOGNITION_MODEL, Word, band_for, is_suspect, lines_from_json, low_confidence,
@@ -375,6 +376,14 @@ pub fn install_with_thai(ocr: Ocr, thai: Option<Ocr>) -> Arc<dyn Recognizer> {
     ocrs
 }
 
+/// [`install`], with an in-memory OpenThai 2.1 Text reader for Thai.
+pub fn install_with_openthai(ocr: Ocr, openthai: pdfcraft_ocr::openthai::OpenThai) -> Arc<dyn Recognizer> {
+    THAI_INSTALLED.store(true, std::sync::atomic::Ordering::Release);
+    let ocrs: Arc<dyn Recognizer> = Arc::new(pdfcraft_ocr::OcrsRecognizer::from_ocr_with_openthai(ocr, openthai));
+    ENGINES.lock().unwrap_or_else(|e| e.into_inner()).get_or_insert_with(|| EngineCache { ocrs: None }).ocrs = Some(ocrs.clone());
+    ocrs
+}
+
 /// Whether an ocrs recogniser has been loaded (from the model files, or by [`install`]).
 fn ocrs_loaded() -> bool {
     ENGINES.lock().unwrap_or_else(|e| e.into_inner()).as_ref().is_some_and(|c| c.ocrs.is_some())
@@ -696,7 +705,7 @@ pub fn available() -> bool {
 /// Whether the recognition models for `lang` (`"en"`, `"th"`) are installed.
 pub fn available_for(lang: &str) -> bool {
     let installed_in_memory = matches!(lang, "th" | "tha") && THAI_INSTALLED.load(std::sync::atomic::Ordering::Acquire);
-    installed_in_memory || Models::find_for(lang).is_some()
+    installed_in_memory || Models::find_for(lang).is_some() || (matches!(lang, "th" | "tha") && pdfcraft_ocr::thai_available())
 }
 
 /// Why `engine` cannot run right now, named for the UI's tooltips (the Engine dropdown
