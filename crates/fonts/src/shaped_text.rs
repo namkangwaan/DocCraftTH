@@ -57,6 +57,12 @@ pub fn latin_message(e: GlyphError, text: &str) -> String {
 /// the bundled Inter face; and the text between them, left to the standard font. An error when a
 /// run can't be shaped (no Thai face, a missing character).
 pub fn fallback_pieces(line: &str, thai: bool, latin: bool) -> Result<Vec<Piece>, GlyphError> {
+    fallback_pieces_in(line, thai.then_some(ShapedScript::Thai), latin)
+}
+
+/// [`fallback_pieces`] with its Thai runs (`Some`) shaped in the face `thai` names. A face that lacks a
+/// character leaves the run to the default Thai face, as [`shape_thai`] does.
+pub fn fallback_pieces_in(line: &str, thai: Option<ShapedScript>, latin: bool) -> Result<Vec<Piece>, GlyphError> {
     #[derive(Clone, Copy, PartialEq)]
     enum Run {
         Thai,
@@ -64,7 +70,7 @@ pub fn fallback_pieces(line: &str, thai: bool, latin: bool) -> Result<Vec<Piece>
         Standard,
     }
     let kind = |c: char| {
-        if thai && is_thai(c) {
+        if thai.is_some() && is_thai(c) {
             Run::Thai
         } else if latin && latin_fallback(c) {
             Run::Latin
@@ -99,11 +105,22 @@ pub fn fallback_pieces(line: &str, thai: bool, latin: bool) -> Result<Vec<Piece>
     }
     runs.into_iter()
         .map(|(run, s)| match run {
-            Run::Thai => shape_thai(&s).map(Piece::Shaped),
+            Run::Thai => shape_thai_in(&s, thai.unwrap_or(ShapedScript::Thai)).map(Piece::Shaped),
             Run::Latin => shape_latin(&s).map(Piece::Shaped),
             Run::Standard => Ok(Piece::Latin(s)),
         })
         .collect()
+}
+
+/// Thai shaped in `script`'s face; the default face (or Sarabun) when that face is missing or lacks a character.
+fn shape_thai_in(text: &str, script: ShapedScript) -> Result<Vec<ShapedCluster>, GlyphError> {
+    if script == ShapedScript::Thai {
+        return shape_thai(text);
+    }
+    match crate::shape_thai_with(text, script) {
+        Err(GlyphError::Missing | GlyphError::NoFont) => shape_thai(text),
+        shaped => shaped,
+    }
 }
 
 /// A combining diacritical mark (U+0300–U+036F), drawn on the letter before it.
@@ -115,10 +132,15 @@ fn is_mark(c: char) -> bool {
 /// measured by `standard`. Text with nothing for the fallback faces, or that they can't shape, is
 /// measured by `standard` as a whole (drawing then reports why).
 pub fn fallback_width(text: &str, size: f64, thai: bool, latin: bool, standard: impl Fn(&str, f64) -> f64) -> f64 {
-    if !text.chars().any(|c| (thai && is_thai(c)) || (latin && latin_fallback(c))) {
+    fallback_width_in(text, size, thai.then_some(ShapedScript::Thai), latin, standard)
+}
+
+/// [`fallback_width`] with its Thai shaped in the face `thai` names.
+pub fn fallback_width_in(text: &str, size: f64, thai: Option<ShapedScript>, latin: bool, standard: impl Fn(&str, f64) -> f64) -> f64 {
+    if !text.chars().any(|c| (thai.is_some() && is_thai(c)) || (latin && latin_fallback(c))) {
         return standard(text, size);
     }
-    match fallback_pieces(text, thai, latin) {
+    match fallback_pieces_in(text, thai, latin) {
         Ok(pieces) => pieces_width(&pieces, size, 0.0, standard),
         Err(_) => standard(text, size),
     }
@@ -136,6 +158,11 @@ pub enum Piece {
 /// the standard font. Thai runs left to right, so the pieces are in typing order.
 /// [`GlyphError::NoFont`] when there's Thai and this build has no Thai face.
 pub fn thai_pieces(line: &str) -> Result<Vec<Piece>, GlyphError> {
+    thai_pieces_in(line, ShapedScript::Thai)
+}
+
+/// [`thai_pieces`] with the Thai shaped in the face `script` names.
+pub fn thai_pieces_in(line: &str, script: ShapedScript) -> Result<Vec<Piece>, GlyphError> {
     let mut runs: Vec<(bool, String)> = Vec::new();
     for c in line.chars() {
         match runs.last_mut() {
@@ -143,7 +170,7 @@ pub fn thai_pieces(line: &str) -> Result<Vec<Piece>, GlyphError> {
             _ => runs.push((is_thai(c), c.to_string())),
         }
     }
-    runs.into_iter().map(|(thai, s)| if thai { shape_thai(&s).map(Piece::Shaped) } else { Ok(Piece::Latin(s)) }).collect()
+    runs.into_iter().map(|(thai, s)| if thai { shape_thai_in(&s, script).map(Piece::Shaped) } else { Ok(Piece::Latin(s)) }).collect()
 }
 
 /// The width of `text` at `size`: its Thai shaped, the rest measured by `latin`. Text the Thai
@@ -339,11 +366,16 @@ pub fn appearance_lines(lines: &[String], fonts: &mut Dict) -> (Vec<Vec<Piece>>,
 /// `PCLa…`. A line whose runs can't be shaped, and every line when a glyph can't be read, is left
 /// to the standard font, which writes `?` for what it lacks; the caller reports that.
 pub fn fallback_appearance_lines(lines: &[String], thai: bool, latin: bool, fonts: &mut Dict) -> (Vec<Vec<Piece>>, ShapedFonts) {
+    fallback_appearance_lines_in(lines, thai.then_some(ShapedScript::Thai), latin, fonts)
+}
+
+/// [`fallback_appearance_lines`] with its Thai shaped in the face `thai` names.
+pub fn fallback_appearance_lines_in(lines: &[String], thai: Option<ShapedScript>, latin: bool, fonts: &mut Dict) -> (Vec<Vec<Piece>>, ShapedFonts) {
     let plain = |l: &String| vec![Piece::Latin(l.clone())];
-    let needs = |c: char| (thai && is_thai(c)) || (latin && latin_fallback(c));
+    let needs = |c: char| (thai.is_some() && is_thai(c)) || (latin && latin_fallback(c));
     let pieces: Vec<Vec<Piece>> =
-        lines.iter().map(|l| if l.chars().any(needs) { fallback_pieces(l, thai, latin).unwrap_or_else(|_| plain(l)) } else { plain(l) }).collect();
-    let prefix = if thai { "PCTh" } else { "PCLa" };
+        lines.iter().map(|l| if l.chars().any(needs) { fallback_pieces_in(l, thai, latin).unwrap_or_else(|_| plain(l)) } else { plain(l) }).collect();
+    let prefix = if thai.is_some() { "PCTh" } else { "PCLa" };
     match ShapedFonts::new(clusters(pieces.iter().map(Vec::as_slice)), shaped_glyph, &Dict::new(), fonts, prefix, &mut |o| o).map_err(|(e, _)| e) {
         Ok(shaped) => (pieces, shaped),
         Err(_) => (lines.iter().map(plain).collect(), ShapedFonts::default()),
@@ -353,10 +385,15 @@ pub fn fallback_appearance_lines(lines: &[String], thai: bool, latin: bool, font
 /// How far the Thai glyphs of `line` reach below and above its baseline, in em units; `None`
 /// without Thai, or with Thai the face can't draw.
 pub fn thai_reach(line: &str) -> Option<[f64; 2]> {
+    thai_reach_in(line, ShapedScript::Thai)
+}
+
+/// [`thai_reach`] with the Thai shaped in the face `script` names.
+pub fn thai_reach_in(line: &str, script: ShapedScript) -> Option<[f64; 2]> {
     if !line.chars().any(is_thai) {
         return None;
     }
-    let pieces = thai_pieces(line).ok()?;
+    let pieces = thai_pieces_in(line, script).ok()?;
     let mut reach: Option<[f64; 2]> = None;
     for c in clusters([pieces.as_slice()]) {
         for (id, [_, dy]) in &c.glyphs {
@@ -646,5 +683,33 @@ mod tests {
         let text: String = clusters([pieces.as_slice()]).map(|c| c.text.as_str()).collect();
         assert_eq!(text, "ชื่อบุญฤทธิ์");
         assert!(thai_width("น้ำ", 10.0, |_, _| 0.0) > 0.0);
+    }
+
+    #[test]
+    fn chosen_face_owns_its_thai_clusters() {
+        for script in [ShapedScript::Thai, ShapedScript::ThaiSarabun] {
+            if script.font().is_none() {
+                continue;
+            }
+            let pieces = thai_pieces_in("สวัสดี", script).unwrap();
+            assert!(clusters([pieces.as_slice()]).all(|c| c.script == script), "{script:?}");
+        }
+    }
+
+    #[test]
+    fn a_face_without_latin_leaves_latin_to_the_standard_font() {
+        if ShapedScript::ThaiSarabun.font().is_none() {
+            return;
+        }
+        let pieces = thai_pieces_in("ก A1", ShapedScript::ThaiSarabun).unwrap();
+        assert!(pieces.iter().any(|p| matches!(p, Piece::Latin(s) if s.contains("A1"))), "{pieces:?}");
+        assert!(clusters([pieces.as_slice()]).all(|c| c.script == ShapedScript::ThaiSarabun));
+        // The appearance path, width and reach follow the same face.
+        let lines = ["ก A1".to_string()];
+        let (drawn, _) = fallback_appearance_lines_in(&lines, Some(ShapedScript::ThaiSarabun), false, &mut Dict::new());
+        assert!(clusters(drawn.iter().map(Vec::as_slice)).all(|c| c.script == ShapedScript::ThaiSarabun));
+        let width = fallback_width_in("ก A1", 10.0, Some(ShapedScript::ThaiSarabun), false, |s, size| s.chars().count() as f64 * size);
+        assert!(width > 20.0, "Thai and Latin both count: {width}");
+        assert!(thai_reach_in("น้ำ", ShapedScript::ThaiSarabun).is_some());
     }
 }
