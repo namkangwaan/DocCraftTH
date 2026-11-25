@@ -65,6 +65,7 @@ mod stamp_preview;
 mod test_hooks;
 pub mod text_fonts;
 pub mod text_links;
+pub mod thai_catalog;
 mod text_preview;
 pub mod text_script;
 pub mod text_style_bookmarks;
@@ -109,10 +110,11 @@ pub use pdfcraft_edit::{
     Family as FontFamily, Hairlines, HairlinesFixed, HeaderFooter, Ink as TextInk, MarkKind, PageNumberStyle, PrinterMarks, Watermark,
 };
 pub use pdfcraft_forms::{
-    BorderStyle, CalculatedField, CalculationIssue, CalculationOrder, CheckStyle, Field as FormField, FieldAction, FieldChange, FieldFont,
+    BorderStyle, CalculatedField, CalculationIssue, CalculationOrder, CheckStyle, Field as FormField, FieldAction, FieldChange, FieldFace, FieldFont,
     FieldKind as FormFieldKind, FieldProps, FieldValue, Look as FieldLook, LookPatch as FieldLookPatch, NewField, TabOrder, Trigger as FieldTrigger,
     Widget as FormWidget, af as form_scripts, appearance as form_appearance, appearance::auto_text_size_by as field_auto_text_size_by,
-    appearance::comb_auto_text_size as field_comb_auto_text_size, calculations_changed as form_calculations_changed, flags as field_flags,
+    appearance::comb_auto_text_size as field_comb_auto_text_size, calculations_changed as form_calculations_changed, field_face,
+    flags as field_flags,
 };
 
 pub use pdfcraft_a11y as a11y;
