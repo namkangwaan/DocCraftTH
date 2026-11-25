@@ -173,16 +173,29 @@ pub enum FieldFont {
     Helvetica,
     Times,
     Courier,
+    /// An embedded Thai face. Its `/DR` resource name is the one the embedding gives it, so it is
+    /// supplied where the `/DA` is written ([`FieldFont::resource_with`]).
+    Thai(pdfcraft_fonts::thai_faces::FaceId),
 }
 
 impl FieldFont {
+    /// The three standard fonts; Thai faces are listed by the catalogue.
     pub const ALL: [FieldFont; 3] = [FieldFont::Helvetica, FieldFont::Times, FieldFont::Courier];
 
     fn resource(self) -> &'static str {
         match self {
-            FieldFont::Helvetica => "Helv",
+            FieldFont::Helvetica | FieldFont::Thai(_) => "Helv",
             FieldFont::Times => "TiRo",
             FieldFont::Courier => "Cour",
+        }
+    }
+
+    /// The `/DR` resource a `/DA` names for this font; `thai` is the resource a Thai face was
+    /// embedded under.
+    pub(super) fn resource_with(self, thai: Option<&str>) -> String {
+        match (self, thai) {
+            (FieldFont::Thai(_), Some(name)) => name.to_string(),
+            _ => self.resource().to_string(),
         }
     }
 
@@ -191,6 +204,7 @@ impl FieldFont {
             FieldFont::Helvetica => "Helvetica",
             FieldFont::Times => "Times Roman",
             FieldFont::Courier => "Courier",
+            FieldFont::Thai(id) => pdfcraft_fonts::thai_faces::family(id),
         }
     }
 }
@@ -288,10 +302,13 @@ pub fn look(doc: &Document, f: &Field) -> Look {
             _ => BorderStyle::Solid,
         },
         text,
-        font: match parsed.font.as_str() {
-            "TiRo" | "Times-Roman" => FieldFont::Times,
-            "Cour" | "Courier" => FieldFont::Courier,
-            _ => FieldFont::Helvetica,
+        font: match super::face::field_face(doc, f) {
+            super::face::FieldFace::Thai(id) => FieldFont::Thai(id),
+            _ => match parsed.font.as_str() {
+                "TiRo" | "Times-Roman" => FieldFont::Times,
+                "Cour" | "Courier" => FieldFont::Courier,
+                _ => FieldFont::Helvetica,
+            },
         },
     }
 }

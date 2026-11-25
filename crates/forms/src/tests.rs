@@ -7914,3 +7914,45 @@ fn page_scripts_are_the_pages_own_then_each_annotations_in_order() {
     assert_eq!(got, [(None, "close()"), (Some("anim"), "stop();")], "a URI action is not a script");
     assert!(page_scripts(&doc, 1, PageEvent::Open).is_empty(), "no such page");
 }
+
+/// A one-field form whose default appearance is `da`, with one `/DR` font `/Fx` (a Type0 font
+/// named `dr_font`) when given.
+fn thai_da_form(da: &str, dr_font: Option<&str>) -> Document {
+    let dr = if dr_font.is_some() { "/DR << /Font << /Fx 6 0 R >> >>" } else { "" };
+    let font = dr_font.map_or_else(|| "null".to_string(), |b| format!("<< /Type /Font /Subtype /Type0 /BaseFont /{b} >>"));
+    let objs: Vec<String> = vec![
+        "<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R >>".into(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 600 800] >>".into(),
+        "<< /Type /Page /Parent 2 0 R /Annots [5 0 R] >>".into(),
+        format!("<< /Fields [5 0 R] /DA ({da}) {dr} >>"),
+        format!("<< /Type /Annot /Subtype /Widget /FT /Tx /T (name) /Rect [50 700 250 720] /P 3 0 R /DA ({da}) >>"),
+        font,
+    ];
+    document(&objs)
+}
+
+#[test]
+fn da_with_a_thai_resource_reads_back_as_that_face() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let doc = thai_da_form("/Fx 0 Tf 0 g", Some("ABCDEF+Sarabun"));
+    let f = field(&fields(&doc), "name").clone();
+    assert_eq!(field_face(&doc, &f), FieldFace::Thai(sarabun));
+    assert_eq!(look(&doc, &f).font, FieldFont::Thai(sarabun));
+}
+
+#[test]
+fn an_unknown_da_font_is_reported_by_name_not_as_helvetica() {
+    let doc = thai_da_form("/THSarabunPSK 0 Tf 0 g", None);
+    let f = field(&fields(&doc), "name").clone();
+    assert_eq!(field_face(&doc, &f), FieldFace::Unknown("THSarabunPSK".into()));
+    let standard = thai_da_form("/Helv 0 Tf 0 g", None);
+    assert_eq!(field_face(&standard, field(&fields(&standard), "name")), FieldFace::Standard);
+}
+
+#[test]
+fn a_patch_without_a_font_leaves_an_unknown_da_unchanged() {
+    let mut doc = thai_da_form("/THSarabunPSK 0 Tf 0 g", None);
+    let before = field(&fields(&doc), "name").da.clone();
+    set_props(&mut doc, "name", &FieldProps { appearance: Some(LookPatch { width: Some(2.0), ..Default::default() }), ..FieldProps::default() }).unwrap();
+    assert_eq!(field(&fields(&doc), "name").da, before);
+}
