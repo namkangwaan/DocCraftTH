@@ -31,14 +31,8 @@ fn help_prints_usage_and_exits() {
         let out = run(&[flag], Stdio::piped());
         assert!(out.status.success(), "{flag}: {:?} {}", out.status, String::from_utf8_lossy(&out.stderr));
         let stdout = String::from_utf8_lossy(&out.stdout);
-        assert!(
-            stdout.starts_with("Usage: pdfcraft [options] [files…]") || stdout.starts_with("Usage: dthframe [options] [files…]"),
-            "{flag}: {stdout}"
-        );
-        assert!(
-            stdout.contains("pdfcraft-cli") || stdout.contains("dthframe-cli"),
-            "{flag}: points scripts to the CLI: {stdout}"
-        );
+        assert!(stdout.starts_with("Usage: pdfcraft [options] [files…]"), "{flag}: {stdout}");
+        assert!(stdout.contains("pdfcraft-cli"), "{flag}: points scripts to the CLI: {stdout}");
     }
     // Wherever it is on the command line, and with files named.
     let out = run(&["missing.pdf", "--help"], Stdio::piped());
@@ -50,8 +44,7 @@ fn help_prints_usage_and_exits() {
 fn version_prints_the_version_and_exits() {
     let out = run(&["--version"], Stdio::piped());
     assert!(out.status.success(), "{:?} {}", out.status, String::from_utf8_lossy(&out.stderr));
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.starts_with("pdfcraft ") || stdout.starts_with("dthframe "), "{}", stdout);
+    assert!(String::from_utf8_lossy(&out.stdout).starts_with("pdfcraft "), "{}", String::from_utf8_lossy(&out.stdout));
 }
 
 /// An `OPENSSL_ia32cap` that asks for a CPU feature the processor lacks (CPUID leaf 1, EDX bit
@@ -63,9 +56,7 @@ fn version_prints_the_version_and_exits() {
 fn a_cpu_override_naming_a_missing_feature_does_not_stop_the_app() {
     let out = run_with(Command::new(BIN).arg("--version").env("OPENSSL_ia32cap", "0x400"), Stdio::piped());
     assert!(out.status.success(), "{:?} {}", out.status, String::from_utf8_lossy(&out.stderr));
-    // The fork's binary prints its own name (DTHFrame), as `version_prints_the_version_and_exits` accepts.
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    assert!(stdout.starts_with("pdfcraft ") || stdout.starts_with("dthframe "), "{stdout}");
+    assert!(String::from_utf8_lossy(&out.stdout).starts_with("pdfcraft "), "{}", String::from_utf8_lossy(&out.stdout));
 }
 
 /// A standard output that can't be written (here a full device) ends the run normally: `println!`

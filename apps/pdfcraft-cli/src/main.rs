@@ -93,8 +93,8 @@ dthframe-cli run    --script steps.json [--root DIR] [--report]
 ",
     mcp_usage!(),
     "\
-dthframe-cli ui     --control FILE <method> [key=value …] [--out shot.png]
-                                                           drive a running app started with --control FILE
+dthframe-cli ui     --control PORT (--control-token-file FILE | --control-token TOKEN) <method> [key=value …] [--out shot.png]
+                                                           drive a running app started with --control PORT
 Source: https://github.com/storytold/pdfcraft"
 );
 
