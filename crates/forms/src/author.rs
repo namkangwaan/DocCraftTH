@@ -21,6 +21,7 @@ pub(crate) use tree::ancestor_sets;
 
 pub use edit::set_props;
 pub use face::{FieldFace, field_face};
+pub(crate) use face::thai_script_of;
 pub(crate) use edit::set_props_object;
 pub use lifecycle::{add_field, delete_field, delete_field_object, delete_widget, duplicate_field};
 pub(crate) use look::button_appearance;

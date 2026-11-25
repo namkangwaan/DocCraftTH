@@ -47,9 +47,19 @@ fn bundled_face(id: FaceId) -> Option<&'static crate::EmbeddedFace> {
     }
 }
 
-/// The bundled Thai faces this build has (none without craft-fonts), Sarabun last.
+/// The bundled Thai faces a form field can embed (none without craft-fonts), Sarabun last. A bundled
+/// face the embedding policy refuses (a variable font such as the bundled Noto Sans Thai) is not
+/// listed: it still shapes Thai in appearances, but a form cannot carry it.
 pub fn bundled() -> Vec<FaceId> {
-    [FaceId(PRIMARY), FaceId(SARABUN)].into_iter().filter(|id| bundled_face(*id).is_some()).collect()
+    static EMBEDDABLE: std::sync::OnceLock<Vec<FaceId>> = std::sync::OnceLock::new();
+    EMBEDDABLE
+        .get_or_init(|| {
+            [FaceId(PRIMARY), FaceId(SARABUN)]
+                .into_iter()
+                .filter(|id| bundled_face(*id).is_some_and(|f| embedding::validate(f.bytes).is_ok()))
+                .collect()
+        })
+        .clone()
 }
 
 /// Sarabun, when this build bundles it.

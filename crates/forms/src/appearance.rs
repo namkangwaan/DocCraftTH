@@ -858,12 +858,16 @@ fn field_appearance_fit(doc: &Document, f: &Field, w: &Widget, values: &[String]
         Some((o, enc)) => (da.font.clone(), o, enc),
         None => ("Helv".to_string(), helvetica(), FontText::WinAnsi),
     };
+    // The Thai face the `/DA` font names (an embedded one the author chose), else the default.
+    let thai_face = thai.then(|| crate::author::thai_script_of(doc, &da.font));
     let width_of = |text: &str, size: f64| {
-        if thai || latin { shaped_text::fallback_width(text, size, thai, latin, |s, size| enc.width(s, size)) } else { enc.width(text, size) }
+        if thai || latin { shaped_text::fallback_width_in(text, size, thai_face, latin, |s, size| enc.width(s, size)) } else { enc.width(text, size) }
     };
     // How far a line's ink reaches below and above its baseline (em), where Thai stacks or
     // descenders reach past the form font's (Helvetica's) -0.207 and 0.718; `None` otherwise.
-    let thai_ink = |line: &str| thai.then(|| shaped_text::thai_reach(line)).flatten().map(|[lo, hi]| [lo.min(-0.207), hi.max(0.718)]);
+    let thai_ink = |line: &str| {
+        thai_face.and_then(|script| shaped_text::thai_reach_in(line, script)).map(|[lo, hi]| [lo.min(-0.207), hi.max(0.718)])
+    };
     let (mut c, bw) = frame(doc, &wd, width, height);
     let pad = 2.0 + bw;
     let inner_w = (width - 2.0 * pad).max(1.0);
@@ -978,7 +982,7 @@ fn field_appearance_fit(doc: &Document, f: &Field, w: &Widget, values: &[String]
             }
         }
     }
-    let (body, fonts, unencodable) = draw_lines(&shown, size, &font_name, font_obj, &enc, thai, latin);
+    let (body, fonts, unencodable) = draw_lines(&shown, size, &font_name, font_obj, &enc, thai_face, latin);
     // Acrobat regenerates only what is inside /Tx BMC when it redraws a field (e.g. on focus
     // changes), discarding what came before it (issues #1613, #633). The background and border
     // therefore go inside the marked-content block too, so a redraw keeps them with the text.
@@ -1018,14 +1022,14 @@ fn draw_lines(
     font_name: &str,
     font: Object,
     enc: &FontText,
-    thai: bool,
+    thai: Option<pdfcraft_fonts::ShapedScript>,
     latin: bool,
 ) -> (Vec<u8>, Dict, Option<char>) {
     let mut fonts = Dict::new();
     fonts.set(font_name.as_bytes().to_vec(), font);
     let lines: Vec<String> = shown.iter().map(|(_, _, text)| text.clone()).collect();
-    let (pieces, shaped) = if thai || latin {
-        shaped_text::fallback_appearance_lines(&lines, thai, latin, &mut fonts)
+    let (pieces, shaped) = if thai.is_some() || latin {
+        shaped_text::fallback_appearance_lines_in(&lines, thai, latin, &mut fonts)
     } else {
         (lines.into_iter().map(|l| vec![Piece::Latin(l)]).collect(), ShapedFonts::default())
     };

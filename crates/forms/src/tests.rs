@@ -8030,3 +8030,37 @@ fn a_signed_form_refuses_a_font_that_would_change_its_resources() {
     assert!(set_props(&mut doc, "name", &thai_font(sarabun)).is_err());
     assert!(acroform(&doc).is_some_and(|af| !af.contains(b"DR")), "the signed form's resources are untouched");
 }
+
+/// The auto font size an appearance was drawn at (`/Helv <size> Tf`).
+fn drawn_size(ap: &str) -> f64 {
+    ap.split("/Helv ").nth(1).and_then(|s| s.split(' ').next()).and_then(|n| n.parse().ok()).unwrap_or_else(|| panic!("no /Helv size in {ap}"))
+}
+
+#[test]
+fn thai_value_is_drawn_with_the_chosen_face() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = one_page();
+    // A narrow box, so the automatic size is the one that makes the text fit: it follows the
+    // advances of the face that draws it. Field "a" keeps the default Thai face, "b" is Sarabun.
+    for name in ["a", "b"] {
+        add_field(&mut doc, 0, [20.0, 20.0, 140.0, 48.0], &NewField::Text { multiline: false }, Some(name)).unwrap();
+        if name == "b" {
+            set_props(&mut doc, name, &thai_font(sarabun)).unwrap();
+        }
+        set_value(&mut doc, name, &FieldValue::Text("สวัสดีครับพี่น้องทุกท่าน".into())).unwrap();
+    }
+    let size = |name: &str| drawn_size(&ap(&doc, &field(&fields(&doc), name).widgets[0]));
+    let a = ap(&doc, &field(&fields(&doc), "a").widgets[0]);
+    assert!(!a.contains('?'), "Thai is drawn, not replaced: {a}");
+    assert!((size("a") - size("b")).abs() > 0.01, "each face fits the text with its own advances: {} {}", size("a"), size("b"));
+}
+
+#[test]
+fn mixed_thai_latin_and_digits_all_draw_in_a_chosen_face() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    set_value(&mut doc, "name", &FieldValue::Text("ชื่อ Name 123".into())).unwrap();
+    let a = ap(&doc, &field(&fields(&doc), "name").widgets[0]);
+    assert!(a.contains("Name 123") && !a.contains('?'), "{a}");
+}

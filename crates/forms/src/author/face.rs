@@ -28,12 +28,7 @@ pub fn field_face(doc: &Document, f: &Field) -> FieldFace {
     if STANDARD.contains(&resource.as_str()) {
         return FieldFace::Standard;
     }
-    let base = crate::acroform(doc)
-        .and_then(|af| af.get(b"DR").and_then(|o| doc.resolve(o).as_dict().cloned()))
-        .and_then(|dr| dr.get(b"Font").and_then(|o| doc.resolve(o).as_dict().cloned()))
-        .and_then(|fonts| fonts.get(resource.as_bytes()).and_then(|o| doc.resolve(o).as_dict().cloned()))
-        .and_then(|font| font.name(b"BaseFont").map(|n| String::from_utf8_lossy(n).into_owned()));
-    match base {
+    match dr_base_font(doc, &resource) {
         Some(base) => match thai_faces::by_family(&base) {
             Some(id) => FieldFace::Thai(id),
             None if STANDARD.contains(&base.as_str()) => FieldFace::Standard,
@@ -41,6 +36,21 @@ pub fn field_face(doc: &Document, f: &Field) -> FieldFace {
         },
         None => FieldFace::Unknown(resource),
     }
+}
+
+/// The `/BaseFont` of the form's `/DR /Font` entry `resource`, when it has one.
+fn dr_base_font(doc: &Document, resource: &str) -> Option<String> {
+    crate::acroform(doc)
+        .and_then(|af| af.get(b"DR").and_then(|o| doc.resolve(o).as_dict().cloned()))
+        .and_then(|dr| dr.get(b"Font").and_then(|o| doc.resolve(o).as_dict().cloned()))
+        .and_then(|fonts| fonts.get(resource.as_bytes()).and_then(|o| doc.resolve(o).as_dict().cloned()))
+        .and_then(|font| font.name(b"BaseFont").map(|n| String::from_utf8_lossy(n).into_owned()))
+}
+
+/// The shaping script of the Thai face the `/DA` font `resource` names, or the default Thai face
+/// when it names none: the face an appearance draws Thai runs with.
+pub(crate) fn thai_script_of(doc: &Document, resource: &str) -> pdfcraft_fonts::ShapedScript {
+    dr_base_font(doc, resource).and_then(|base| thai_faces::by_family(&base)).map_or(pdfcraft_fonts::ShapedScript::Thai, thai_faces::script)
 }
 
 /// The `/DR /Font` resource the form holds `face` under, embedding the whole font there the first
