@@ -33,9 +33,12 @@ pub enum ShapedScript {
     /// ([`crate::document_latin_fonts`]), which every build has: for the ones WinAnsiEncoding
     /// lacks, beside the standard font that draws the rest.
     Latin,
+    /// A Thai face registered at run time ([`crate::thai_faces::register`]); the number is its slot.
+    Custom(u8),
 }
 
 impl ShapedScript {
+    /// The craft-fonts face, `None` for [`Self::Custom`] (see [`Self::family`] and [`Self::program`]).
     pub fn font(self) -> Option<&'static crate::EmbeddedFace> {
         match self {
             Self::Arabic => crate::document_arabic_font(),
@@ -43,11 +46,31 @@ impl ShapedScript {
             Self::Thai => crate::document_thai_font(),
             Self::ThaiSarabun => crate::document_thai_font_named("Sarabun"),
             Self::Latin => crate::document_latin_fonts(false).into_iter().next(),
+            Self::Custom(_) => None,
+        }
+    }
+
+    /// The family of the face that owns this script's glyph ids, when there is one.
+    pub fn family(self) -> Option<&'static str> {
+        match self {
+            Self::Custom(slot) => crate::thai_faces::custom_family(u16::from(slot)),
+            _ => self.font().map(|f| f.family),
+        }
+    }
+
+    /// The font program that owns this script's glyph ids, when there is one.
+    pub fn program(self) -> Option<&'static [u8]> {
+        match self {
+            Self::Custom(slot) => crate::thai_faces::custom_bytes(u16::from(slot)),
+            _ => self.font().map(|f| f.bytes),
         }
     }
 }
 
 fn face(script: ShapedScript) -> Option<&'static (FontRef<'static>, ShaperData)> {
+    if let ShapedScript::Custom(slot) = script {
+        return crate::thai_faces::custom_shaper(slot);
+    }
     static FACE: OnceLock<Option<(FontRef<'static>, ShaperData)>> = OnceLock::new();
     static HEBREW: OnceLock<Option<(FontRef<'static>, ShaperData)>> = OnceLock::new();
     static THAI: OnceLock<Option<(FontRef<'static>, ShaperData)>> = OnceLock::new();
@@ -59,6 +82,7 @@ fn face(script: ShapedScript) -> Option<&'static (FontRef<'static>, ShaperData)>
         ShapedScript::Thai => &THAI,
         ShapedScript::ThaiSarabun => &THAI_SARABUN,
         ShapedScript::Latin => &LATIN,
+        ShapedScript::Custom(_) => return None,
     };
     cache
         .get_or_init(|| {
@@ -174,7 +198,7 @@ fn shape_script(text: &str, rtl: bool, kind: ShapedScript) -> Result<Vec<ShapedC
     buffer.set_script(match kind {
         ShapedScript::Arabic => script::ARABIC,
         ShapedScript::Hebrew => script::HEBREW,
-        ShapedScript::Thai | ShapedScript::ThaiSarabun => script::THAI,
+        ShapedScript::Thai | ShapedScript::ThaiSarabun | ShapedScript::Custom(_) => script::THAI,
         ShapedScript::Latin => match latin_run(text) {
             LatinRun::Greek => script::GREEK,
             LatinRun::Cyrillic => script::CYRILLIC,
@@ -184,7 +208,9 @@ fn shape_script(text: &str, rtl: bool, kind: ShapedScript) -> Result<Vec<ShapedC
     // Preserve the historical Arabic per-character mapping; Hebrew, Thai and Latin marks stay with their base.
     buffer.set_cluster_level(match kind {
         ShapedScript::Arabic => BufferClusterLevel::Characters,
-        ShapedScript::Hebrew | ShapedScript::Thai | ShapedScript::ThaiSarabun | ShapedScript::Latin => BufferClusterLevel::MonotoneGraphemes,
+        ShapedScript::Hebrew | ShapedScript::Thai | ShapedScript::ThaiSarabun | ShapedScript::Latin | ShapedScript::Custom(_) => {
+            BufferClusterLevel::MonotoneGraphemes
+        }
     });
     let shaped = shaper.shape(buffer, ShapeOptions::new());
     // Clusters are byte offsets into `text`; a cluster shows the characters up to the next one.
