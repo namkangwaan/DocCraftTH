@@ -20,7 +20,7 @@ use craft::ui::text::{NumberField, TextField};
 
 use super::draft::{FieldDraft, FieldTab};
 use super::tabs::{actions_tab, calculate_tab, format_tab, validate_tab};
-use super::{BorderStyle, FieldFont, FormFieldKind};
+use super::{BorderStyle, FormFieldKind};
 use crate::comments::colours::{RecentColours, field_choice, palette};
 
 /// The Delete part of an item row of a choice field.
@@ -199,9 +199,8 @@ fn appearance_tab(ui: &mut egui::Ui, d: &mut FieldDraft, recent: &RecentColours,
         d.font_size = if auto { 0.0 } else { 12.0 };
     }
     number_row(ui, "font-size", tl!("Font Size:"), &mut d.font_size, 2.0..=100.0, Some(tl!("pt")), !auto);
+    super::font_row::show(ui, d);
     let Some(l) = d.look.as_mut() else { return };
-    let fonts = entries(&FieldFont::ALL, |f| tl!(f.label()).to_string());
-    select_row(ui, "font", tl!("Font:"), &mut l.font, &fonts);
     FieldGroup::new(tl!("Text Color:")).id_salt("text-colour").show(ui, |ui, _| {
         let pick = palette(ui, tl!("Text Color:"), Some(l.text), "field.props.text", recent);
         if let Some(c) = pick.picked {

@@ -712,6 +712,13 @@ impl Document {
         Some(pdfcraft_forms::look(&e.cos, f))
     }
 
+    /// A form field's font face (standard, embedded Thai, or an unknown `/DA` font name).
+    pub fn field_face(&self, name: &str) -> Option<pdfcraft_forms::FieldFace> {
+        let e = self.editor.as_ref()?;
+        let f = self.form.iter().find(|f| f.name == name)?;
+        Some(pdfcraft_forms::field_face(&e.cos, f))
+    }
+
     /// A check box's or radio button's mark (Field Properties ▸ Options), `None` for other fields.
     pub fn field_check_style(&self, name: &str) -> Option<CheckStyle> {
         let e = self.editor.as_ref()?;

@@ -70,3 +70,13 @@ pub(super) fn ensure_thai_font(doc: &mut Document, face: FaceId) -> Result<Strin
     doc.set(form, Object::Dict(af));
     Ok(resource)
 }
+
+/// When `props` sets a Thai face (through `look` or `appearance`), embeds it in `/DR` and returns
+/// its resource name.
+pub(super) fn ensure_props_thai_font(doc: &mut Document, props: &super::FieldProps) -> Result<Option<String>, FormError> {
+    let font = props.look.map(|l| l.font).or_else(|| props.appearance.and_then(|p| p.font));
+    match font {
+        Some(super::FieldFont::Thai(id)) => ensure_thai_font(doc, id).map(Some),
+        _ => Ok(None),
+    }
+}

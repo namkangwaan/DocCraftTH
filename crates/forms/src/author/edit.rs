@@ -1,5 +1,5 @@
 use super::join::{check_join, join_radio_group};
-use super::look::{BorderStyle, FieldFont, da_string_with, patch_da_with, patch_widget_look, redraw_widgets};
+use super::look::{BorderStyle, da_string_with, patch_da_with, patch_widget_look, redraw_widgets};
 use super::tree::{ancestor_sets, attach, check_place, child_named, clash, detach, ensure_form, inherited, name_parts, own_inherited};
 use super::{Dict, Document, Field, FieldKind, FieldProps, FormError, MIN_FIELD_SIDE, ObjRef, Object, PdfString, fields, flags, invalid};
 
@@ -190,13 +190,7 @@ fn set_props_target(doc: &mut Document, name: &str, object: Option<ObjRef>, prop
     // properties are written first, to this field, and its buttons then move.
     let (new_name, join) = rename_field(doc, &all, &f, name, props)?;
     // A Thai face is embedded in the form's resources before the default appearance names it.
-    let thai_face = match (&props.look, &props.appearance) {
-        (Some(l), _) => Some(l.font),
-        (None, Some(p)) => p.font,
-        _ => None,
-    }
-    .and_then(|font| if let FieldFont::Thai(id) = font { Some(id) } else { None });
-    let thai_res = thai_face.map(|id| super::face::ensure_thai_font(doc, id)).transpose()?;
+    let thai_res = super::face::ensure_props_thai_font(doc, props)?;
     // The new default appearance when the size or the look changes.
     let size = props.font_size.unwrap_or_else(|| crate::appearance::parse_da(&f.da).size);
     let new_da = match &props.look {

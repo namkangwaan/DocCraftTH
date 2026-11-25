@@ -3244,3 +3244,9 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	This document has unsaved changes. They are saved first, then the file is renamed.	เอกสารนี้มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก ระบบจะบันทึกก่อน แล้วจึงเปลี่ยนชื่อไฟล์
 	Turn off so that only Ctrl+L (⌘L on macOS) leaves full screen, as for a kiosk display.	ปิดเพื่อให้ออกจากโหมดเต็มหน้าจอได้ด้วย Ctrl+L (⌘L บน macOS) เท่านั้น เหมือนจอแสดงผลแบบคีออสก์
 	Turn off to keep the page display, such as continuous scrolling, in full screen.	ปิดเพื่อคงรูปแบบการแสดงหน้า เช่น การเลื่อนต่อเนื่อง ไว้ในโหมดเต็มหน้าจอ
+	shown as Sarabun	แสดงเป็น Sarabun
+	kept as is	คงไว้ตามเดิม
+	{name} can't be embedded in a form. The field will use Sarabun.	ไม่สามารถฝังฟอนต์ {name} ลงในแบบฟอร์มได้ ช่องนี้จะใช้ฟอนต์ Sarabun แทน
+	No Thai font is built in. Thai text uses a font installed on this computer on screen only.	ไม่มีฟอนต์ไทยติดมากับโปรแกรม ข้อความภาษาไทยจะใช้ฟอนต์ที่ติดตั้งบนเครื่องนี้สำหรับการแสดงผลบนหน้าจอเท่านั้น
+	Files you open in DTHFrame appear here	ไฟล์ที่คุณเปิดใน DTHFrame จะแสดงที่นี่
+	DTHFrame web page	หน้าเว็บ DTHFrame

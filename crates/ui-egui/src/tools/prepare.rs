@@ -10,13 +10,14 @@ use craft::behavior::geometry::MoveGesture;
 use craft::behavior::item_marquee::MarqueeSelect;
 use egui::{Pos2, Rect, vec2};
 use pdfcraft_engine::form_scripts::{CalcOp, Calculate, DATE_PRESETS, Format, TIME_PRESETS, Validate, format_value};
-use pdfcraft_engine::{BorderStyle, Edit, FieldFont, FieldLook, FieldProps, FormField, FormFieldKind, NewField};
+use pdfcraft_engine::{BorderStyle, Edit, FieldFont, FieldLook, FieldLookPatch, FieldProps, FormField, FormFieldKind, NewField};
 use pdfcraft_render::DocInfo;
 
 use crate::canvas::{DocView, PageBoxDrag, PageSession, PageXform};
 
 pub(crate) mod dialog;
 mod draft;
+mod font_row;
 mod properties;
 mod tabs;
 pub(crate) mod tool;
@@ -24,6 +25,8 @@ pub use dialog::FieldPropsDialog;
 
 pub use draft::{ACTION_KINDS, ActionDraft, FieldDraft, FieldTab};
 pub(crate) use draft::{da_font, da_size};
+pub(crate) use font_row::embeddable_entries as embeddable_thai_fonts;
+pub use font_row::show_with_entries as show_font_row_with_entries;
 
 /// The Add form components tools.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

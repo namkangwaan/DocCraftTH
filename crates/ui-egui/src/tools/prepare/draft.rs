@@ -1,4 +1,4 @@
-use super::{Calculate, FieldLook, FieldProps, FormField, FormFieldKind, Format, Validate};
+use super::{Calculate, FieldLook, FieldLookPatch, FieldProps, FormField, FormFieldKind, Format, Validate};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FieldTab {
@@ -94,6 +94,9 @@ pub struct FieldDraft {
     /// `/MK /R`: 0, 90, 180 or 270 degrees counterclockwise.
     pub rotation: i64,
     pub look: Option<FieldLook>,
+    /// The field's `/DA` font face as read from the document (`Unknown` keeps `/DA`'s font name
+    /// unless the user picks another font).
+    pub face: Option<pdfcraft_engine::FieldFace>,
     /// Check boxes and radio buttons: the mark when on (Options tab).
     pub check_style: Option<pdfcraft_engine::CheckStyle>,
     pub format: Format,
@@ -168,6 +171,7 @@ impl Default for FieldDraft {
             position: [0.0; 4],
             rotation: 0,
             look: None,
+            face: None,
             check_style: None,
             format: Format::default(),
             validate: Validate::default(),
@@ -232,6 +236,7 @@ impl FieldDraft {
             position: [r[0], r[1], r[2] - r[0], r[3] - r[1]],
             rotation: f.widgets.get(widget).map(|w| w.rotation).unwrap_or(0),
             look: None,
+            face: None,
             check_style: None,
             format: f.actions.format.clone(),
             validate: f.actions.validate.clone(),
@@ -298,8 +303,26 @@ impl FieldDraft {
                 (self.widget, [x, y, x + w.max(4.0), y + h.max(4.0)])
             }),
             rotation: (self.rotation != o.rotation).then_some((self.widget, self.rotation)),
-            look: (self.look != o.look).then_some(self.look).flatten(),
-            appearance: None,
+            look: if matches!(o.face, Some(pdfcraft_engine::FieldFace::Unknown(_))) {
+                None
+            } else {
+                (self.look != o.look).then_some(self.look).flatten()
+            },
+            appearance: match (self.look, o.look) {
+                (Some(l), Some(ol)) if matches!(o.face, Some(pdfcraft_engine::FieldFace::Unknown(_))) => {
+                    let font_changed = l.font != ol.font || self.face != o.face;
+                    let patch = FieldLookPatch {
+                        border: (l.border != ol.border).then_some(l.border),
+                        fill: (l.fill != ol.fill).then_some(l.fill),
+                        width: ((l.width - ol.width).abs() > 1e-6).then_some(l.width),
+                        style: (l.style != ol.style).then_some(l.style),
+                        text: (l.text != ol.text).then_some(l.text),
+                        font: font_changed.then_some(l.font),
+                    };
+                    (patch != FieldLookPatch::default()).then_some(patch)
+                }
+                _ => None,
+            },
             check_style: (self.check_style != o.check_style).then_some(self.check_style).flatten(),
             format: (self.format != o.format).then(|| self.format.clone()),
             validate: (self.validate != o.validate).then(|| self.validate.clone()),

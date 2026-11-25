@@ -178,7 +178,7 @@ impl Draft {
         font.mixed |= fields.iter().any(|f| prepare::da_font(&f.da) != resource);
         let font_label = if font.mixed {
             "Mixed".to_string()
-        } else if ["Helv", "Helvetica", "TiRo", "Times-Roman", "Cour", "Courier"].contains(&resource) {
+        } else if ["Helv", "Helvetica", "TiRo", "Times-Roman", "Cour", "Courier"].contains(&resource) || matches!(font.value, FieldFont::Thai(_)) {
             font.value.label().to_string()
         } else {
             "Custom font".to_string()
@@ -588,7 +588,10 @@ fn tabs(ui: &mut Ui, d: &mut Draft) {
 fn appearance(ui: &mut Ui, d: &mut Draft, recent: &RecentColours, request: &mut Option<ColorRequest>) {
     if d.text_appearance {
         number(ui, "Font Size:", &mut d.font_size, 0.0..=100.0, Some("pt"), |v| *v, |v| v);
-        let fonts: Vec<Entry<FieldFont>> = FieldFont::ALL.into_iter().map(|font| Entry::new(font, font.label().to_owned())).collect();
+        let mut fonts: Vec<Entry<FieldFont>> = FieldFont::ALL.into_iter().map(|font| Entry::new(font, font.label().to_owned())).collect();
+        for entry in prepare::embeddable_thai_fonts() {
+            fonts.push(Entry::new(entry.font, entry.family));
+        }
         // A custom font, or fonts that differ, show their name as the placeholder until the row is applied.
         let shown_label = d.font.value.label() != d.font_label;
         let (font, placeholder) = (&mut d.font, d.font_label.clone());

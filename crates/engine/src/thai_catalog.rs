@@ -74,13 +74,18 @@ fn is_thai_regular(face: &FaceInfo) -> bool {
     face.code_pages[0] & THAI_CODE_PAGE != 0 && !face.italic && face.variations.is_empty() && face.style.eq_ignore_ascii_case("Regular")
 }
 
+/// The bundled faces a form can embed (used on web and while the system catalogue scans).
+pub fn bundled_entries() -> Vec<CatalogEntry> {
+    thai_faces::bundled()
+        .into_iter()
+        .map(|id| CatalogEntry { family: thai_faces::family(id).to_string(), font: FieldFont::Thai(id), source: Source::Bundled, substituted: false })
+        .collect()
+}
+
 /// The bundled faces a form can embed, then the Thai faces `catalog` lists (Regular style, by
 /// family). Reads each candidate's file, so call it when the Font list opens, not every frame.
 pub fn thai_entries(catalog: &Catalog) -> Vec<CatalogEntry> {
-    let mut out: Vec<CatalogEntry> = thai_faces::bundled()
-        .into_iter()
-        .map(|id| CatalogEntry { family: thai_faces::family(id).to_string(), font: FieldFont::Thai(id), source: Source::Bundled, substituted: false })
-        .collect();
+    let mut out = bundled_entries();
     let mut seen: HashSet<FaceId> = thai_faces::bundled().into_iter().collect();
     let mut seen_substituted = HashSet::new();
     let sarabun = thai_faces::sarabun();

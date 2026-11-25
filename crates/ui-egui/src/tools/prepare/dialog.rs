@@ -76,6 +76,7 @@ pub(crate) fn open(app: &mut PdfCraftApp, name: &str, widget: usize, tab: FieldT
     let mut d = FieldDraft::new(&f, widget);
     d.tab = tab;
     d.look = doc.field_look(name);
+    d.face = doc.field_face(name);
     d.check_style = doc.field_check_style(name);
     let others: Vec<String> = doc.form.iter().filter(|x| x.name != name).map(|x| x.name.clone()).collect();
     d.others = others.clone();
@@ -83,6 +84,7 @@ pub(crate) fn open(app: &mut PdfCraftApp, name: &str, widget: usize, tab: FieldT
     d.chained = doc.field_action_chains(name);
     if let Some(o) = d.original.as_mut() {
         o.look = d.look;
+        o.face = d.face.clone();
         o.check_style = d.check_style;
         o.others = others;
         o.actions = d.actions.clone();
