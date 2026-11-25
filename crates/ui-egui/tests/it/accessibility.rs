@@ -97,9 +97,15 @@ fn checking_fixing_skipping_and_reporting() {
     h.run_steps(3);
     assert_eq!(status(&h, Rule::Title), Status::Passed);
     assert_eq!(h.state().a11y.previous.as_ref().unwrap().1.result(Rule::Title).unwrap().status, Status::Failed);
+<<<<<<< ours
+    assert!(matches!(h.state().dialog, Some(Dialog::Properties(_))));
+    assert_eq!(h.state().window_title, "notes • — DTHFrame");
+    h.state_mut().dialog = None;
+=======
     assert!(!h.state().dialogs.is_empty(), "Document Properties opens to edit the title");
     assert_eq!(h.state().window_title, "notes • — PdfCraft");
     h.get_by_label("Cancel").click();
+>>>>>>> theirs
     h.run_steps(2);
     assert!(h.state().dialogs.is_empty());
     h.get_by_role_and_label(Role::Heading, "Compare");

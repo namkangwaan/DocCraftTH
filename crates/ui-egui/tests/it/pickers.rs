@@ -724,7 +724,7 @@ fn a_late_startup_url_preserves_home_even_after_all_other_tabs_are_closed() {
         h.deliver("late.pdf", fixture(1));
         h.steps(2);
         assert_eq!(h.state().active, None, "Home stays selected (closed tabs: {close})");
-        h.get_by_label_contains("Welcome to PdfCraft");
+        h.get_by_label_contains("Welcome to DTHFrame");
         h.get_by_label("late.pdf").click();
         h.steps(2);
         assert!(h.state().active.is_some());

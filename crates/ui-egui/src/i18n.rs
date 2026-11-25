@@ -40,11 +40,53 @@ use craft_i18n::I18n;
 
 include!(concat!(env!("OUT_DIR"), "/craft_i18n.rs"));
 
+/// Process the embedded Thai catalog to insert soft breaks (U+200B) at word boundaries
+/// for line breaking in the UI, keeping th.tsv clean.
+fn prepare_catalogs(embedded: &'static craft_i18n::Embedded) -> &'static craft_i18n::Embedded {
+    let mut list = embedded.to_vec();
+    for entry in &mut list {
+        if entry.0 == "th" {
+            let processed = process_th_tsv(entry.2);
+            entry.2 = Box::leak(processed.into_boxed_str());
+        }
+    }
+    Box::leak(list.into_boxed_slice())
+}
+
+fn process_th_tsv(tsv: &str) -> String {
+    let mut out = String::with_capacity(tsv.len() + 2048);
+    for line in tsv.lines() {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.starts_with('#') || line.trim().is_empty() {
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.len() >= 3 {
+            out.push_str(parts[0]);
+            out.push('\t');
+            out.push_str(parts[1]);
+            out.push('\t');
+            out.push_str(&th_breaks::soft_breaks(parts[2]));
+            for p in &parts[3..] {
+                out.push('\t');
+                out.push_str(p);
+            }
+        } else {
+            out.push_str(line);
+        }
+        out.push('\n');
+    }
+    out
+}
+
 /// The embedded catalogs, offering exactly the languages in [`LANGUAGES`]. Built on first use; a
 /// locale is parsed on its first lookup.
 static I18N: LazyLock<Arc<I18n>> = LazyLock::new(|| {
     let offered: Vec<&str> = LANGUAGES.iter().map(|l| l.code).collect();
-    let (i18n, problems) = I18n::new(CRAFT_I18N, &offered);
+    let embedded = prepare_catalogs(CRAFT_I18N);
+    let (i18n, problems) = I18n::new(embedded, &offered);
     for problem in problems {
         log::warn!("interface catalogs: {problem}");
     }
@@ -231,6 +273,12 @@ impl PartialEq for Lang {
 
 impl Eq for Lang {}
 
+impl std::hash::Hash for Lang {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.code().hash(state);
+    }
+}
+
 impl Lang {
     pub const EN: Lang = Lang { lang: craft_i18n::Lang::EN, catalogs: None };
 
@@ -346,7 +394,7 @@ impl Lang {
 /// Whether this build embeds the craft-i18n catalogs (`CRAFT_I18N_DIR` was set). Without them the
 /// interface is English only; tests that need a translation skip with a note.
 pub fn catalogs_embedded() -> bool {
-    !CRAFT_I18N.is_empty()
+    CRAFT_I18N.iter().any(|(code, ..)| *code != "th")
 }
 
 /// The canonical `language` preference for user input: [`AUTO`] or a registered code (any case).
@@ -612,6 +660,50 @@ fn same_shape(translated: &str, english: &str) -> bool {
 /// run for display.
 pub use craft_i18n::fmt_plain as fmt;
 
+/// `y` (Common Era) as the current interface language counts years: Buddhist Era for Thai.
+pub fn local_year(y: i64) -> i64 {
+    pdfcraft_engine::dates::era_year(current().code(), y)
+}
+
+/// A PDF date shown as [`pdfcraft_render::pretty_date`] does (`2026-09-30 10:45`), with the year
+/// in `lang`'s era. Strings that aren't such a date come back unchanged.
+pub fn local_pdf_date_in(lang: Lang, s: &str) -> String {
+    let mut pretty = pdfcraft_render::pretty_date(s);
+    let offset = pdfcraft_engine::dates::era_year(lang.code(), 0);
+    if offset == 0 || !is_pretty_date(&pretty) {
+        return pretty;
+    }
+    let Some(year) = pretty.get(..4).and_then(|y| y.parse::<i64>().ok()) else {
+        return pretty;
+    };
+    let local_year = year.saturating_add(offset);
+    if (1000..=9999).contains(&local_year) {
+        pretty.replace_range(0..4, &local_year.to_string());
+        pretty
+    } else {
+        format!("{}{}", local_year, &pretty[4..])
+    }
+}
+
+fn is_pretty_date(s: &str) -> bool {
+    let b = s.as_bytes();
+    b.len() == 16
+        && b[0..4].iter().all(u8::is_ascii_digit)
+        && b[4] == b'-'
+        && b[5..7].iter().all(u8::is_ascii_digit)
+        && b[7] == b'-'
+        && b[8..10].iter().all(u8::is_ascii_digit)
+        && b[10] == b' '
+        && b[11..13].iter().all(u8::is_ascii_digit)
+        && b[13] == b':'
+        && b[14..16].iter().all(u8::is_ascii_digit)
+}
+
+/// [`local_pdf_date_in`] for the current interface language.
+pub fn local_pdf_date(s: &str) -> String {
+    local_pdf_date_in(current(), s)
+}
+
 /// A generated history label (the action part of "Undo …") in the current language. Captured
 /// values (file and field names) are inserted as they are; unknown labels are looked up whole.
 pub fn action_label(text: &str) -> String {
@@ -707,6 +799,8 @@ fn name_sort_key(name: &str) -> String {
         .collect()
 }
 
+pub(crate) mod th_breaks;
+
 /// A test language whose PdfCraft catalog is `source` (catalog format), so tests of lookup code
 /// don't depend on the embedded catalogs' wording. `code` picks the CLDR plural rules.
 #[cfg(test)]
@@ -730,6 +824,9 @@ pub(crate) fn needs_catalogs() -> bool {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod th_tests;
 
 #[cfg(test)]
 mod picker_order_tests {

@@ -758,6 +758,25 @@ pub fn field_text_size(painter: &egui::Painter, f: &FormField, w: &FormWidget, t
         // A field turned a quarter lays its text out along its height, as its appearance does.
         let (across, up) = if matches!(w.rotation, 90 | 270) { (up, across) } else { (across, up) };
         let (width, height) = (across - 2.0 * pad, up - 2.0 * pad);
+/// The calendar's hover text for one day (`October 17, 2026`) in `lang`.
+pub(crate) fn day_tooltip_in(lang: crate::i18n::Lang, y: i32, m: u32, day: u32) -> String {
+    use crate::i18n::{fmt, tr, tr_ctx};
+    let month = MONTHS.get(m.clamp(1, 12) as usize - 1).copied().unwrap_or_default();
+    fmt(
+        tr(lang, "{month} {day}, {y}"),
+        &[
+            ("month", tr_ctx(lang, "calendar date", month)),
+            ("day", &day.to_string()),
+            ("y", &pdfcraft_engine::dates::era_year(lang.code(), i64::from(y)).to_string()),
+        ],
+    )
+}
+
+/// [`day_tooltip_in`] for the current interface language.
+fn day_tooltip(y: i32, m: u32, day: u32) -> String {
+    day_tooltip_in(crate::i18n::current(), y, m, day)
+}
+
         // Comb cells hold one character each, so only the height limits them, as on the page.
         if f.is_comb() {
             return pdfcraft_engine::field_comb_auto_text_size(height);

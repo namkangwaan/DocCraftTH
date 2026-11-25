@@ -82,15 +82,20 @@ fn at_zero_opening_a_file_records_nothing() {
 fn at_zero_home_has_no_recent_section() {
     let h = harness(0, &[]);
     assert!(h.query_by_label("Recent").is_none(), "no heading");
-    assert!(h.query_by_label_contains("Files you open in PdfCraft appear here").is_none(), "and no promise of a list");
-    h.get_by_label_contains("PdfCraft works offline");
+    assert!(h.query_by_label_contains("Files you open in DTHFrame appear here").is_none(), "and no promise of a list");
+    h.get_by_label_contains("DTHFrame works offline");
 }
 
 #[test]
 fn above_zero_an_empty_list_still_says_what_it_is_for() {
     let h = harness(1, &[]);
+<<<<<<< ours
+    h.get_by_label("Recent");
+    h.get_by_label_contains("Files you open in DTHFrame appear here");
+=======
     h.get_by_role_and_label(egui::accesskit::Role::Heading, "Recent");
     h.get_by_label_contains("Files you open in PdfCraft appear here");
+>>>>>>> theirs
 }
 
 #[test]

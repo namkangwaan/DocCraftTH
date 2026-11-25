@@ -31,6 +31,17 @@ fn utc_stamp_is_utc_minutes_and_clamps_pre_epoch() {
     assert!(far.iter().all(|s| s.ends_with(" UTC")), "{far:?}");
 }
 
+#[test]
+fn utc_stamp_uses_buddhist_era_in_thai() {
+    use std::time::Duration;
+    let th = crate::i18n::Lang::from_code("th").expect("registered language");
+    // 2026-10-08 14:05 UTC is 1791468300 seconds past UNIX epoch.
+    let time = SystemTime::UNIX_EPOCH + Duration::from_secs(1791468300);
+    assert_eq!(utc_stamp_in(th, time), "2569-10-08 14:05 UTC");
+    assert_eq!(utc_stamp_in(th, time).get(..10), Some("2569-10-08"));
+    assert_eq!(utc_stamp_in(crate::i18n::Lang::EN, time), "2026-10-08 14:05 UTC");
+}
+
 /// A one-page PDF that opens with "pw".
 fn locked() -> Vec<u8> {
     let objs =

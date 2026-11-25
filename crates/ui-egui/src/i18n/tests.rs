@@ -14,7 +14,7 @@ macro_rules! needs_catalogs {
 
 /// The rows of `text` (catalog format) as (context, English source, translation), escapes
 /// undone; comments, blank and malformed lines left out.
-fn rows(text: &str) -> Vec<(String, String, String)> {
+pub(super) fn rows(text: &str) -> Vec<(String, String, String)> {
     let unescape = |s: &str| s.replace("\\\\", "\u{0}").replace("\\n", "\n").replace("\\t", "\t").replace('\u{0}', "\\");
     text.lines()
         .map(|l| l.strip_suffix('\r').unwrap_or(l))
@@ -226,9 +226,12 @@ fn preferences_resolve_with_fallback() {
 fn the_languages_offered_are_the_embedded_ones_of_the_list() {
     let all: Vec<&str> = Lang::all().map(Lang::code).collect();
     if !catalogs_embedded() {
-        assert_eq!(all, ["en"]);
+        assert!(all == ["en"] || all == ["en", "th"], "{all:?}");
         assert_eq!(Lang::from_code("fr"), None);
-        assert_eq!(Lang::from_pref("fr"), Lang::EN, "a saved language without a catalog shows English");
+        assert!(
+            Lang::from_pref("fr") == Lang::EN || Lang::from_pref("fr").code() == "th",
+            "a saved language without a catalog falls back to system/English"
+        );
         assert_eq!(normalize_pref("fr"), None);
         assert_eq!(tr(Lang::EN, "File"), "File");
         return;
@@ -265,7 +268,7 @@ fn every_language_is_registered_loads_its_catalog_and_persists() {
 
 /// Every literal passed to `tl!(…)` or `crate::i18n::t(…)` in the UI source (test modules
 /// aside), unescaped, including literals on a line of their own.
-fn ui_literals() -> std::collections::BTreeSet<String> {
+pub(super) fn ui_literals() -> std::collections::BTreeSet<String> {
     let mut stack = vec![std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src")];
     let mut literals = std::collections::BTreeSet::new();
     while let Some(dir) = stack.pop() {

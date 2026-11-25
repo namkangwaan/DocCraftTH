@@ -24,7 +24,7 @@ use craft::ui::runtime::requests::PathKind;
 use craft::ui::style::DataColor;
 use craft::ui::text::TextField;
 use egui::{Color32, CornerRadius, Rect, pos2, vec2};
-use pdfcraft_engine::{Backdrop, Background, DocId, Edit, FontFamily, HeaderFooter, MarkKind, Watermark};
+use pdfcraft_engine::{Backdrop, Background, DocId, Edit, FontFamily, HeaderFooter, MarkKind, PageNumberStyle, Watermark};
 
 use crate::PdfCraftApp;
 
@@ -202,6 +202,13 @@ impl Default for MarksDraft {
 }
 
 const PAGE_FORMATS: [&str; 5] = ["<<1>>", "<<1 of n>>", "<<1/n>>", "<<Page 1>>", "<<Page 1 of n>>"];
+const NUMBER_STYLES: [(PageNumberStyle, &str); 5] = [
+    (PageNumberStyle::Decimal, "1, 2, 3"),
+    (PageNumberStyle::LatinUpper, "A, B, C"),
+    (PageNumberStyle::LatinLower, "a, b, c"),
+    (PageNumberStyle::ThaiDigits, "๑, ๒, ๓"),
+    (PageNumberStyle::ThaiLetters, "ก, ข, ค"),
+];
 // New formats go last: `date_format` is an index into this list.
 const DATE_FORMATS: [&str; 11] = [
     "<<m/d/yyyy>>",
@@ -491,6 +498,12 @@ fn notes_of(kind: MarkKind, d: &MarksDraft, has_file: bool, g: &Geometry, select
             MarkKind::HeaderFooter => d.hf.text.iter().any(|x| !x.trim().is_empty()),
             MarkKind::Watermark => {
                 if d.use_file {
+                let style_label = NUMBER_STYLES.iter().find(|(style, _)| *style == d.hf.number_style).map(|(_, label)| *label).unwrap_or("1, 2, 3");
+                craft_ui::ComboBox::from_id_salt("hf-number-style").selected_text(style_label).show_ui(ui, |ui| {
+                    for (style, label) in NUMBER_STYLES {
+                        ui.selectable_value(&mut d.hf.number_style, style, label);
+                    }
+                });
                     has_file
                 } else {
                     !d.wm.text.trim().is_empty()
@@ -509,6 +522,7 @@ struct Geometry {
     count: usize,
     current: usize,
     units: MarginUnits,
+                ui.add(widgets::checkbox(&mut d.hf.continue_numbering, tl!("Continue from previous section")));
 }
 
 fn choice(options: impl IntoIterator<Item = (String, String)>, default: &str) -> ParamKind {

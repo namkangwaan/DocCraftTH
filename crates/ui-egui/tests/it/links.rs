@@ -1,5 +1,9 @@
+<<<<<<< ours
+//! Community links and about dialog.
+=======
 //! Community links: the About dialog shows the credits, and the home screen's community card
 //! closes for the run.
+>>>>>>> theirs
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -20,6 +24,33 @@ fn harness(setup: impl FnOnce(&mut PdfCraftApp) + 'static) -> Harness<'static, P
 }
 
 #[test]
+<<<<<<< ours
+fn about_dialog_shows_plain_text_attribution_and_no_upstream_marks() {
+    let pdf = b"%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF";
+    let mut h = harness(move |app| {
+        app.open_bytes("one.pdf", None, pdf.to_vec()).unwrap();
+        app.dialog = Some(Dialog::About);
+    });
+    assert_eq!(h.query_all_by_label("ArtCraft").count(), 0, "no ArtCraft logo marks in about dialog");
+    assert!(h.query_all_by_label_contains("DTHFrame (TH Document Craft)").count() >= 1);
+    h.get_by_label_contains("Forked from PdfCraft by the ArtCraft team");
+    h.get_by_label("DTHFrame on GitHub").click();
+    h.run_steps(2);
+    assert_eq!(h.state().last_opened_url.as_deref(), Some(links::GITHUB));
+}
+
+#[test]
+fn help_commands_open_each_link() {
+    for l in links::LINKS {
+        let mut h = harness(|_| {});
+        assert!(h.state_mut().execute(l.command), "{}", l.command);
+        assert_eq!(h.state().last_opened_url.as_deref(), Some(l.url));
+        assert_eq!(
+            pdfcraft_engine::commands::command(l.command).unwrap().menu,
+            if l.command == "help.github" { Some("Help") } else { None }
+        );
+    }
+=======
 fn home_community_card_closes_for_this_run() {
     let mut h = harness(|_| {});
     h.get_by_role_and_label(egui::accesskit::Role::Group, "Join the ArtCraft community");
@@ -30,6 +61,7 @@ fn home_community_card_closes_for_this_run() {
     assert!(h.query_by_label("Join our Discord").is_none());
     // Not remembered: a fresh app shows the card again.
     assert!(!crate::control::new_app().community_card_closed);
+>>>>>>> theirs
 }
 
 /// Runs frames until the node labelled `label` exists and has stopped moving, then returns it. A table row is named by

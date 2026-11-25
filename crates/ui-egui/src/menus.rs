@@ -18,7 +18,7 @@ use crate::{PdfCraftApp, RightPanel};
 pub(super) mod tab_context;
 
 /// The app's name in the menus the layouts write (About, Hide, Quit).
-pub(crate) const APP_NAME: &str = "PdfCraft";
+pub(crate) const APP_NAME: &str = "DTHFrame";
 
 /// Menu-only commands. The registry's commands keep their own ids.
 pub(crate) const CUT: &str = "edit.cut";
@@ -114,6 +114,7 @@ const FILE: &[&str] = &[
     SEP,
     "file.properties",
     "file.word_count",
+    "file.qr_scanner",
     SEP,
     "print.dialog",
     QUIT,
@@ -216,8 +217,7 @@ const SIGN: &[&str] = &[
     "sign.panel",
 ];
 const WINDOW: &[&str] = &["view.next_tab", "view.previous_tab"];
-const HELP: &[&str] =
-    &["help.shortcuts", SEP, "help.app_page", "help.github", "help.website", "help.discord", SEP, "help.check_updates", SEP, "help.about"];
+const HELP: &[&str] = &["help.user_guide", "help.shortcuts", SEP, "help.github", SEP, "help.about"];
 
 /// A registry shortcut as a craft-keymap chord: `command` is ⌘ (Ctrl elsewhere) and `mac_ctrl`
 /// the Control key on macOS. `None` for a key craft-keymap doesn't name.

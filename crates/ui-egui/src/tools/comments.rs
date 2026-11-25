@@ -363,7 +363,8 @@ pub fn color32(c: Rgb) -> Color32 {
     Color32::from_rgb(b(c[0]), b(c[1]), b(c[2]))
 }
 
-/// Commenting preferences shared by every document (author, per-tool styles, pin).
+/// Commenting preferences shared by every document (author, per-tool styles, pin), and the
+/// hover colours the page view reads with them.
 #[derive(Clone, Debug)]
 pub struct CommentPrefs {
     /// `/T` of new comments (Acrobat: Preferences ▸ Identity, default the login name).
@@ -377,6 +378,8 @@ pub struct CommentPrefs {
     pub group_tool: [CommentTool; 3],
     /// Hide hover previews on highlight annotations when they contain no comment text beyond the author.
     pub hide_empty_highlight_hover: bool,
+    /// The frame drawn over a QR code under the pointer (sRGB).
+    pub qr_highlight_color: [u8; 3],
 }
 
 impl Default for CommentPrefs {
@@ -388,6 +391,7 @@ impl Default for CommentPrefs {
             pinned: false,
             group_tool: [CommentTool::Note, CommentTool::Highlight, CommentTool::Ink],
             hide_empty_highlight_hover: false,
+            qr_highlight_color: crate::canvas::qr_hover::DEFAULT_QR_HIGHLIGHT,
         }
     }
 }

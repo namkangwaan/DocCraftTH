@@ -95,6 +95,7 @@ mod split_view_render;
 mod stamps;
 mod status_layers;
 mod text_select;
+mod thai_wrap;
 mod theme;
 mod trust_signer;
 mod ui;

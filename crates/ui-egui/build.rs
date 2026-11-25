@@ -44,7 +44,7 @@ fn craft_i18n() -> String {
     println!("cargo::rerun-if-env-changed=CRAFT_I18N_DIR");
     println!("cargo::rerun-if-env-changed=CRAFT_I18N_REQUIRED");
     let required = std::env::var("CRAFT_I18N_REQUIRED").is_ok_and(|v| v.trim() == "1");
-    let entries = match std::env::var_os("CRAFT_I18N_DIR").filter(|d| !d.is_empty()) {
+    let mut entries = match std::env::var_os("CRAFT_I18N_DIR").filter(|d| !d.is_empty()) {
         // Not canonicalized: on Windows that gives `\\?\C:\…`, which `include_str!` can't read.
         Some(dir) => match locales(&std::path::PathBuf::from(dir).join("locales")) {
             Ok(entries) => entries,
@@ -61,6 +61,15 @@ fn craft_i18n() -> String {
             Vec::new()
         }
     };
+    let th_tsv = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/i18n/th.tsv");
+    if th_tsv.is_file() {
+        println!("cargo::rerun-if-changed={}", th_tsv.display());
+        if let Some(entry) = entries.iter_mut().find(|(code, _, _)| code == "th") {
+            entry.2 = th_tsv;
+        } else {
+            entries.push(("th".to_string(), None, th_tsv));
+        }
+    }
     let mut o = String::from("/// (locale, shared catalog, PdfCraft's catalog), one entry per locale; `\"\"` for a missing file.\n");
     o.push_str("pub static CRAFT_I18N: &craft_i18n::Embedded = &[\n");
     for (code, shared, app) in entries {

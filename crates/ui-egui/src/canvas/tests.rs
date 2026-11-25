@@ -583,6 +583,13 @@ fn without_animations_a_transition_cuts_and_the_display_time_counts() {
     assert_eq!(v.view.current, 2, "page 2's second is up");
 }
 
+<<<<<<< ours
+/// A PDF of one line of text on each page, `lines[i]` on page `i`.
+pub(super) fn text_pages_pdf(lines: &[&str]) -> Vec<u8> {
+    let n = lines.len();
+    // 1 catalog, 2 pages, 3 font, then a page and its content stream for each line.
+    let mut objects = vec![
+=======
 /// A page turned by hand while a display time counts starts its own time afresh (ISO 32000-2
 /// §12.4.4.1, NOTE 1: "The user can advance the page manually before the specified time has
 /// expired"); the time left on the page before is not carried over.
@@ -607,6 +614,7 @@ fn fox_pages_pdf() -> Vec<u8> {
     let content = format!("<< /Length {} >>\nstream\n{body}\nendstream", body.len());
     let page = |contents: &str| format!("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 200] {contents}/Resources << /Font << /F1 7 0 R >> >> >>");
     let objects = [
+>>>>>>> theirs
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
         "<< /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >>".to_string(),
         page("/Contents 6 0 R "),
