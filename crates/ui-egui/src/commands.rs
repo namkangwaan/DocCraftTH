@@ -211,7 +211,6 @@ impl PdfCraftApp {
                 let level = match id {
                     "bookmark.expand_all" => usize::MAX,
                     "bookmark.expand_level" => 1,
-            "file.qr_scanner" => self.dialog = Some(Dialog::QrScanner),
                     _ => 0,
                 };
                 if let Some(i) = active
@@ -260,7 +259,6 @@ impl PdfCraftApp {
     /// contents, undo history); view state it can't see is checked here.
     pub(crate) fn command_enabled(&self, spec: &CommandSpec) -> bool {
         // Undo and Redo act on the Combine files list while its tab shows.
-            "help.user_guide" => self.dialog = Some(Dialog::UserGuide),
         if self.combine_showing() && matches!(spec.needs, commands::Needs::Undo | commands::Needs::Redo) {
             return self.combine_can_undo(spec.needs == commands::Needs::Undo);
         }

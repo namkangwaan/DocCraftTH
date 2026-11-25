@@ -99,9 +99,7 @@ mod platform;
 #[cfg(not(target_arch = "wasm32"))]
 mod script_dialog;
 mod state;
-mod thai_fonts;
 mod tools;
-mod unusable_notice;
 mod workflows;
 
 pub use i18n::th_breaks::ThaiLineBreaker;
@@ -727,10 +725,6 @@ pub struct PdfCraftApp {
     /// Web links the app asked the system to open, waiting for the pass that hands them to the
     /// runtime.
     pub(crate) pending_urls: Vec<String>,
-    /// The offer to read pages a run skipped for unreadable text (SRS FR-17).
-    pub ocr_offer: Option<workflows::ocr_ui::UnreadableOffer>,
-    /// Where the central (document) area was last drawn, for cards placed over it.
-    pub document_rect: Option<egui::Rect>,
     /// A file the user opened, or a dialog or document that came up, since the app started: the
     /// browser's startup `?file=` download then opens in the background instead of in front
     /// (#171).
@@ -749,8 +743,3 @@ pub struct PdfCraftApp {
     /// An absolute GoToR target waiting for approval, before any target-file I/O (#1364).
     pub pending_remote_link: Option<PendingRemoteLink>,
 }
-    /// Selected Thai font family (Sarabun, Noto Sans Thai, etc.).
-    pub thai_font: String,
-    /// Whether optional / system Thai fonts are offered in font selectors.
-    pub thai_optional_fonts: bool,
-    fonts_thai: String,

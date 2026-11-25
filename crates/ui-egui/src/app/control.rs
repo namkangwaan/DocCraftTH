@@ -110,7 +110,6 @@ impl PdfCraftApp {
             }
             ("tools", _) if value == "full" => self.expand_all_tools(ctx),
             ("tools", _) => {
-                    "user-guide" => Some(Dialog::UserGuide),
                 self.all_tools_full = false;
                 self.all_tools_expanded = value != "collapsed";
             }

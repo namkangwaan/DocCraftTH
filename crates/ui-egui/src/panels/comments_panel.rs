@@ -425,10 +425,6 @@ pub(crate) fn header(
     prefs: &CommentPrefs,
     enabled: impl Fn(&str) -> bool,
 ) -> Option<&'static str> {
-    let lang = crate::i18n::current();
-    let comment_date = a.modified.as_deref().map(|m| view.comments.formatted_date(lang, m).to_string());
-    let reply_dates: Vec<Option<String>> =
-        replies.iter().map(|r| r.modified.as_deref().map(|m| view.comments.formatted_date(lang, m).to_string())).collect();
     let (list, _) = threads(doc, prefs);
     let more = IconButton::new(IconSpec::svg(IconId::new("more"))).label(tl!("More options").to_string()).show(ui);
     let hide_all = if doc.comments_hidden() { tl!("Show all comments") } else { tl!("Hide all comments") };

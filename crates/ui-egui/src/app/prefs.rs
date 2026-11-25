@@ -114,8 +114,6 @@ impl PdfCraftApp {
     /// Colors). A document the change actually touches re-renders.
     pub fn set_reading_colors(&mut self, colors: pdfcraft_render::ReadingColors) {
         self.reading_colors = colors;
-            "thai_font": self.thai_font,
-            "thai_optional_fonts": self.thai_optional_fonts,
         for i in 0..self.views.len() {
             // Idempotent per document: the engine says whether anything changed.
             if self.session.set_reading_colors(self.views[i].id, colors) {
@@ -189,7 +187,6 @@ impl PdfCraftApp {
             default_zoom: Some(self.view_defaults.zoom_name().to_string()),
             language: Some(self.language.clone()),
             flatten_fill_sign: Some(self.flatten_fill_sign_on_save),
-        v["qr_highlight_color"] = serde_json::json!(self.comment_prefs.qr_highlight_color);
             ask_to_lock_signatures: Some(self.ask_to_lock_signatures),
             fill_text_size: Some(self.fill_text_size),
             fill_text_color: Some(self.fill_text_color),
@@ -428,12 +425,6 @@ impl PdfCraftApp {
         if let Some(setups) = parsed(&p.print_printers).and_then(|v| crate::print_ui::setups_from_json(&v)) {
             self.print_draft.setups = setups;
         }
-        if let Some(family) = v["thai_font"].as_str().and_then(crate::thai_fonts::known_choice) {
-            self.thai_font = family.to_string();
-        }
-        if let Some(on) = v["thai_optional_fonts"].as_bool() {
-            self.thai_optional_fonts = on;
-        }
         // The Print dialog's remembered choices (#2001). Settings are untrusted: an unknown name
         // or a scale outside the dialog's range keeps the default. The scale is applied before the
         // size mode, which carries it.
@@ -562,10 +553,6 @@ impl PdfCraftApp {
         }
         if let Some(pinned) = v.comment_tool_pinned {
             self.comment_prefs.pinned = pinned;
-        }
-        // Anything but three bytes (a channel over 255, say) keeps the colour it had.
-        if let Ok(color) = serde_json::from_value::<[u8; 3]>(v["qr_highlight_color"].clone()) {
-            self.comment_prefs.qr_highlight_color = color;
         }
     }
 

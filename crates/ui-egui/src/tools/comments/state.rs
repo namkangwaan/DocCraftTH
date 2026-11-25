@@ -212,8 +212,6 @@ impl CommentView {
 
     /// Prunes comment state whose `(page, index)` slot was removed or shifted by a document change.
     pub(crate) fn document_changed(&mut self, info: &DocInfo) {
-    /// Cache of formatted comment modified dates keyed by language and raw date string (M7).
-    pub date_cache: std::collections::HashMap<(crate::i18n::Lang, String), String>,
         let next = Self::snapshot_slots(info);
         let page_count = info.pages.len();
         let same_slot = |page: usize, index: usize| -> bool {
@@ -239,12 +237,6 @@ impl CommentView {
         if self.panel.editing.as_ref().is_some_and(|(thread, _, _)| {
             let (p, i) = bridge::thread_key(*thread);
             !same_slot(p, i)
-    /// Formats a comment modified timestamp for `lang`, caching the result to avoid
-    /// re-parsing and String allocations on every UI frame (M7).
-    pub fn formatted_date(&mut self, lang: crate::i18n::Lang, s: &str) -> &str {
-        self.date_cache.entry((lang, s.to_string())).or_insert_with(|| crate::i18n::local_pdf_date_in(lang, s)).as_str()
-    }
-
         }) {
             self.panel.editing = None;
         }

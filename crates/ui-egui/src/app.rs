@@ -422,9 +422,6 @@ impl PdfCraftApp {
             logic_without_ui: false,
             #[cfg(test)]
             panic_next: None,
-            thai_font: crate::thai_fonts::DEFAULT_THAI_FONT.to_string(),
-            thai_optional_fonts: false,
-            fonts_thai: String::new(),
             custom_actions: Vec::new(),
             action_run: None,
             pdfa: Default::default(),
@@ -511,8 +508,6 @@ impl PdfCraftApp {
             startup_superseded: false,
             startup_files: Vec::new(),
             community_card_closed: false,
-            ocr_offer: None,
-            document_rect: None,
             pending_link: None,
             pending_window: None,
             pending_remote_link: None,
@@ -549,7 +544,6 @@ impl PdfCraftApp {
     /// The app's root values for this frame: appearance mode, motion, interface scale and the
     /// interface language's direction. The one place the app's `RootEnv` is built.
     pub(crate) fn root_env(&self, ctx: &egui::Context) -> RootEnv {
-            qr_scanner_draft: Default::default(),
         static SIZES: std::sync::OnceLock<Arc<craft::theme::AppSizes>> = std::sync::OnceLock::new();
         let sizes = SIZES.get_or_init(|| {
             let mut sizes = craft::theme::AppSizes::default();
@@ -915,4 +909,3 @@ impl PdfCraftApp {
         }
     }
 }
-        self.document_rect = Some(central.response.rect);

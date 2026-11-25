@@ -27,7 +27,7 @@ pub(crate) use parts::range_of;
 #[cfg(test)]
 pub(crate) use parts::{Part, moved_order, moved_pages, removed_pages};
 #[cfg(test)]
-use parts::{title_of, utc_stamp, utc_stamp_in};
+use parts::{title_of, utc_stamp};
 pub(crate) use table::columns_from_legacy;
 pub(crate) use view::page;
 

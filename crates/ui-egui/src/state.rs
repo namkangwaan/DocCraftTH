@@ -296,8 +296,6 @@ pub enum LinkOrigin {
     Button,
     /// A script (`app.launchURL`).
     Script,
-    /// A QR code printed on the page (its right-click menu's Open in Browser).
-    QrCode,
 }
 
 impl LinkOrigin {
@@ -306,7 +304,6 @@ impl LinkOrigin {
             Self::Link => "A link",
             Self::Button => "A button",
             Self::Script => "A script",
-            Self::QrCode => "A QR code",
         }
     }
 }

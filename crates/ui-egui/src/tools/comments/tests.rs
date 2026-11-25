@@ -380,61 +380,8 @@ fn text_boxes_fit_their_text() {
     assert!(long[3] - long[1] > 50.0);
 }
 
-<<<<<<< ours
-#[test]
-fn comment_view_caches_formatted_dates_per_language() {
-    let mut cv = CommentView::default();
-    let th = crate::i18n::Lang::from_code("th").expect("registered language");
-    let en = crate::i18n::Lang::EN;
-    let raw = "D:20261008140500Z";
-    let formatted_th = cv.formatted_date(th, raw).to_string();
-    assert_eq!(cv.date_cache.len(), 1);
-    assert!(formatted_th.contains("2569"));
-    // Second call for the same language hits cache (no new entry).
-    let _ = cv.formatted_date(th, raw);
-    assert_eq!(cv.date_cache.len(), 1);
-    // Call for English adds a separate cache entry.
-    let formatted_en = cv.formatted_date(en, raw).to_string();
-    assert_eq!(cv.date_cache.len(), 2);
-    assert!(formatted_en.contains("2026"));
-}
-
-#[test]
-fn markup_comment_markers_skip_rounded_inverted_clamp_bounds() {
-    let prefs = CommentPrefs::default();
-    let ptr = PagePointer::default();
-    let info = DocInfo {
-        pages: vec![PageInfo { width: 12.0, height: 12.0, label: String::new(), crop: [0.0, 0.0, 12.0, 12.0], rotation: 0 }],
-        ..Default::default()
-    };
-    let a = Annotation { rect: [0.0, 0.0, 12.0, 12.0], contents: Some("Review".into()), ..annotation("Highlight", None, false) };
-    for min in [pos2(1.0e-7, 0.0), pos2(0.0, 1.0e-7)] {
-        let page = Rect::from_min_max(min, pos2(12.0, 12.0));
-        assert_eq!(page.size(), vec2(12.0, 12.0));
-        let marker_max = page.max - vec2(12.0, 12.0);
-        assert!(marker_max.x < page.min.x || marker_max.y < page.min.y);
-        let xf = PageXform { rect: page, rot: 0, pw: 12.0, ph: 12.0 };
-        let cx = PageCx {
-            page: 0,
-            xf: &xf,
-            ptr: &ptr,
-            info: &info,
-            tool: QuickTool::Select,
-            prefs: &prefs,
-            allowed: true,
-            hidden: false,
-            redact_mark: ([0.0; 3], 1.0),
-            keys: crate::page_keys::PageKeys::new(false),
-        };
-        assert!(page.intersects(cx.screen_rects(&a).last().unwrap()));
-        assert!(cx.comment_marker_rect(&a).is_none());
-    }
-}
-
-=======
 /// A commented markup's marker lies inside its page for every page and view rotation and zoom, picking the marker takes
 /// the topmost comment, and plain or off-page markup has none.
->>>>>>> theirs
 #[test]
 fn markup_comment_markers_stay_inside_turned_and_zoomed_pages() {
     let tolerance_of = |map: &PageMap<'_>| map.doc_len(SLOP);
