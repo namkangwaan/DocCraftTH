@@ -18,7 +18,7 @@ use crate::{ShapedScript, embedding};
 pub struct FaceId(u16);
 
 /// Registered faces beyond the bundled ones, so a folder of fonts cannot grow memory without bound.
-const MAX_CUSTOM: usize = 16;
+const MAX_CUSTOM: usize = 240;
 /// Ids 0 and 1 are the bundled primary Thai face and Sarabun; registered faces follow.
 const PRIMARY: u16 = 0;
 const SARABUN: u16 = 1;
@@ -102,16 +102,26 @@ pub fn by_family(name: &str) -> Option<FaceId> {
     })
 }
 
-/// Whether `bytes` is a font a form can carry as a Thai face: it passes the embedding checks and has
-/// Thai letters. Registers nothing; the error says why not.
+/// Whether `bytes` is a font a form can carry as a Thai face: it passes the embedding checks,
+/// yields a usable ASCII `/BaseFont` name, and has Thai letters. Registers nothing; the error says why not.
 pub fn check(bytes: &[u8]) -> Result<(), String> {
     embedding::validate_document_input(bytes)?;
     embedding::validate(bytes)?;
+    let (family, _) = embedding::names(bytes)?;
+    let ascii: String = family.chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_')).collect();
+    if ascii.is_empty() || ascii.len() > 128 {
+        return Err("the font family name has no ASCII letters for /BaseFont".into());
+    }
     let font = FontRef::new(bytes).map_err(|e| e.to_string())?;
     if font.charmap().map('ก').is_none() {
         return Err("this font has no Thai letters".into());
     }
     Ok(())
+}
+
+/// The `FAMILY_NAME` string `embedding` will use as `/BaseFont` when `bytes` is embedded.
+pub fn family_of(bytes: &[u8]) -> Result<String, String> {
+    embedding::names(bytes).map(|(family, _)| family)
 }
 
 /// Register a font file as a Thai face. Fails with the embedding policy's own message when the font

@@ -28,29 +28,76 @@ pub fn field_face(doc: &Document, f: &Field) -> FieldFace {
     if STANDARD.contains(&resource.as_str()) {
         return FieldFace::Standard;
     }
+    if let Some(id) = embedded_thai_face(doc, &resource) {
+        return FieldFace::Thai(id);
+    }
     match dr_base_font(doc, &resource) {
-        Some(base) => match thai_faces::by_family(&base) {
-            Some(id) => FieldFace::Thai(id),
-            None if STANDARD.contains(&base.as_str()) => FieldFace::Standard,
-            None => FieldFace::Unknown(base),
-        },
+        Some(base) if STANDARD.contains(&base.as_str()) => FieldFace::Standard,
+        Some(base) => FieldFace::Unknown(base),
         None => FieldFace::Unknown(resource),
     }
 }
 
-/// The `/BaseFont` of the form's `/DR /Font` entry `resource`, when it has one.
-fn dr_base_font(doc: &Document, resource: &str) -> Option<String> {
+/// The `/DR /Font` dictionary of the form, if present.
+fn dr_fonts(doc: &Document) -> Option<super::Dict> {
     crate::acroform(doc)
         .and_then(|af| af.get(b"DR").and_then(|o| doc.resolve(o).as_dict().cloned()))
         .and_then(|dr| dr.get(b"Font").and_then(|o| doc.resolve(o).as_dict().cloned()))
-        .and_then(|fonts| fonts.get(resource.as_bytes()).and_then(|o| doc.resolve(o).as_dict().cloned()))
+}
+
+/// The `/BaseFont` of the form's `/DR /Font` entry `resource`, when it has one.
+fn dr_base_font(doc: &Document, resource: &str) -> Option<String> {
+    dr_fonts(doc)?
+        .get(resource.as_bytes())
+        .and_then(|o| doc.resolve(o).as_dict().cloned())
         .and_then(|font| font.name(b"BaseFont").map(|n| String::from_utf8_lossy(n).into_owned()))
+}
+
+/// Resolves a `/DR /Font` entry to a registered Thai [`FaceId`], first by `/BaseFont` family and
+/// otherwise by reading and registering the entry's embedded `FontFile2` / `FontFile3` stream.
+fn font_dict_thai_face(doc: &Document, font: &super::Dict) -> Option<FaceId> {
+    if let Some(base) = font.name(b"BaseFont").map(|n| String::from_utf8_lossy(n).into_owned())
+        && let Some(id) = thai_faces::by_family(&base)
+    {
+        return Some(id);
+    }
+    let descendant = font
+        .get(b"DescendantFonts")
+        .and_then(|o| doc.resolve(o).as_array().and_then(|a| a.first().cloned()))
+        .and_then(|o| doc.resolve(&o).as_dict().cloned())?;
+    let descriptor = descendant.get(b"FontDescriptor").and_then(|o| doc.resolve(o).as_dict().cloned())?;
+    let stream_obj = descriptor.get(b"FontFile2").or_else(|| descriptor.get(b"FontFile3"))?;
+    let bytes = match doc.resolve(stream_obj).as_ref() {
+        Object::Stream(s) => s.decoded_within(16 << 20).ok()?,
+        _ => return None,
+    };
+    thai_faces::register(bytes).ok()
+}
+
+fn embedded_thai_face(doc: &Document, resource: &str) -> Option<FaceId> {
+    let font = dr_fonts(doc)?.get(resource.as_bytes()).and_then(|o| doc.resolve(o).as_dict().cloned())?;
+    font_dict_thai_face(doc, &font)
+}
+
+/// All embeddable Thai faces already carried in the document's `/AcroForm /DR /Font`.
+pub fn document_thai_faces(doc: &Document) -> Vec<FaceId> {
+    let Some(fonts) = dr_fonts(doc) else { return Vec::new() };
+    let mut out = Vec::new();
+    for (_, val) in fonts.iter() {
+        if let Some(font) = doc.resolve(val).as_dict()
+            && let Some(id) = font_dict_thai_face(doc, font)
+            && !out.contains(&id)
+        {
+            out.push(id);
+        }
+    }
+    out
 }
 
 /// The shaping script of the Thai face the `/DA` font `resource` names, or the default Thai face
 /// when it names none: the face an appearance draws Thai runs with.
 pub(crate) fn thai_script_of(doc: &Document, resource: &str) -> pdfcraft_fonts::ShapedScript {
-    dr_base_font(doc, resource).and_then(|base| thai_faces::by_family(&base)).map_or(pdfcraft_fonts::ShapedScript::Thai, thai_faces::script)
+    embedded_thai_face(doc, resource).map_or(pdfcraft_fonts::ShapedScript::Thai, thai_faces::script)
 }
 
 /// The `/DR /Font` resource the form holds `face` under, embedding the whole font there the first

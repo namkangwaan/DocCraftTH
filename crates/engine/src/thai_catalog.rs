@@ -40,6 +40,7 @@ const THAI_CODE_PAGE: u32 = 1 << 16;
 
 /// `%LOCALAPPDATA%\PdfCraft\Fonts` on Windows (`$XDG_DATA_HOME/pdfcraft/fonts` elsewhere): fonts put
 /// there are found without being installed.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn app_font_dir() -> Option<PathBuf> {
     let var = |name: &str| std::env::var_os(name).filter(|v| !v.is_empty()).map(PathBuf::from);
     if cfg!(windows) {
@@ -51,15 +52,27 @@ pub fn app_font_dir() -> Option<PathBuf> {
 
 /// The catalogue of this machine's fonts the Font list reads: the system catalogue with the app's
 /// font folder added, or, with `PDFCRAFT_SYSTEM_FONTS=0`, only the files in that folder.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn installed_catalog() -> Arc<Catalog> {
     let dir = app_font_dir();
+    if let Some(ref d) = dir {
+        let _ = std::fs::create_dir_all(d);
+    }
     if std::env::var_os("PDFCRAFT_SYSTEM_FONTS").is_some_and(|v| v == "0") {
         let files = dir
             .and_then(|d| std::fs::read_dir(d).ok())
             .map(|read| {
                 read.filter_map(Result::ok)
                     .map(|e| e.path())
-                    .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("ttf") || x.eq_ignore_ascii_case("otf")))
+                    .filter(|p| {
+                        std::fs::symlink_metadata(p).is_ok_and(|m| !m.file_type().is_symlink() && m.is_file())
+                            && p.extension().is_some_and(|x| {
+                                x.eq_ignore_ascii_case("ttf")
+                                    || x.eq_ignore_ascii_case("otf")
+                                    || x.eq_ignore_ascii_case("ttc")
+                                    || x.eq_ignore_ascii_case("otc")
+                            })
+                    })
                     .collect()
             })
             .unwrap_or_default();
@@ -88,26 +101,45 @@ pub fn entries_in_files(files: Vec<PathBuf>) -> Vec<CatalogEntry> {
     thai_entries(&Catalog::of_files(files))
 }
 
+/// Maximum file size `embedding::validate` accepts (16 MiB).
+const MAX_FONT_BYTES: u64 = 16 << 20;
+
 /// The bundled faces a form can embed, then the Thai faces `catalog` lists (Regular style, by
 /// family). Reads each candidate's file, so call it when the Font list opens, not every frame.
 pub fn thai_entries(catalog: &Catalog) -> Vec<CatalogEntry> {
     let mut out = bundled_entries();
     let mut seen: HashSet<FaceId> = thai_faces::bundled().into_iter().collect();
-    let mut seen_substituted = HashSet::new();
+    let mut seen_keys: HashSet<String> = HashSet::new();
     let sarabun = thai_faces::sarabun();
     let mut faces: Vec<FaceInfo> = catalog.faces().iter().filter(|f| is_thai_regular(f)).cloned().collect();
     faces.sort_by(|a, b| a.family.cmp(&b.family));
     for face in faces {
+        let key = pdfcraft_fonts::embedding::face_key(&face.family);
+        if seen_keys.contains(&key) {
+            continue;
+        }
+        if face.file_bytes.is_some_and(|b| b > MAX_FONT_BYTES) {
+            if let Some(sarabun) = sarabun
+                && seen_keys.insert(key)
+            {
+                out.push(CatalogEntry { family: face.family, font: FieldFont::Thai(sarabun), source: Source::Installed, substituted: true });
+            }
+            continue;
+        }
         let Ok(data) = catalog.load(&face) else { continue };
-        match thai_faces::check(&data.bytes).and_then(|()| thai_faces::register(data.bytes.to_vec())) {
-            Ok(id) => {
-                if seen.insert(id) {
-                    out.push(CatalogEntry { family: face.family, font: FieldFont::Thai(id), source: Source::Installed, substituted: false });
+        match thai_faces::check(&data.bytes).and_then(|()| {
+            let fam = thai_faces::family_of(&data.bytes)?;
+            let id = thai_faces::register(data.bytes.to_vec())?;
+            Ok((fam, id))
+        }) {
+            Ok((fam, id)) => {
+                if seen.insert(id) && seen_keys.insert(pdfcraft_fonts::embedding::face_key(&fam)) {
+                    out.push(CatalogEntry { family: fam, font: FieldFont::Thai(id), source: Source::Installed, substituted: false });
                 }
             }
             Err(_) => {
                 if let Some(sarabun) = sarabun
-                    && seen_substituted.insert(face.family.clone())
+                    && seen_keys.insert(key)
                 {
                     out.push(CatalogEntry { family: face.family, font: FieldFont::Thai(sarabun), source: Source::Installed, substituted: true });
                 }
@@ -176,5 +208,49 @@ mod tests {
         assert_eq!(bundled.len(), pdfcraft_fonts::thai_faces::bundled().len());
         assert!(bundled.iter().all(|e| !e.substituted));
         assert!(all.iter().take(bundled.len()).all(|e| e.source == Source::Bundled));
+    }
+
+    #[test]
+    fn system_fonts_off_skips_installed_roots() {
+        let all = thai_entries(&Catalog::of_files(Vec::new()));
+        assert!(all.iter().all(|e| e.source == Source::Bundled));
+    }
+
+    #[test]
+    fn oversized_or_symlinked_files_are_never_listed_as_embeddable() {
+        let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+        let dir = std::env::temp_dir().join(format!("pdfcraft-thai-catalog-edge-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("real.ttf");
+        std::fs::write(&target, pdfcraft_fonts::thai_faces::bytes(sarabun)).unwrap();
+        // A non-font oversized file (>16 MiB) must never be loaded or listed as embeddable.
+        let big = dir.join("big.ttf");
+        let f = std::fs::File::create(&big).unwrap();
+        f.set_len((16 << 20) + 1024).unwrap();
+        let entries = thai_entries(&Catalog::of_files(vec![big]));
+        assert!(entries.iter().filter(|e| e.source == Source::Installed).all(|e| e.substituted));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn catalog_dedupes_embeddable_and_substituted_by_family_key() {
+        let (Some(sarabun), Some(variable)) = (pdfcraft_fonts::thai_faces::sarabun(), pdfcraft_fonts::document_thai_font()) else { return };
+        let dir = std::env::temp_dir().join(format!("pdfcraft-thai-catalog-dedupe-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let f1 = dir.join("sarabun_copy.ttf");
+        let mut copy1 = pdfcraft_fonts::thai_faces::bytes(sarabun).to_vec();
+        copy1.extend_from_slice(&11u32.to_le_bytes());
+        std::fs::write(&f1, copy1).unwrap();
+        let f2 = dir.join("var_copy.ttf");
+        let mut copy2 = variable.bytes.to_vec();
+        copy2.extend_from_slice(&12u32.to_le_bytes());
+        std::fs::write(&f2, copy2).unwrap();
+        let found = installed(thai_entries(&Catalog::of_files(vec![f1, f2])));
+        let _ = std::fs::remove_dir_all(&dir);
+        let keys: Vec<_> = found.iter().map(|e| pdfcraft_fonts::embedding::face_key(&e.family)).collect();
+        let unique: HashSet<_> = keys.iter().collect();
+        assert_eq!(keys.len(), unique.len(), "duplicate family keys in {found:?}");
     }
 }

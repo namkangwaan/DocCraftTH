@@ -621,13 +621,14 @@ impl Automation {
         } else {
             single.into_iter().map(str::to_owned).collect()
         };
+        let font_entries = self.appearance_font_entries(a)?;
         let mut edits = Vec::with_capacity(names.len());
         let mut new_name = None;
         let mut reported_font: Option<ChosenFont> = None;
         for name in &names {
             // Merge appearance changes separately for each field: changing just the border
             // must not copy the first field's fill, font or text colour onto the others.
-            let (props, chosen_font) = self.field_props_arg(a, name)?;
+            let (props, chosen_font) = self.field_props_arg(a, name, &font_entries)?;
             if props == FieldProps::default() {
                 return Err(bad("nothing to change"));
             }
@@ -670,8 +671,9 @@ impl Automation {
         Ok(out)
     }
 
-    /// Font files (`.ttf` / `.otf`) directly inside the configured automation read root, resolved
-    /// through `self.resolve`. Never touches OS or application font folders.
+    /// Font files (`.ttf`, `.otf`, `.ttc`, `.otc`) directly inside the configured automation read
+    /// root, resolved through `self.resolve` (skipping symbolic links). Never touches OS or
+    /// application font folders.
     fn root_font_files(&self) -> Vec<std::path::PathBuf> {
         let base = if let Some(ref roots) = self.roots { roots.read_root().map(std::path::Path::to_path_buf) } else { self.root.clone() };
         let Some(base) = base else { return Vec::new() };
@@ -679,12 +681,13 @@ impl Automation {
         let Ok(read) = std::fs::read_dir(&dir) else { return Vec::new() };
         let mut files = Vec::new();
         for entry in read.flatten().take(256) {
-            if !entry.file_type().is_ok_and(|t| t.is_file()) {
+            let path = entry.path();
+            if !std::fs::symlink_metadata(&path).is_ok_and(|m| !m.file_type().is_symlink() && m.is_file()) {
                 continue;
             }
-            let path = entry.path();
-            if path.extension().is_some_and(|x| x.eq_ignore_ascii_case("ttf") || x.eq_ignore_ascii_case("otf"))
-                && let Ok(resolved) = self.resolve(&path.to_string_lossy(), false)
+            if path.extension().is_some_and(|x| {
+                x.eq_ignore_ascii_case("ttf") || x.eq_ignore_ascii_case("otf") || x.eq_ignore_ascii_case("ttc") || x.eq_ignore_ascii_case("otc")
+            }) && let Ok(resolved) = self.resolve(&path.to_string_lossy(), false)
             {
                 files.push(resolved);
             }
@@ -692,15 +695,40 @@ impl Automation {
         files
     }
 
-    fn field_props_arg(&self, a: &Args, name: &str) -> Result<(FieldProps, Option<ChosenFont>)> {
+    /// Resolves available Thai font entries once per `form_set_props` call: bundled faces, font files
+    /// inside the read root, and Thai faces already embedded in the document.
+    fn appearance_font_entries(&self, a: &Args) -> Result<Vec<pdfcraft_engine::thai_catalog::CatalogEntry>> {
+        if a.get("appearance").and_then(|v| v.get("font")).is_none() {
+            return Ok(Vec::new());
+        }
+        let mut entries = pdfcraft_engine::thai_catalog::entries_in_files(self.root_font_files());
+        if let Ok(doc) = self.doc(a) {
+            for (family, font) in doc.embedded_thai_fonts() {
+                if !entries.iter().any(|e| !e.substituted && e.family.eq_ignore_ascii_case(&family)) {
+                    entries.push(pdfcraft_engine::thai_catalog::CatalogEntry {
+                        family,
+                        font,
+                        source: pdfcraft_engine::thai_catalog::Source::Bundled,
+                        substituted: false,
+                    });
+                }
+            }
+        }
+        Ok(entries)
+    }
+
+    fn field_props_arg(
+        &self,
+        a: &Args,
+        name: &str,
+        font_entries: &[pdfcraft_engine::thai_catalog::CatalogEntry],
+    ) -> Result<(FieldProps, Option<ChosenFont>)> {
         let doc = self.doc(a)?;
         let f = doc.form.iter().find(|f| f.name == name).ok_or_else(|| failed(format!("there is no field named {name:?} (see form_fields)")))?;
         let (appearance, chosen_font) = match a.get("appearance") {
             None => (None, None),
             Some(v) => {
-                let entries =
-                    if v.get("font").is_some() { pdfcraft_engine::thai_catalog::entries_in_files(self.root_font_files()) } else { Vec::new() };
-                let (patch, chosen) = look_arg(v, &entries)?;
+                let (patch, chosen) = look_arg(v, font_entries)?;
                 ((patch != pdfcraft_engine::FieldLookPatch::default()).then_some(patch), chosen)
             }
         };

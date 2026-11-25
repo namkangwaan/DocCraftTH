@@ -7953,7 +7953,8 @@ fn an_unknown_da_font_is_reported_by_name_not_as_helvetica() {
 fn a_patch_without_a_font_leaves_an_unknown_da_unchanged() {
     let mut doc = thai_da_form("/THSarabunPSK 0 Tf 0 g", None);
     let before = field(&fields(&doc), "name").da.clone();
-    set_props(&mut doc, "name", &FieldProps { appearance: Some(LookPatch { width: Some(2.0), ..Default::default() }), ..FieldProps::default() }).unwrap();
+    set_props(&mut doc, "name", &FieldProps { appearance: Some(LookPatch { width: Some(2.0), ..Default::default() }), ..FieldProps::default() })
+        .unwrap();
     assert_eq!(field(&fields(&doc), "name").da, before);
 }
 
@@ -8106,4 +8107,66 @@ fn the_embedded_font_covers_thai_the_value_never_used() {
         other => panic!("not a stream: {other:?}"),
     };
     assert!(pdfcraft_fonts::embedding::covers(&bytes, "ฐานข้อมูลใหม่ ๑๒๓"), "a viewer's later typing finds its glyphs");
+}
+
+#[test]
+fn comb_field_with_chosen_thai_face_draws_clusters_without_question_marks() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = fixture();
+    set_props(&mut doc, "zip", &thai_font(sarabun)).unwrap();
+    set_value(&mut doc, "zip", &FieldValue::Text("ชื่อ".into())).unwrap();
+    let zip = field(&fields(&doc), "zip").clone();
+    let content = ap(&doc, &zip.widgets[0]);
+    assert!(!content.contains('?'), "comb field must not emit '?': {content}");
+    assert!(acroform(&doc).and_then(|af| af.get(b"NeedAppearances").cloned()).is_none(), "comb field must not set /NeedAppearances");
+}
+
+#[test]
+fn auto_size_multiline_and_password_work_with_chosen_thai_face() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = fixture();
+    for name in ["notes", "pin"] {
+        set_props(&mut doc, name, &thai_font(sarabun)).unwrap();
+    }
+    // Multiline wrap under Sarabun
+    set_value(&mut doc, "notes", &FieldValue::Text("ภาษาไทยหลายบรรทัดในช่องฟอร์มที่เลือกฟอนต์สารบรรณ".into())).unwrap();
+    let notes_ap = ap(&doc, &field(&fields(&doc), "notes").widgets[0]);
+    assert!(!notes_ap.contains('?'), "multiline must not emit '?': {notes_ap}");
+    // Password field draws '*' without '?'
+    set_value(&mut doc, "pin", &FieldValue::Text("รหัส".into())).unwrap();
+    let pin_ap = ap(&doc, &field(&fields(&doc), "pin").widgets[0]);
+    assert!(!pin_ap.contains('?') && pin_ap.contains("(****)"), "password must mask as '*': {pin_ap}");
+}
+
+#[test]
+fn non_bundled_embedded_thai_font_preserves_identity_and_face_on_reopen() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    // Simulate a form reopened in a fresh process where the embedded /BaseFont is not in `CUSTOM`.
+    let f = field(&fields(&doc), "name").clone();
+    let res = appearance::parse_da(&f.da).font;
+    let font_ref = dr_font_dict(&doc).get(res.as_bytes()).and_then(Object::as_ref).expect("indirect /DR font");
+    doc.update_dict(font_ref, |d| d.set(b"BaseFont".to_vec(), Object::name("UnregisteredCustomThai"))).unwrap();
+    let doc = reopen(&doc);
+    let f = field(&fields(&doc), "name").clone();
+    assert!(matches!(field_face(&doc, &f), FieldFace::Thai(_)), "must resolve embedded FontFile2, got {:?}", field_face(&doc, &f));
+    assert!(matches!(look(&doc, &f).font, FieldFont::Thai(_)), "look().font must stay Thai");
+}
+
+#[test]
+fn signed_form_is_not_mutated_when_thai_font_refused() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    add_field(&mut doc, 0, [20.0, 60.0, 120.0, 90.0], &NewField::Signature, Some("sig")).unwrap();
+    let sig = field(&fields(&doc), "sig").obj;
+    doc.update_dict(sig, |d| d.set(b"V".to_vec(), Object::Dict(Dict::new()))).unwrap();
+    let before = write_incremental(&doc, &SaveOptions::default()).unwrap();
+    let props = FieldProps {
+        tooltip: Some("Should not be written".into()),
+        look: Some(Look { border: None, fill: None, width: 1.0, style: BorderStyle::Solid, text: [0.0; 3], font: FieldFont::Thai(sarabun) }),
+        ..Default::default()
+    };
+    assert!(set_props(&mut doc, "name", &props).is_err(), "signed form must refuse Thai font");
+    assert_eq!(write_incremental(&doc, &SaveOptions::default()).unwrap(), before, "doc must not be partially mutated on refusal");
 }

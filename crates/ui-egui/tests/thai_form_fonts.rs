@@ -219,3 +219,64 @@ fn bulk_edit_can_set_a_thai_face() {
     assert_eq!(doc.field_look("alpha").unwrap().font, FieldFont::Thai(sarabun));
     assert_eq!(doc.field_look("beta").unwrap().font, FieldFont::Thai(sarabun));
 }
+
+#[test]
+fn substituted_notice_does_not_leak_across_reopen_or_other_field() {
+    let (Some(sarabun), Some(variable)) = (pdfcraft_fonts::thai_faces::sarabun(), pdfcraft_fonts::document_thai_font()) else { return };
+    let dir = std::env::temp_dir().join(format!("pdfcraft-ui-thai-leak-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut copy = variable.bytes.to_vec();
+    copy.extend_from_slice(&9u32.to_le_bytes());
+    let file = dir.join("variable.ttf");
+    std::fs::write(&file, copy).unwrap();
+    let entries = pdfcraft_engine::thai_catalog::thai_entries(&craft::font_catalog::Catalog::of_files(vec![file]));
+    let _ = std::fs::remove_dir_all(&dir);
+    let sub = entries.iter().find(|e| e.substituted).expect("a substituted Thai face").clone();
+    let option_label = format!("{} (shown as Sarabun)", sub.family);
+
+    let mut draft1 = pdfcraft_ui_egui::prepare::FieldDraft::default();
+    draft1.field = "city".into();
+    draft1.look = Some(pdfcraft_engine::FieldLook {
+        border: None,
+        fill: None,
+        width: 1.0,
+        style: pdfcraft_engine::BorderStyle::Solid,
+        text: [0.0; 3],
+        font: FieldFont::Helvetica,
+    });
+    draft1.face = Some(pdfcraft_engine::FieldFace::Standard);
+    let mut installed = false;
+    let mut h = Harness::builder().with_size(egui::vec2(600.0, 300.0)).build_ui_state(
+        move |ui, d: &mut pdfcraft_ui_egui::prepare::FieldDraft| {
+            if !installed {
+                install_runtime(ui.ctx());
+                installed = true;
+            }
+            pdfcraft_ui_egui::prepare::show_font_row_with_entries(ui, d, &entries);
+        },
+        draft1,
+    );
+    h.run_steps(2);
+    h.get_by_label("Font:").click();
+    h.run_steps(2);
+    h.get_all_by_label(&option_label).last().expect("substituted face option").click();
+    h.run_steps(2);
+    assert_eq!(h.state().look.unwrap().font, FieldFont::Thai(sarabun));
+
+    // Reopening a fresh draft for the same field ("city") with Sarabun must NOT show the notice.
+    let mut fresh = pdfcraft_ui_egui::prepare::FieldDraft::default();
+    fresh.field = "city".into();
+    fresh.look = Some(pdfcraft_engine::FieldLook {
+        border: None,
+        fill: None,
+        width: 1.0,
+        style: pdfcraft_engine::BorderStyle::Solid,
+        text: [0.0; 3],
+        font: FieldFont::Thai(sarabun),
+    });
+    fresh.face = Some(pdfcraft_engine::FieldFace::Thai(sarabun));
+    *h.state_mut() = fresh;
+    h.run_steps(2);
+    let notice = format!("{} can't be embedded in a form. The field will use Sarabun.", sub.family);
+    assert!(h.query_all_by_label_contains(&notice).next().is_none(), "substitution notice must not leak into a reopened dialog");
+}

@@ -20,9 +20,9 @@ mod tree;
 pub(crate) use tree::ancestor_sets;
 
 pub use edit::set_props;
-pub use face::{FieldFace, field_face};
-pub(crate) use face::thai_script_of;
 pub(crate) use edit::set_props_object;
+pub(crate) use face::thai_script_of;
+pub use face::{FieldFace, document_thai_faces, field_face};
 pub use lifecycle::{add_field, delete_field, delete_field_object, delete_widget, duplicate_field};
 pub(crate) use look::button_appearance;
 pub(crate) use look::redraw_field_object;

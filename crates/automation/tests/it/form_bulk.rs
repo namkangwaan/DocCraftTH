@@ -187,6 +187,19 @@ fn appearance_font_accepts_a_bundled_thai_family() {
 }
 
 #[test]
+fn appearance_font_accepts_a_font_already_embedded_in_the_document() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let (mut a, id, dir) = setup("thai-embedded-in-doc");
+    // Embed Sarabun on "alpha", then set "beta" to "Sarabun" and verify it works with no font files in root.
+    call(&mut a, json!({"doc": id, "field": "alpha", "appearance": {"font": "Sarabun"}}));
+    let out = call(&mut a, json!({"doc": id, "field": "beta", "appearance": {"font": "Sarabun"}}));
+    assert_eq!(out["font"], json!({"family": "Sarabun", "embedded": true, "substituted": false}));
+    let doc = a.session().get(DocId(id)).unwrap();
+    assert_eq!(doc.field_look("beta").unwrap().font, FieldFont::Thai(sarabun));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn unknown_font_name_is_an_error_listing_choices() {
     let Some(_) = pdfcraft_fonts::thai_faces::sarabun() else { return };
     let (mut a, id, dir) = setup("thai-unknown");

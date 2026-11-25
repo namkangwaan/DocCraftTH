@@ -167,6 +167,9 @@ fn set_props_target(doc: &mut Document, name: &str, object: Option<ObjRef>, prop
     if f.locked() && props.locked != Some(false) && *props != (FieldProps { locked: props.locked, ..FieldProps::default() }) {
         return invalid(format!("{name} is locked: unlock it first"));
     }
+    // Validate Thai font embedding before any mutation (`locked`, `actions`, `rename_field`) so a
+    // signed-form refusal leaves `doc` untouched.
+    let thai_res = super::face::ensure_props_thai_font(doc, props)?;
     if let Some(options) = export_options.as_ref()
         && *props == (FieldProps { export_value: props.export_value.clone(), ..FieldProps::default() })
     {
@@ -189,8 +192,6 @@ fn set_props_target(doc: &mut Document, name: &str, object: Option<ObjRef>, prop
     // A radio button renamed to another radio group's name joins that group (#4949). The other
     // properties are written first, to this field, and its buttons then move.
     let (new_name, join) = rename_field(doc, &all, &f, name, props)?;
-    // A Thai face is embedded in the form's resources before the default appearance names it.
-    let thai_res = super::face::ensure_props_thai_font(doc, props)?;
     // The new default appearance when the size or the look changes.
     let size = props.font_size.unwrap_or_else(|| crate::appearance::parse_da(&f.da).size);
     let new_da = match &props.look {

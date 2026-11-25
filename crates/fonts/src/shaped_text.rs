@@ -423,8 +423,14 @@ pub fn first_undrawable_in_line(line: &str) -> Option<char> {
 /// Why the Thai in `text` can't be drawn ([`thai_message`]): this build has no Thai face, or the
 /// face lacks a character. For tools that refuse such text rather than write `?`; `None` when all
 /// of its Thai draws, or it has none.
+/// [`thai_refusal`] using `script`'s face, falling back to [`ShapedScript::Thai`] when `script`
+/// lacks a glyph.
+pub fn thai_refusal_in(text: &str, script: ShapedScript) -> Option<String> {
+    text.split(['\n', '\r']).filter(|l| l.chars().any(is_thai)).find_map(|l| thai_pieces_in(l, script).err().map(|e| thai_message(e, l)))
+}
+
 pub fn thai_refusal(text: &str) -> Option<String> {
-    text.split(['\n', '\r']).filter(|l| l.chars().any(is_thai)).find_map(|l| thai_pieces(l).err().map(|e| thai_message(e, l)))
+    thai_refusal_in(text, ShapedScript::Thai)
 }
 
 /// [`type3_font`] written into `doc`, with its glyphs, descriptor and ToUnicode as objects of their

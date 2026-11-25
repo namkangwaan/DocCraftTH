@@ -97,6 +97,9 @@ pub struct FieldDraft {
     /// The field's `/DA` font face as read from the document (`Unknown` keeps `/DA`'s font name
     /// unless the user picks another font).
     pub face: Option<pdfcraft_engine::FieldFace>,
+    /// Name of a non-embeddable Thai font selected in this dialog session (shown as Sarabun);
+    /// never persisted to the document or across dialog opens.
+    pub substituted_family: Option<String>,
     /// Check boxes and radio buttons: the mark when on (Options tab).
     pub check_style: Option<pdfcraft_engine::CheckStyle>,
     pub format: Format,
@@ -172,6 +175,7 @@ impl Default for FieldDraft {
             rotation: 0,
             look: None,
             face: None,
+            substituted_family: None,
             check_style: None,
             format: Format::default(),
             validate: Validate::default(),
@@ -237,6 +241,7 @@ impl FieldDraft {
             rotation: f.widgets.get(widget).map(|w| w.rotation).unwrap_or(0),
             look: None,
             face: None,
+            substituted_family: None,
             check_style: None,
             format: f.actions.format.clone(),
             validate: f.actions.validate.clone(),

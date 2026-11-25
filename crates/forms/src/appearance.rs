@@ -788,12 +788,36 @@ pub(crate) fn thai_refusal(doc: &Document, f: &Field, text: &str) -> Option<Stri
     if f.has(flags::PASSWORD) || !text.chars().any(shaped_text::is_thai) {
         return None;
     }
-    let held = |w: &Widget| {
+    let script = |w: &Widget| {
         let wd = doc.get(w.obj).as_dict().cloned().unwrap_or_default();
         let da = parse_da(wd.get(b"DA").and_then(|o| doc.resolve(o).as_string().map(|s| s.to_text())).as_deref().unwrap_or(&f.da));
-        dr_font(doc, &da.font).is_some_and(|(_, enc)| matches!(enc, FontText::Simple(_)) && text.split(['\n', '\r']).all(|l| enc.can_encode(l)))
+        (dr_font(doc, &da.font), crate::author::thai_script_of(doc, &da.font))
     };
-    if f.widgets.iter().all(held) { None } else { shaped_text::thai_refusal(text) }
+    let held = |w: &Widget| {
+        let (dr, _) = script(w);
+        dr.is_some_and(|(_, enc)| matches!(enc, FontText::Simple(_)) && text.split(['\n', '\r']).all(|l| enc.can_encode(l)))
+    };
+    if f.widgets.iter().all(held) {
+        None
+    } else {
+        let chosen = f.widgets.first().map(|w| script(w).1).unwrap_or(pdfcraft_fonts::ShapedScript::Thai);
+        shaped_text::thai_refusal_in(text, chosen)
+    }
+}
+
+/// Splits `text` into one-cell clusters for a comb field so Thai combining marks stay with their base letter.
+fn comb_clusters(text: &str) -> Vec<String> {
+    let mut clusters: Vec<String> = Vec::new();
+    for ch in text.chars() {
+        if shaped_text::joins_previous(ch)
+            && let Some(prev) = clusters.last_mut()
+        {
+            prev.push(ch);
+        } else {
+            clusters.push(ch.to_string());
+        }
+    }
+    clusters
 }
 
 /// [`field_appearance_drawn`], and whether the text drawn is cut off by the box.
@@ -841,14 +865,14 @@ fn field_appearance_fit(doc: &Document, f: &Field, w: &Widget, values: &[String]
         }
     };
     let dr = dr_font(doc, &da.font);
+    let chosen_script = crate::author::thai_script_of(doc, &da.font);
     // Thai the form's font can't hold (it isn't a simple font encoding it) is drawn from the Thai
     // face, as Add text draws it: Type 3 glyphs beside the form's font, which draws the rest. One
     // line of a text field or combo box at a time; the `/DA` is kept.
     let thai = matches!(f.kind, FieldKind::Text | FieldKind::Combo)
-        && !f.is_comb()
         && text.chars().any(shaped_text::is_thai)
         && !dr.as_ref().is_some_and(|(_, enc)| matches!(enc, FontText::Simple(_)) && can_show(enc, &text, false))
-        && shaped_text::thai_refusal(&text).is_none();
+        && shaped_text::thai_refusal_in(&text, chosen_script).is_none();
     let latin_text: String = if thai { text.chars().filter(|c| !shaped_text::is_thai(*c)).collect() } else { text.clone() };
     // Latin, Greek and Cyrillic the form's font can't hold, nor Helvetica, are drawn from the
     // bundled Inter face in the same way, beside the font that draws the rest (#6822): the value is
@@ -859,15 +883,13 @@ fn field_appearance_fit(doc: &Document, f: &Field, w: &Widget, values: &[String]
         None => ("Helv".to_string(), helvetica(), FontText::WinAnsi),
     };
     // The Thai face the `/DA` font names (an embedded one the author chose), else the default.
-    let thai_face = thai.then(|| crate::author::thai_script_of(doc, &da.font));
+    let thai_face = thai.then_some(chosen_script);
     let width_of = |text: &str, size: f64| {
         if thai || latin { shaped_text::fallback_width_in(text, size, thai_face, latin, |s, size| enc.width(s, size)) } else { enc.width(text, size) }
     };
     // How far a line's ink reaches below and above its baseline (em), where Thai stacks or
     // descenders reach past the form font's (Helvetica's) -0.207 and 0.718; `None` otherwise.
-    let thai_ink = |line: &str| {
-        thai_face.and_then(|script| shaped_text::thai_reach_in(line, script)).map(|[lo, hi]| [lo.min(-0.207), hi.max(0.718)])
-    };
+    let thai_ink = |line: &str| thai_face.and_then(|script| shaped_text::thai_reach_in(line, script)).map(|[lo, hi]| [lo.min(-0.207), hi.max(0.718)]);
     let (mut c, bw) = frame(doc, &wd, width, height);
     let pad = 2.0 + bw;
     let inner_w = (width - 2.0 * pad).max(1.0);
@@ -968,8 +990,7 @@ fn field_appearance_fit(doc: &Document, f: &Field, w: &Widget, values: &[String]
                     let cells = f.max_len.unwrap_or(1).max(1);
                     let cell = width / cells as f64;
                     c.push_str(&comb_dividers(doc, &wd, width, height, cells));
-                    for (i, ch) in text.chars().take(cells).enumerate() {
-                        let s = ch.to_string();
+                    for (i, s) in comb_clusters(&text).into_iter().take(cells).enumerate() {
                         show(cell * i as f64 + (cell - width_of(&s, size)) / 2.0, y, &s);
                     }
                 } else {

@@ -719,6 +719,15 @@ impl Document {
         Some(pdfcraft_forms::field_face(&e.cos, f))
     }
 
+    /// All embeddable Thai faces already carried in the document's `/AcroForm /DR /Font`.
+    pub fn embedded_thai_fonts(&self) -> Vec<(String, pdfcraft_forms::FieldFont)> {
+        let Some(e) = self.editor.as_ref() else { return Vec::new() };
+        pdfcraft_forms::document_thai_faces(&e.cos)
+            .into_iter()
+            .map(|id| (pdfcraft_fonts::thai_faces::family(id).to_string(), pdfcraft_forms::FieldFont::Thai(id)))
+            .collect()
+    }
+
     /// A check box's or radio button's mark (Field Properties ▸ Options), `None` for other fields.
     pub fn field_check_style(&self, name: &str) -> Option<CheckStyle> {
         let e = self.editor.as_ref()?;
