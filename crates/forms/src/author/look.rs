@@ -42,7 +42,9 @@ impl LookPatch {
 /// fill colour (`g`, `rg` or `k`), appending one when the string has none. Everything else (a
 /// custom font resource, colour space or other graphics state) is kept, and repeated edits don't
 /// grow the string.
-pub(super) fn patch_da(da: &str, size: Option<f64>, patch: &LookPatch) -> String {
+///
+/// `thai` is the `/DR` resource a Thai font in the patch was embedded under.
+pub(super) fn patch_da_with(da: &str, size: Option<f64>, patch: &LookPatch, thai: Option<&str>) -> String {
     if patch.font.is_none() && size.is_none() && patch.text.is_none() {
         return da.to_string();
     }
@@ -50,7 +52,7 @@ pub(super) fn patch_da(da: &str, size: Option<f64>, patch: &LookPatch) -> String
     let numeric = |s: &str| s.parse::<f64>().is_ok();
     if patch.font.is_some() || size.is_some() {
         let old = appearance::parse_da(da);
-        let font = patch.font.map_or_else(|| old.font.clone(), |f| f.resource().to_string());
+        let font = patch.font.map_or_else(|| old.font.clone(), |f| f.resource_with(thai));
         // `parse_da` reads sizes up to 300 points; keep the same bound when writing.
         let size = appearance::fmt(size.unwrap_or(old.size).clamp(0.0, 300.0));
         let at = toks.iter().enumerate().rev().find(|(i, t)| t.as_str() == "Tf" && *i >= 2).map(|(i, _)| i);
@@ -314,9 +316,10 @@ pub fn look(doc: &Document, f: &Field) -> Look {
 }
 
 /// A `/DA` string with the given font, size and colour.
-pub(super) fn da_string(font: FieldFont, size: f64, c: [f64; 3]) -> String {
+/// `thai` is the `/DR` resource a Thai font was embedded under.
+pub(super) fn da_string_with(font: FieldFont, size: f64, c: [f64; 3], thai: Option<&str>) -> String {
     let f = crate::appearance::fmt;
-    format!("/{} {} Tf {} {} {} rg", font.resource(), f(size.clamp(0.0, 100.0)), f(c[0]), f(c[1]), f(c[2]))
+    format!("/{} {} Tf {} {} {} rg", font.resource_with(thai), f(size.clamp(0.0, 100.0)), f(c[0]), f(c[1]), f(c[2]))
 }
 
 /// Regenerate every widget appearance of a field from its current value and settings. A value or

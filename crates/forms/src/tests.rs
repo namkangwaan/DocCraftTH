@@ -7956,3 +7956,77 @@ fn a_patch_without_a_font_leaves_an_unknown_da_unchanged() {
     set_props(&mut doc, "name", &FieldProps { appearance: Some(LookPatch { width: Some(2.0), ..Default::default() }), ..FieldProps::default() }).unwrap();
     assert_eq!(field(&fields(&doc), "name").da, before);
 }
+
+fn text_field_form(names: &[&str]) -> Document {
+    let mut doc = one_page();
+    for (i, name) in names.iter().enumerate() {
+        let y = 20.0 + 30.0 * i as f64;
+        add_field(&mut doc, 0, [20.0, y, 200.0, y + 22.0], &NewField::Text { multiline: false }, Some(name)).unwrap();
+    }
+    doc
+}
+
+fn thai_font(face: pdfcraft_fonts::thai_faces::FaceId) -> FieldProps {
+    FieldProps { appearance: Some(LookPatch { font: Some(FieldFont::Thai(face)), ..Default::default() }), ..FieldProps::default() }
+}
+
+/// The `/DR /Font` dictionary of the form, resolved.
+fn dr_font_dict(doc: &Document) -> pdfcraft_cos::Dict {
+    let af = acroform(doc).expect("a form");
+    let dr = doc.resolve(af.get(b"DR").expect("has /DR")).as_dict().cloned().expect("/DR is a dictionary");
+    doc.resolve(dr.get(b"Font").expect("has /Font")).as_dict().cloned().expect("/Font is a dictionary")
+}
+
+#[test]
+fn choosing_a_thai_face_embeds_its_font_in_dr() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    let doc = reopen(&doc);
+    let f = field(&fields(&doc), "name").clone();
+    assert_eq!(look(&doc, &f).font, FieldFont::Thai(sarabun), "the choice reads back after a save");
+    let resource = appearance::parse_da(&f.da).font;
+    let fonts = dr_font_dict(&doc);
+    let entry = fonts.get(resource.as_bytes()).expect("the /DA's font is in /DR");
+    assert!(matches!(entry, Object::Ref(_)), "Acrobat needs /DR fonts as objects: {entry:?}");
+    let font = doc.resolve(entry).as_dict().cloned().unwrap();
+    assert_eq!(font.name(b"Subtype"), Some(&b"Type0"[..]));
+    assert!(font.get(b"DescendantFonts").is_some() && font.get(b"ToUnicode").is_some());
+}
+
+#[test]
+fn the_same_face_on_many_fields_embeds_once() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let names = ["a", "b", "c", "d", "e"];
+    let mut doc = text_field_form(&names);
+    for name in names {
+        set_props(&mut doc, name, &thai_font(sarabun)).unwrap();
+    }
+    let thai_entries = dr_font_dict(&doc)
+        .iter()
+        .filter(|(_, v)| {
+            doc.resolve(v).as_dict().and_then(|d| d.name(b"BaseFont").map(|b| pdfcraft_fonts::embedding::face_key(&String::from_utf8_lossy(b))))
+                == Some(pdfcraft_fonts::embedding::face_key("Sarabun"))
+        })
+        .count();
+    assert_eq!(thai_entries, 1, "one /DR entry for the face");
+    let size = write_incremental(&doc, &SaveOptions::default()).unwrap().len();
+    assert!(size < 2 * pdfcraft_fonts::thai_faces::bytes(sarabun).len() + 200_000, "the program is stored once: {size} bytes");
+}
+
+#[test]
+fn a_signed_form_refuses_a_font_that_would_change_its_resources() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let objs: Vec<String> = vec![
+        "<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R >>".into(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 600 800] >>".into(),
+        "<< /Type /Page /Parent 2 0 R /Annots [5 0 R 6 0 R] >>".into(),
+        "<< /Fields [5 0 R 6 0 R] /DA (/Helv 0 Tf 0 g) /SigFlags 3 >>".into(),
+        "<< /Type /Annot /Subtype /Widget /FT /Tx /T (name) /Rect [50 700 250 720] /P 3 0 R >>".into(),
+        "<< /Type /Annot /Subtype /Widget /FT /Sig /T (sig) /V 7 0 R /Rect [0 0 0 0] /P 3 0 R >>".into(),
+        "<< /Type /Sig /Filter /Adobe.PPKLite /ByteRange [0 0 0 0] /Contents <00> >>".into(),
+    ];
+    let mut doc = document(&objs);
+    assert!(set_props(&mut doc, "name", &thai_font(sarabun)).is_err());
+    assert!(acroform(&doc).is_some_and(|af| !af.contains(b"DR")), "the signed form's resources are untouched");
+}

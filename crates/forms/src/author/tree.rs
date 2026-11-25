@@ -44,7 +44,7 @@ pub(crate) fn ensure_form(doc: &mut Document) -> Result<ObjRef, FormError> {
 }
 
 /// The form dictionary's `/DR` and its `/Font` dictionary, resolved (empty where missing).
-fn form_fonts(doc: &Document, af: &Dict) -> (Dict, Dict) {
+pub(super) fn form_fonts(doc: &Document, af: &Dict) -> (Dict, Dict) {
     let dr = af.get(b"DR").map(|o| doc.resolve(o)).and_then(|o| o.as_dict().cloned()).unwrap_or_default();
     let fonts = dr.get(b"Font").map(|o| doc.resolve(o)).and_then(|o| o.as_dict().cloned()).unwrap_or_default();
     (dr, fonts)
@@ -66,7 +66,7 @@ fn inline_fonts_as_objects(doc: &mut Document, fonts: &mut Dict) -> bool {
 
 /// Write `fonts` back as the `/DR /Font` of the form dictionary `af`. An indirect `/DR` or
 /// `/Font` stays the object it is.
-fn store_form_fonts(doc: &mut Document, af: &mut Dict, mut dr: Dict, fonts: Dict) {
+pub(super) fn store_form_fonts(doc: &mut Document, af: &mut Dict, mut dr: Dict, fonts: Dict) {
     match dr.get(b"Font").and_then(Object::as_ref) {
         Some(fr) => doc.set(fr, Object::Dict(fonts)),
         None => dr.set(b"Font".to_vec(), Object::Dict(fonts)),
@@ -120,7 +120,7 @@ fn dict_has(doc: &Document, d: &Dict, key: &[u8]) -> bool {
 /// Whether the field `r`, or the nearest ancestor that has one, holds a `/V` (the entry is
 /// inheritable, ISO 32000-2 §12.7.4). The `/Parent` chain is followed at most 64 deep, as deep
 /// as the field walk goes, so a cyclic chain ends.
-fn holds_value(doc: &Document, r: ObjRef) -> bool {
+pub(super) fn holds_value(doc: &Document, r: ObjRef) -> bool {
     let mut at = r;
     for _ in 0..=64 {
         let obj = doc.get(at);

@@ -1,5 +1,5 @@
 use super::join::{check_join, join_radio_group};
-use super::look::{BorderStyle, da_string, patch_da, patch_widget_look, redraw_widgets};
+use super::look::{BorderStyle, FieldFont, da_string_with, patch_da_with, patch_widget_look, redraw_widgets};
 use super::tree::{ancestor_sets, attach, check_place, child_named, clash, detach, ensure_form, inherited, name_parts, own_inherited};
 use super::{Dict, Document, Field, FieldKind, FieldProps, FormError, MIN_FIELD_SIDE, ObjRef, Object, PdfString, fields, flags, invalid};
 
@@ -189,11 +189,19 @@ fn set_props_target(doc: &mut Document, name: &str, object: Option<ObjRef>, prop
     // A radio button renamed to another radio group's name joins that group (#4949). The other
     // properties are written first, to this field, and its buttons then move.
     let (new_name, join) = rename_field(doc, &all, &f, name, props)?;
+    // A Thai face is embedded in the form's resources before the default appearance names it.
+    let thai_face = match (&props.look, &props.appearance) {
+        (Some(l), _) => Some(l.font),
+        (None, Some(p)) => p.font,
+        _ => None,
+    }
+    .and_then(|font| if let FieldFont::Thai(id) = font { Some(id) } else { None });
+    let thai_res = thai_face.map(|id| super::face::ensure_thai_font(doc, id)).transpose()?;
     // The new default appearance when the size or the look changes.
     let size = props.font_size.unwrap_or_else(|| crate::appearance::parse_da(&f.da).size);
     let new_da = match &props.look {
-        Some(l) => da_string(l.font, size, l.text),
-        None => patch_da(&f.da, props.font_size, &props.appearance.unwrap_or_default()),
+        Some(l) => da_string_with(l.font, size, l.text, thai_res.as_deref()),
+        None => patch_da_with(&f.da, props.font_size, &props.appearance.unwrap_or_default(), thai_res.as_deref()),
     };
     if props.look.is_some() || props.appearance.is_some_and(|p| p.font.is_some()) {
         ensure_form(doc)?;
@@ -319,7 +327,7 @@ fn set_props_target(doc: &mut Document, name: &str, object: Option<ObjRef>, prop
                     .map(|v| doc.resolve(&v))
                     .and_then(|v| v.as_string().map(|s| s.to_text()));
                 if let Some(da) = da {
-                    let da = patch_da(&da, props.font_size, patch);
+                    let da = patch_da_with(&da, props.font_size, patch, thai_res.as_deref());
                     doc.update_dict(w.obj, |d| d.set(b"DA".to_vec(), PdfString::literal(da.into_bytes())))?;
                 }
             }

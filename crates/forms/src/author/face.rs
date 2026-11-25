@@ -1,9 +1,10 @@
 //! Which face a field's default appearance names: one of the standard fonts, a Thai face the app
 //! knows, or something else that must be kept as it is.
 
+use pdfcraft_fonts::embedding;
 use pdfcraft_fonts::thai_faces::{self, FaceId};
 
-use super::{Document, Field, appearance};
+use super::{Document, Field, FieldKind, FormError, Object, appearance, ensure_form, fields, invalid, tree};
 
 /// The face a field's `/DA` font refers to.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -40,4 +41,22 @@ pub fn field_face(doc: &Document, f: &Field) -> FieldFace {
         },
         None => FieldFace::Unknown(resource),
     }
+}
+
+/// The `/DR /Font` resource the form holds `face` under, embedding the whole font there the first
+/// time (once per document, however many fields use it; as an object, which Acrobat needs). A viewer
+/// that edits the field then has the font even where it is not installed.
+///
+/// A form a signature covers is refused: its resources must stay as the signer saw them.
+pub(super) fn ensure_thai_font(doc: &mut Document, face: FaceId) -> Result<String, FormError> {
+    if fields(doc).iter().any(|f| f.kind == FieldKind::Signature && tree::holds_value(doc, f.obj)) {
+        return invalid("this form is signed: changing a field's font would change what was signed");
+    }
+    let form = ensure_form(doc)?;
+    let mut af = doc.get(form).as_dict().cloned().unwrap_or_default();
+    let (dr, mut fonts) = tree::form_fonts(doc, &af);
+    let resource = embedding::embed(doc, &mut fonts, thai_faces::bytes(face), thai_faces::family(face)).map_err(FormError::Invalid)?;
+    tree::store_form_fonts(doc, &mut af, dr, fonts);
+    doc.set(form, Object::Dict(af));
+    Ok(resource)
 }
