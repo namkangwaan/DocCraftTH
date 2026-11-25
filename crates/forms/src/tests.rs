@@ -8064,3 +8064,46 @@ fn mixed_thai_latin_and_digits_all_draw_in_a_chosen_face() {
     let a = ap(&doc, &field(&fields(&doc), "name").widgets[0]);
     assert!(a.contains("Name 123") && !a.contains('?'), "{a}");
 }
+
+#[test]
+fn thai_field_with_a_chosen_face_does_not_ask_viewers_to_redraw() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    set_value(&mut doc, "name", &FieldValue::Text("ชื่อ-นามสกุล".into())).unwrap();
+    let af = acroform(&doc).expect("a form");
+    assert!(af.get(b"NeedAppearances").is_none(), "the embedded appearance is kept: {af:?}");
+}
+
+#[test]
+fn a_saved_form_draws_and_reads_back_with_no_font_folder() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    set_value(&mut doc, "name", &FieldValue::Text("สวัสดี".into())).unwrap();
+    let mut doc = reopen(&doc);
+    let f = field(&fields(&doc), "name").clone();
+    assert_eq!(look(&doc, &f).font, FieldFont::Thai(sarabun));
+    redraw_field(&mut doc, "name").unwrap();
+    let a = ap(&doc, &field(&fields(&doc), "name").widgets[0]);
+    assert!(!a.contains('?'), "{a}");
+}
+
+#[test]
+fn the_embedded_font_covers_thai_the_value_never_used() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    set_value(&mut doc, "name", &FieldValue::Text("ก".into())).unwrap();
+    let f = field(&fields(&doc), "name").clone();
+    let resource = appearance::parse_da(&f.da).font;
+    let font = doc.resolve(dr_font_dict(&doc).get(resource.as_bytes()).unwrap()).as_dict().cloned().unwrap();
+    let descendant = doc.resolve(&font.get(b"DescendantFonts").and_then(|a| doc.resolve(a).as_array().and_then(|a| a.first().cloned())).unwrap());
+    let descriptor = doc.resolve(descendant.as_dict().unwrap().get(b"FontDescriptor").unwrap());
+    let program = descriptor.as_dict().unwrap().get(b"FontFile2").or_else(|| descriptor.as_dict().unwrap().get(b"FontFile3")).unwrap().clone();
+    let bytes = match doc.resolve(&program).as_ref() {
+        Object::Stream(s) => s.decoded_within(16 << 20).expect("decodes"),
+        other => panic!("not a stream: {other:?}"),
+    };
+    assert!(pdfcraft_fonts::embedding::covers(&bytes, "ฐานข้อมูลใหม่ ๑๒๓"), "a viewer's later typing finds its glyphs");
+}
