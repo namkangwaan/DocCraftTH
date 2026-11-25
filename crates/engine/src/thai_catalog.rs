@@ -82,6 +82,12 @@ pub fn bundled_entries() -> Vec<CatalogEntry> {
         .collect()
 }
 
+/// The bundled faces a form can embed, then the Thai faces found in `files` (for confined callers
+/// such as automation that only inspect files inside their allowed read root).
+pub fn entries_in_files(files: Vec<PathBuf>) -> Vec<CatalogEntry> {
+    thai_entries(&Catalog::of_files(files))
+}
+
 /// The bundled faces a form can embed, then the Thai faces `catalog` lists (Regular style, by
 /// family). Reads each candidate's file, so call it when the Font list opens, not every frame.
 pub fn thai_entries(catalog: &Catalog) -> Vec<CatalogEntry> {

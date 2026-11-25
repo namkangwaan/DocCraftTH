@@ -116,7 +116,11 @@ The batch is atomic and creates one undo step. A missing or locked field, invali
 unknown argument or malformed appearance refuses the whole edit. Set `locked: false` to
 unlock and change fields together. Only supplied properties change: each field/widget keeps
 its other colours, fonts, values and unknown PDF dictionary keys. `"none"` removes a border
-or fill colour. Names, rectangles, rotations and captions require the single-field form. Results keep
+or fill colour. `appearance.font` accepts `"helvetica"`, `"times"`, `"courier"` or a Thai font
+family name (from the bundled Thai faces or `.ttf`/`.otf` files inside the allowed read root;
+OS and application font folders are never read by automation), and returns
+`"font": {"family": …, "embedded": bool, "substituted": bool}` when a font is set. Names,
+rectangles, rotations and captions require the single-field form. Results keep
 `field` for single edits and return `fields` for batches. CLI and MCP use the same tool.
 
 ## MCP server

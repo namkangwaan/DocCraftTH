@@ -174,3 +174,40 @@ fn button_export_edit_is_one_undo_step_and_survives_save() {
     assert_eq!(check["value"], true);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn appearance_font_accepts_a_bundled_thai_family() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let (mut a, id, dir) = setup("thai-bundled");
+    let out = call(&mut a, json!({"doc": id, "field": "alpha", "appearance": {"font": "Sarabun"}}));
+    assert_eq!(out["font"], json!({"family": "Sarabun", "embedded": true, "substituted": false}));
+    let doc = a.session().get(DocId(id)).unwrap();
+    assert_eq!(doc.field_look("alpha").unwrap().font, FieldFont::Thai(sarabun));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn unknown_font_name_is_an_error_listing_choices() {
+    let Some(_) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let (mut a, id, dir) = setup("thai-unknown");
+    let err = a.call("form_set_props", &json!({"doc": id, "field": "alpha", "appearance": {"font": "NoSuchThaiFont"}})).unwrap_err();
+    let ToolError::InvalidArgs(msg) = err else { panic!("expected InvalidArgs: {err:?}") };
+    for choice in ["helvetica", "times", "courier", "Sarabun"] {
+        assert!(msg.contains(choice), "error should list {choice:?}: {msg}");
+    }
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn result_reports_substitution() {
+    let (Some(sarabun), Some(variable)) = (pdfcraft_fonts::thai_faces::sarabun(), pdfcraft_fonts::document_thai_font()) else { return };
+    let (mut a, id, dir) = setup("thai-sub");
+    let mut copy = variable.bytes.to_vec();
+    copy.extend_from_slice(&7u32.to_le_bytes());
+    std::fs::write(dir.join("NotoSansThai-Variable.ttf"), copy).unwrap();
+    let out = call(&mut a, json!({"doc": id, "field": "alpha", "appearance": {"font": "Noto Sans Thai"}}));
+    assert_eq!(out["font"], json!({"family": "Sarabun", "embedded": true, "substituted": true}));
+    let doc = a.session().get(DocId(id)).unwrap();
+    assert_eq!(doc.field_look("alpha").unwrap().font, FieldFont::Thai(sarabun));
+    std::fs::remove_dir_all(dir).unwrap();
+}
