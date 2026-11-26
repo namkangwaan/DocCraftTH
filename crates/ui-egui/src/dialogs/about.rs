@@ -15,7 +15,7 @@ const LOGO_WHITE: &[u8] = include_bytes!("../../../../docs/brand/artcraft-logo-w
 /// What the About tab shows: PdfCraft's name, blurb and version, the ArtCraft brand, and the community links.
 fn info() -> AboutInfo {
     let info = AboutInfo::new(
-        "PdfCraft",
+        "DTHFrame (TH Document Craft)",
         tl!("A clean-room, open-source PDF application written in Rust. MIT OR Apache-2.0."),
         pdfcraft_engine::build_info::version(),
     )

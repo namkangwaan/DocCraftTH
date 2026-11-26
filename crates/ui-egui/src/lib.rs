@@ -19,7 +19,7 @@ pub const UPDATE_APP: craft::update::app::App = craft::update::app::App {
 };
 
 /// PdfCraft as the framework's services know it (the host, About, recovery).
-pub const APP_INFO: craft::host::AppInfo = craft::host::AppInfo { id: "pdfcraft", name: "PdfCraft", version: env!("CARGO_PKG_VERSION") };
+pub const APP_INFO: craft::host::AppInfo = craft::host::AppInfo { id: "pdfcraft", name: "DTHFrame", version: env!("CARGO_PKG_VERSION") };
 
 /// Translate an English UI string into the current language (see [`i18n`]).
 macro_rules! tl {

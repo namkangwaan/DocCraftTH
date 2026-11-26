@@ -156,9 +156,9 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         // Open is in the title bar, as in production.
         .offers_open(false)
         .pinned_title(tl!("Folders").to_string())
-        .drop_hint(tl!("Files you open in PdfCraft appear here").to_string())
+        .drop_hint(tl!("Files you open in DTHFrame appear here").to_string())
         .section(StartPlace::BeforeRecent, |ui, _| {
-            let _ = Text::new(tl!("Welcome to PdfCraft").to_string()).role(TypeRole::Display).show(ui);
+            let _ = Text::new(tl!("Welcome to DTHFrame").to_string()).role(TypeRole::Display).show(ui);
             let _ = Text::new(tl!("An open-source PDF workbench — local, private, and scriptable.").to_string()).show(ui);
             if community_card {
                 Stack::new().label(tl!("Join the ArtCraft community")).fill_width().surface(SurfaceKind::Raised).pad(Pad::Regular).show(
@@ -216,7 +216,7 @@ pub fn show(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
         .section(StartPlace::AfterSections, |ui, _| {
             let _ = Text::new(tl!("Privacy").to_uppercase()).role(TypeRole::Label).show(ui);
             let _ =
-                Text::new(tl!("PdfCraft works offline. No telemetry, no account, and no cloud processing unless you add a provider.").to_string())
+                Text::new(tl!("DTHFrame works offline. No telemetry, no account, and no cloud processing unless you add a provider.").to_string())
                     .show(ui);
         });
     #[cfg(not(target_arch = "wasm32"))]
