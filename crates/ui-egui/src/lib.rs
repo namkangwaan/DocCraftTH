@@ -646,6 +646,9 @@ pub struct PdfCraftApp {
     /// Where autosaves go (`None`: autosave off, e.g. on the web and in tests).
     #[cfg(not(target_arch = "wasm32"))]
     pub(crate) recovery: Option<std::sync::Arc<craft::platform::autosave::RecoveryStore>>,
+    /// Recovery store failed to open at startup: posted once the app can notify.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) pending_recovery_notice: Option<String>,
     /// Copies an earlier run left, offered for recovery (none on the web, which keeps no recovery folder).
     pub(crate) recovered: Vec<craft::platform::autosave::RecoveryEntry>,
     /// When each document is due for its next autosave.

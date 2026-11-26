@@ -777,6 +777,7 @@
 	Copy Image in Original Format	คัดลอกรูปภาพในรูปแบบเดิม
 	The image has been copied as a {ext} file	คัดลอกรูปภาพเป็นไฟล์ {ext} แล้ว
 	The page has changed; select the image again	หน้ามีการเปลี่ยนแปลง โปรดเลือกรูปภาพอีกครั้ง
+	The page is gone	ไม่มีหน้านี้แล้ว
 	No check has run yet.	ยังไม่ได้ตรวจสอบ
 	PdfCraft {v} is available.	มี DTHFrame {v} ให้ใช้งานแล้ว
 	You have version {c}. Download the new version from its release page.	คุณใช้รุ่น {c} ดาวน์โหลดรุ่นใหม่ได้จากหน้ารุ่นที่เผยแพร่
@@ -1241,6 +1242,7 @@
 	Applied 1 redaction mark. Save to remove the content from the file.	ปิดทับตามเครื่องหมายแล้ว 1 จุด บันทึกเพื่อเอาเนื้อหาออกจากไฟล์
 	Applied {n} redaction marks. Save to remove the content from the file.	ปิดทับตามเครื่องหมายแล้ว {n} จุด บันทึกเพื่อเอาเนื้อหาออกจากไฟล์
 	JavaScript Console	คอนโซล JavaScript
+	JavaScript error	ข้อผิดพลาดจาก JavaScript
 	JavaScript is turned off (Preferences ▸ JavaScript).	JavaScript ปิดอยู่ (การตั้งค่า ▸ JavaScript)
 	Output appears here.	ผลลัพธ์จะแสดงที่นี่
 	Script Name:	ชื่อสคริปต์:
@@ -1557,6 +1559,7 @@
 	Replacing images arrives on the web with image file pickers	การแทนที่รูปภาพบนเว็บจะมาพร้อมกับตัวเลือกไฟล์รูปภาพ
 	Couldn't create a PDF: {e}	สร้าง PDF ไม่ได้: {e}
 	The clipboard has no image or text	คลิปบอร์ดไม่มีรูปภาพหรือข้อความ
+	The clipboard image is empty, malformed or exceeds size limits	รูปภาพในคลิปบอร์ดว่าง ผิดรูปแบบ หรือมีขนาดเกินขีดจำกัด
 	On the web, open or drop an image to convert it	บนเว็บ ให้เปิดหรือวางรูปภาพเพื่อแปลง
 	Couldn't optimize the file: {e}	ปรับไฟล์ให้เหมาะสมไม่ได้: {e}
 	Couldn't write {path}: {e}	เขียน {path} ไม่ได้: {e}
@@ -2207,6 +2210,7 @@ signature pad	Type	พิมพ์
 	To change locked fields, also set Locked to No.	หากต้องการเปลี่ยนช่องที่ล็อก ให้ตั้งค่าล็อกเป็น ไม่ ด้วย
 	Comb of characters	แบ่งช่องอักขระ
 	The document changed while you were editing field properties.	เอกสารเปลี่ยนแปลงระหว่างที่คุณแก้ไขคุณสมบัติช่อง
+	The document is no longer open	เอกสารไม่ได้เปิดอยู่แล้ว
 	The document is no longer open.	เอกสารไม่ได้เปิดอยู่แล้ว
 	The field properties dialog is no longer open.	กล่องโต้ตอบคุณสมบัติช่องไม่ได้เปิดอยู่แล้ว
 	The field properties could not be changed.	เปลี่ยนคุณสมบัติช่องไม่ได้
@@ -3102,6 +3106,7 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	The region was read again; its words were replaced (undo in the panel)	อ่านบริเวณซ้ำแล้ว และแทนที่คำของบริเวณนั้น (ย้อนกลับได้ในแผงด้านข้าง)
 	The searchable copies are written here under the source names	ไฟล์ที่ค้นหาได้จะถูกเขียนที่นี่ โดยใช้ชื่อเดียวกับไฟล์ต้นฉบับ
 	The selected word is gone; choose another	คำที่เลือกหายไปแล้ว โปรดเลือกคำอื่น
+	The selected region is empty or outside the page	พื้นที่ที่เลือกว่างหรืออยู่นอกหน้า
 	The tesseract program, run as an external process	โปรแกรม tesseract ที่รันเป็นโพรเซสภายนอก
 	Turns pages scanned sideways or upside down upright before reading	หมุนหน้าที่สแกนตะแคงหรือกลับหัวให้ตั้งตรงก่อนอ่าน
 	Type 3 font glyphs	กลิฟฟอนต์ Type 3

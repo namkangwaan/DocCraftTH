@@ -322,6 +322,32 @@ fn a_page_found_cut_after_a_dismissal_is_still_named() {
     assert_eq!(h.state().views[0].cut_pages(), vec![0, 1], "both pages are reported cut");
 }
 
+#[test]
+fn a_page_render_or_text_failure_is_named_and_can_be_dismissed() {
+    use egui_kittest::kittest::Queryable;
+
+    let mut h = egui_kittest::Harness::builder().with_size(vec2(1400.0, 900.0)).build_eframe(|cc| {
+        crate::PdfCraftApp::install_runtime(&cc.egui_ctx);
+        {
+            let mut app = PdfCraftApp::for_unit_tests();
+            app.set_option(&cc.egui_ctx, "language", "en").unwrap();
+            let bytes = app.session.create_blank(300.0, 400.0, 2).unwrap();
+            app.open_bytes(&egui::Context::default(), "blank.pdf", None, bytes.as_ref().clone()).unwrap();
+            app
+        }
+    });
+    h.run_steps(3);
+    h.state_mut().views[0].reports.error(0, "draw failed".into());
+    h.run_steps(2);
+    h.get_by_label_contains("couldn't be drawn or read");
+    h.get_by_label("Dismiss").click();
+    h.run_steps(2);
+    assert!(h.query_by_label_contains("couldn't be drawn or read").is_none());
+    h.state_mut().views[0].session.text_failed.insert(1);
+    h.run_steps(2);
+    h.get_by_label_contains("couldn't be drawn or read");
+}
+
 /// Full screen's presenter for one frame of `ctx`, at time `now`, over the pages `shown` on
 /// screen: whether the frame asked to be drawn again at once.
 fn presenter_frame(ctx: &egui::Context, v: &mut DocView, info: &DocInfo, shown: &[PlacedPage], now: f64) -> bool {

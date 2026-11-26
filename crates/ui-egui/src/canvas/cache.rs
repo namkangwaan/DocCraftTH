@@ -30,6 +30,15 @@ impl DocView {
         self.reports.cut_pages()
     }
 
+    /// Pages whose picture failed to render and/or whose text layer failed (0-based, in order).
+    pub fn page_fail_pages(&self) -> Vec<usize> {
+        let mut pages: std::collections::BTreeSet<usize> = self.session.text_failed.iter().copied().collect();
+        for (p, _) in self.reports.errors() {
+            pages.insert(p);
+        }
+        pages.into_iter().collect()
+    }
+
     /// Pages that could not be rendered, with the reason (for automation; 0-based pages, in order).
     pub fn page_errors(&self) -> Vec<(usize, String)> {
         self.reports.errors()

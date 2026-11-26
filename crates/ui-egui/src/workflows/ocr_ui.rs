@@ -18,6 +18,43 @@ use super::job_count::JobCount;
 // PLAN: assumed `crate::notices::{set_progress, end_progress, ProgressKey, ProgressNotice}` from pdf-chrome-w19 (free functions taking the app).
 use crate::PdfCraftApp;
 use crate::notices::{self, ProgressKey, ProgressNotice};
+use super::ocr_errors::ocr_notice_message;
+
+mod thai_ocr_notice {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    static PENDING: AtomicBool = AtomicBool::new(false);
+
+    pub fn mark() {
+        PENDING.store(true, Ordering::Relaxed);
+    }
+
+    pub fn take() -> bool {
+        PENDING.swap(false, Ordering::Relaxed)
+    }
+}
+
+/// The web loader kept English OCR but both Thai models failed; post once when models are ready.
+pub(crate) fn mark_thai_ocr_unavailable() {
+    thai_ocr_notice::mark();
+}
+
+pub(crate) fn take_thai_ocr_unavailable_notice() -> bool {
+    thai_ocr_notice::take()
+}
+
+#[cfg(target_arch = "wasm32")]
+fn maybe_notify_thai_unavailable(app: &mut PdfCraftApp) {
+    if crate::ocr_web::state() != crate::ocr_web::State::NotStarted {
+        return;
+    }
+    if pdfcraft_engine::ocr::engine_unavailable_reason(EngineChoice::Ocrs).is_some() {
+        return;
+    }
+    if take_thai_ocr_unavailable_notice() {
+        app.notify_tr("Thai text recognition isn't available; English is still available.");
+    }
+}
 
 /// Which pages to read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -698,13 +735,15 @@ impl PdfCraftApp {
         self.ocr_runs.submit(id, craft::host::queue::Priority::default(), move |_| {
             crate::i18n::set_current(lang);
             recognize_guarded(|| {
-                pdfcraft_engine::ocr::recognizers(&settings).map(|r| {
-                    job.run(&r, |done, total| {
-                        reading.set(done, total);
-                        wake.wake();
-                        !reading.cancelled()
+                pdfcraft_engine::ocr::recognizers(&settings)
+                    .map_err(|e| ocr_notice_message(&e))
+                    .map(|r| {
+                        job.run(&r, |done, total| {
+                            reading.set(done, total);
+                            wake.wake();
+                            !reading.cancelled()
+                        })
                     })
-                })
             })
         });
         self.ocr_run = Some(OcrRun { doc: id, count, guard, automatic: auto, editable });
@@ -843,7 +882,7 @@ impl PdfCraftApp {
         let recognizers = match pdfcraft_engine::ocr::recognizers(&settings) {
             Ok(r) => r,
             Err(why) => {
-                self.notify_error(why);
+                self.notify_error(ocr_notice_message(&why));
                 return;
             }
         };
@@ -952,6 +991,8 @@ impl PdfCraftApp {
     /// Show progress; apply the result once the job is done.
     pub(crate) fn poll_ocr(&mut self, ctx: &egui::Context) {
         #[cfg(target_arch = "wasm32")]
+        maybe_notify_thai_unavailable(self);
+        #[cfg(target_arch = "wasm32")]
         self.pump_web_ocr(ctx);
         self.poll_ocr_batch();
         self.poll_ocr_run(ctx);
@@ -1035,7 +1076,7 @@ impl PdfCraftApp {
         let found = match result {
             Ok(f) => f,
             Err(e) => {
-                self.notify_error(e);
+                self.notify_error(ocr_notice_message(&e));
                 return;
             }
         };
@@ -1085,7 +1126,7 @@ impl PdfCraftApp {
                 }
                 self.notify(msg);
             }
-            Err(e) => self.notify_error(e),
+            Err(e) => self.notify_error(ocr_notice_message(&e)),
         }
     }
 }
@@ -1132,9 +1173,9 @@ pub(crate) fn run_batch_files(
                         notes.push(note);
                     }
                 }
-                Err(e) => failed.push(format!("{name}: {e}")),
+                Err(e) => failed.push(format!("{name}: {}", ocr_notice_message(&e))),
             },
-            Err(e) => failed.push(format!("{name}: {e}")),
+            Err(e) => failed.push(format!("{name}: {}", ocr_notice_message(&e))),
         }
     }
     batch_summary(ok, words, skipped, &failed, &notes, not_run)
@@ -1236,6 +1277,14 @@ mod tests {
         crate::notices::texts(app, &egui::Context::default()).join("; ")
     }
 
+    /// #error-message-ux: the Thai-unavailable flag is read once by the UI poll path.
+    #[test]
+    fn thai_unavailable_notice_flag_is_one_shot() {
+        super::mark_thai_ocr_unavailable();
+        assert!(super::take_thai_ocr_unavailable_notice());
+        assert!(!super::take_thai_ocr_unavailable_notice());
+    }
+
     /// A page of one confident word.
     fn one_word_page(confidence: Option<f32>, notes: Vec<String>) -> OcrPage {
         let word = pdfcraft_engine::ocr::PlacedWord {
@@ -1246,7 +1295,7 @@ mod tests {
             confidence,
             source: "ocrs".into(),
         };
-        OcrPage { page: 0, words: vec![word], already_on_page: 0, skipped: None, notes }
+        OcrPage { page: 0, words: vec![word], already_on_page: 0, skipped: None, unusable_text: false, notes, deskew: None }
     }
 
     /// A run on the active document, as the start of one leaves it.

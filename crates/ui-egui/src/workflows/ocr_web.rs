@@ -127,6 +127,7 @@ async fn load() -> Result<(Ocr, Option<LoadedThai>, Files), String> {
             Ok((ocr, files)) => (Some(LoadedThai::Legacy(ocr)), Some(files)),
             Err(e) => {
                 log::warn!("Thai text recognition isn't available: {e}");
+                crate::ocr_ui::mark_thai_ocr_unavailable();
                 (None, None)
             }
         },
@@ -159,7 +160,7 @@ async fn load_thai(detection: &js_sys::Uint8Array) -> Result<(Ocr, ThaiFiles), S
 async fn fetch(name: &str) -> Result<js_sys::Uint8Array, String> {
     use wasm_bindgen_futures::JsFuture;
     let url = format!("models/{name}");
-    let failed = |e: JsValue| format!("{url}: {}", e.as_string().unwrap_or_else(|| format!("{e:?}")));
+    let failed = |e: JsValue| format!("{url}: {}", super::js_value::js_error_text(&e));
     let window = web_sys::window().ok_or("no window")?;
     let init = web_sys::RequestInit::new();
     init.set_cache(web_sys::RequestCache::NoCache);

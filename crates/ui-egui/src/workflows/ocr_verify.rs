@@ -22,6 +22,7 @@ use pdfcraft_engine::{DocId, Session};
 
 // PLAN: assumed `super::job_count::JobCount` (pdf-print-ocr-w6): `Default`, `set(done, total)`, `read() -> (usize, usize)`, `cancel()`, `cancelled() -> bool`.
 use super::job_count::JobCount;
+use super::ocr_errors::{ocr_notice_message, VERIFY_DOC_CLOSED, VERIFY_PAGE_GONE, VERIFY_REGION_OUTSIDE};
 use crate::PdfCraftApp;
 
 mod panes;
@@ -855,7 +856,7 @@ impl OcrVerify {
             return Err("no words are left to write: every word was removed or empty".into());
         }
         let bytes = session.editable_ocr_bytes(doc, &pages)?;
-        let d = session.get(doc).ok_or("the document is no longer open")?;
+        let d = session.get(doc).ok_or_else(|| VERIFY_DOC_CLOSED.to_string())?;
         let base = d.name.strip_suffix(".pdf").unwrap_or(&d.name).to_string();
         Ok((bytes, format!("{base}_ocr.pdf")))
     }
@@ -914,7 +915,7 @@ impl OcrVerify {
         }
         if let Some(region) = region {
             let Some(info) = app.session.get(doc).and_then(|d| d.info.pages.get(page)) else {
-                app.notify_error("the page is gone");
+                app.notify_tr(VERIFY_PAGE_GONE);
                 return;
             };
             // Refuse before running: an empty, inverted or out-of-page rectangle never
@@ -923,12 +924,12 @@ impl OcrVerify {
             let (w, h) = (info.width * scale, info.height * scale);
             let px = [region[0] * scale, region[1] * scale, region[2] * scale, region[3] * scale];
             if clamp_region(px, w.max(1.0) as u32, h.max(1.0) as u32).is_none() {
-                app.notify_error("the selected region is empty or outside the page");
+                app.notify_tr(VERIFY_REGION_OUTSIDE);
                 return;
             }
         }
         let Some(mut job) = app.session.ocr_job(doc, &[page], settings) else {
-            app.notify_error("the document is no longer open");
+            app.notify_tr(VERIFY_DOC_CLOSED);
             return;
         };
         if let Some(region) = region {
@@ -1033,13 +1034,13 @@ impl OcrVerify {
         // it was read from, so it is refused with the reason and the words stay.
         if let Some(why) = self.guard.as_ref().and_then(|g| app.session.stale_reason(g)) {
             self.message = why.clone();
-            app.notify_error(why);
+            app.notify_error(ocr_notice_message(&why));
             return;
         }
         match result {
             Err(why) => {
                 self.message = why.clone();
-                app.notify_error(why);
+                app.notify_error(ocr_notice_message(&why));
             }
             Ok(words) => {
                 let applied = if let Some(region) = region {
@@ -1047,7 +1048,7 @@ impl OcrVerify {
                 } else if self.replace_page_words(page, words) {
                     Ok(false)
                 } else {
-                    Err("the page is gone".to_string())
+                    Err(VERIFY_PAGE_GONE.to_string())
                 };
                 match applied {
                     Ok(is_region) => {
@@ -1059,7 +1060,7 @@ impl OcrVerify {
                             app.notify_tr("The page was read again; its words were replaced (undo in the panel)");
                         };
                     }
-                    Err(why) => app.notify_error(why),
+                    Err(why) => app.notify_error(ocr_notice_message(&why)),
                 }
             }
         }
@@ -1072,7 +1073,7 @@ impl OcrVerify {
     /// run, so `words` is never empty here.
     fn replace_region_words(&mut self, session: &Session, page: usize, region_view: [f32; 4], words: Vec<PlacedWord>) -> Result<(), String> {
         let Some(doc) = self.doc else { return Ok(()) };
-        let Some(info) = session.get(doc).and_then(|d| d.info.pages.get(page)) else { return Err("the page is gone".into()) };
+        let Some(info) = session.get(doc).and_then(|d| d.info.pages.get(page)) else { return Err(VERIFY_PAGE_GONE.into()) };
         // The rectangle in user space (a bbox of its mapped corners) decides which old words
         // the new reading replaces.
         let (a, b, c, d) = (
@@ -1089,7 +1090,7 @@ impl OcrVerify {
             xs.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
             ys.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
         ];
-        let Some(pg) = self.page_mut(page) else { return Err("the page is gone".into()) };
+        let Some(pg) = self.page_mut(page) else { return Err(VERIFY_PAGE_GONE.into()) };
         let before = pg.words.clone();
         let center = |w: &PlacedWord| [w.origin[0] + w.across[0] / 2.0 + w.up[0] / 2.0, w.origin[1] + w.across[1] / 2.0 + w.up[1] / 2.0];
         // The old words outside the rectangle stay, in order; `moved` maps each kept word's old
@@ -1343,7 +1344,7 @@ fn apply(app: &mut PdfCraftApp, ctx: &egui::Context, n: Intents) {
                     app.notify_fmt(tl!("The page's words were applied as one undoable step ({n} words)"), &[("n", &count.to_string())]);
                 }
                 Ok(_) => {}
-                Err(why) => app.notify_error(why),
+                Err(why) => app.notify_error(ocr_notice_message(&why)),
             }
         }
         if n.reject_page {
@@ -1382,11 +1383,11 @@ fn do_accept(v: &mut OcrVerify, app: &mut PdfCraftApp, ctx: &egui::Context) {
                     app.notify_fmt(tl!("Recognized text applied ({n} words, one undoable step)"), &[("n", &count.to_string())]);
                 }
             }
-            Err(why) => app.notify_error(why),
+            Err(why) => app.notify_error(ocr_notice_message(&why)),
         },
         OutputMode::EditableText => match v.editable_output(&app.session) {
             Ok((bytes, name)) => save_editable(app, bytes, name, doc),
-            Err(why) => app.notify_error(why),
+            Err(why) => app.notify_error(ocr_notice_message(&why)),
         },
     }
 }
@@ -1479,6 +1480,8 @@ mod tests {
     use pdfcraft_engine::Session;
     use pdfcraft_engine::ocr::EngineChoice;
 
+    use super::super::ocr_errors::{ocr_notice_message, VERIFY_PAGE_GONE};
+
     /// A word box that sits where a real placed word would (high on the page, reading left
     /// to right).
     fn word(text: &str, conf: Option<f32>) -> PlacedWord {
@@ -1491,7 +1494,7 @@ mod tests {
         let text = session.create_from_text("t", "Recognize these scanned words").expect("fixture");
         let id = session.open("t.pdf", None, text, None).expect("fixture");
         let job = session.ocr_job(id, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { already_on_page: 0, page: 0, words: confs.iter().map(|c| word("w", *c)).collect(), skipped: None, notes: Vec::new() };
+        let page = OcrPage { already_on_page: 0, page: 0, words: confs.iter().map(|c| word("w", *c)).collect(), skipped: None, unusable_text: false, notes: Vec::new(), deskew: None };
         let mut v = OcrVerify::default();
         v.load(id, job.guard.clone(), vec![page]);
         (id, v)
@@ -1570,7 +1573,7 @@ mod tests {
         v2.load(
             id,
             job.guard.clone(),
-            vec![OcrPage { already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new() }],
+            vec![OcrPage { already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None }],
         );
         v2.set_removed((0, 0), true);
         assert!(v2.accept(&mut s).is_err());
@@ -1602,7 +1605,9 @@ mod tests {
             page: 0,
             words: vec![word("one", Some(95.0)), word("two", Some(95.0))],
             skipped: None,
+            unusable_text: false,
             notes: Vec::new(),
+            deskew: None,
         }];
         let n = v.accept_page(&mut s, 0).expect("the page applies");
         assert_eq!(n, 2);
@@ -1634,7 +1639,7 @@ mod tests {
         let pages = words
             .into_iter()
             .enumerate()
-            .map(|(page, words)| OcrPage { already_on_page: 0, page, words, skipped: None, notes: Vec::new() })
+            .map(|(page, words)| OcrPage { already_on_page: 0, page, words, skipped: None, unusable_text: false, notes: Vec::new(), deskew: None })
             .collect();
         let mut v = OcrVerify::default();
         v.load(id, job.guard.clone(), pages);
@@ -1737,7 +1742,7 @@ mod tests {
         let pages = words
             .into_iter()
             .enumerate()
-            .map(|(page, words)| OcrPage { already_on_page: 0, page, words, skipped: None, notes: Vec::new() })
+            .map(|(page, words)| OcrPage { already_on_page: 0, page, words, skipped: None, unusable_text: false, notes: Vec::new(), deskew: None })
             .collect();
         app.ocr_verify.load(id, job.guard.clone(), pages);
         (app, id)
@@ -1835,6 +1840,11 @@ mod tests {
         assert_eq!(app.ocr_verify.awaiting_models, None);
         assert!(app.ocr_verify.reread.is_none());
         assert_eq!(app.ocr_verify.page(0).expect("page").words.len(), 1);
+    }
+
+    #[test]
+    fn verify_page_gone_goes_through_the_catalog() {
+        assert_eq!(ocr_notice_message(VERIFY_PAGE_GONE), crate::i18n::t(VERIFY_PAGE_GONE).to_string());
     }
 
     /// A re-read that finds nothing is a typed failure: the words stay, the review stays.
@@ -1984,7 +1994,7 @@ mod tests {
         app.ocr_verify.load(
             id,
             job.guard.clone(),
-            vec![OcrPage { already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new() }],
+            vec![OcrPage { already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None }],
         );
         assert!(app.ocr_verify.correct((0, 0), "Edited"), "the correction commits");
         app.ocr_draft.output_mode = OutputMode::EditableText;
@@ -2231,8 +2241,8 @@ mod tests {
     /// it already has text is passed over, unless every page was skipped.
     #[test]
     fn a_finished_run_shows_a_read_page_over_a_skipped_one() {
-        let skipped = |page| OcrPage { already_on_page: 0, page, words: Vec::new(), skipped: Some("has text".into()), notes: Vec::new() };
-        let read = |page| OcrPage { already_on_page: 0, page, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new() };
+        let skipped = |page| OcrPage { already_on_page: 0, page, words: Vec::new(), skipped: Some("has text".into()), unusable_text: false, notes: Vec::new(), deskew: None };
+        let read = |page| OcrPage { already_on_page: 0, page, words: vec![word("w", Some(95.0))], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None };
         let mut v = OcrVerify { current: 0, ..Default::default() };
         v.finished(vec![skipped(0), read(1), read(2)], false);
         assert_eq!(v.current, 1, "the first page read");
@@ -2268,7 +2278,7 @@ mod tests {
         }
         let a = app.views.first().expect("a is open").id;
         let job = app.session.ocr_job(a, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new() };
+        let page = OcrPage { already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None };
         app.ocr_verify.load(a, job.guard.clone(), vec![page]);
         assert!(app.ocr_verify.correct((0, 0), "Edited"));
         app.active = Some(2);
@@ -2300,7 +2310,7 @@ mod tests {
         }
         let a = app.views.first().expect("a is open").id;
         let job = app.session.ocr_job(a, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new() };
+        let page = OcrPage { already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None };
         app.ocr_verify.load(a, job.guard.clone(), vec![page]);
         assert!(app.ocr_verify.correct((0, 0), "Edited"));
         (app, a)
@@ -2341,7 +2351,7 @@ mod tests {
     #[test]
     fn a_finished_run_shows_a_page_it_read() {
         let mut v = OcrVerify { current: 0, ..Default::default() };
-        let page = OcrPage { already_on_page: 0, page: 2, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new() };
+        let page = OcrPage { already_on_page: 0, page: 2, words: vec![word("w", Some(95.0))], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None };
         v.finished(vec![page], false);
         assert_eq!(v.current, 2);
         assert!(v.page(v.current).is_some());
@@ -2383,7 +2393,7 @@ mod tests {
         }
         let a = app.views[0].id;
         let job = app.session.ocr_job(a, &[0], OcrSettings::default()).expect("fixture");
-        let page = OcrPage { already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, notes: Vec::new() };
+        let page = OcrPage { already_on_page: 0, page: 0, words: vec![word("w", Some(95.0))], skipped: None, unusable_text: false, notes: Vec::new(), deskew: None };
         app.ocr_verify.load(a, job.guard.clone(), vec![page]);
         assert!(app.first_dirty().is_none(), "nothing is unsaved");
         app.active = Some(1);

@@ -307,6 +307,7 @@ mod idle_tests {
     use std::time::Duration;
 
     use craft::host::{AppInfo, Host, ManualJobs, ScriptedFiles};
+    #[cfg(unix)]
     use craft::platform::autosave::RecoveryStore;
 
     pub(super) struct TestDir(PathBuf);
@@ -406,6 +407,24 @@ mod idle_tests {
             let read = rx.recv_timeout(Duration::from_secs(5)).expect("the read returned instead of waiting on the FIFO");
             assert_eq!(read.map_err(|e| e.kind()), Err(std::io::ErrorKind::InvalidInput), "{}", entry.path.display());
         }
+    }
+
+    /// #error-message-ux: a recovery folder that cannot be opened turns autosave off and posts once.
+    #[test]
+    fn recovery_folder_open_failure_posts_notice() {
+        let dir = TestDir::new();
+        let not_a_dir = dir.path().join("blocker");
+        std::fs::write(&not_a_dir, b"x").unwrap();
+        let (mut app, ..) = app_in(Some(&not_a_dir));
+        assert!(app.recovery.is_none());
+        let ctx = egui::Context::default();
+        PdfCraftApp::install_runtime(&ctx);
+        app.flush_pending_recovery_notice();
+        let msg = crate::notices::texts(&mut app, &ctx).join(" ");
+        assert!(
+            msg.to_ascii_lowercase().contains("autosave is off"),
+            "expected autosave-off notice, got: {msg}"
+        );
     }
 
     /// Check that an edit after autosave is not written before its deadline, is written at it

@@ -303,6 +303,7 @@ impl PdfCraftApp {
                 self.handle_js(ctx, doc, out);
             }
             Ok(false) => {}
+            Err(pdfcraft_engine::EditError::Cancelled) => self.notify_tr("Cancelled"),
             Err(e) => self.notify_error(e),
         }
     }
@@ -451,7 +452,7 @@ impl PdfCraftApp {
             let Some(d) = self.sign_draft.as_ref().map(|d| &d.new_id) else { return Err("nothing to import".into()) };
             let bytes = std::fs::read(&d.file).map_err(|e| format!("{}: {e}", d.file))?;
             let id = sign::pkcs12::open(&bytes, &d.file_password).map_err(|e| match e {
-                sign::SignError::WrongPassword => "The password is incorrect.".to_string(),
+                sign::SignError::WrongPassword => tl!("The password is incorrect.").to_string(),
                 e => e.to_string(),
             })?;
             (d.file.clone(), id.certificate)
@@ -476,7 +477,7 @@ impl PdfCraftApp {
         } else {
             let bytes = std::fs::read(&entry.path).map_err(|e| format!("{}: {e}", entry.path))?;
             sign::pkcs12::open(&bytes, &d.password).map_err(|e| match e {
-                sign::SignError::WrongPassword => "The password is incorrect.".to_string(),
+                sign::SignError::WrongPassword => tl!("The password is incorrect.").to_string(),
                 e => e.to_string(),
             })?
         };

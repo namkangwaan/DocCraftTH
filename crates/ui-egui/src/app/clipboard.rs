@@ -217,7 +217,7 @@ impl PdfCraftApp {
                 Some(pixels) => {
                     self.paste_received_image_at(ctx, page, &pixels, target.map(|(_, at)| at));
                 }
-                None => self.notify_error("the clipboard image is empty, malformed or exceeds size limits"),
+                None => self.notify_tr(crate::create_ui::CLIPBOARD_IMAGE_INVALID),
             }
             return;
         }

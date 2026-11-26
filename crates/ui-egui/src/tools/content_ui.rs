@@ -1453,7 +1453,7 @@ impl crate::PdfCraftApp {
             || pixels != Some(image.pixels.len())
             || bytes.is_none_or(|n| n > crate::create_ui::MAX_IMAGE_BYTES)
         {
-            self.notify_error("the clipboard image is empty, malformed or exceeds size limits");
+            self.notify_tr(crate::create_ui::CLIPBOARD_IMAGE_INVALID);
             return false;
         }
         let rgba = image.pixels.iter().flat_map(egui::Color32::to_srgba_unmultiplied).collect();

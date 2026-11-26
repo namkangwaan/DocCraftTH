@@ -217,18 +217,9 @@ fn revoke(urls: &[String]) {
     let _ = urls;
 }
 
-/// A JavaScript exception as text: an error's `message` (read as a property, since an error from
-/// the print frame isn't an `instanceof Error` here), a thrown string, else its debug form.
 #[cfg(target_arch = "wasm32")]
 fn js_error(e: wasm_bindgen::JsValue) -> String {
-    if let Some(s) = e.as_string() {
-        return s;
-    }
-    js_sys::Reflect::get(&e, &wasm_bindgen::JsValue::from_str("message"))
-        .ok()
-        .and_then(|m| m.as_string())
-        .filter(|m| !m.is_empty())
-        .unwrap_or_else(|| format!("{e:?}"))
+    super::js_value::js_error_text(&e)
 }
 
 /// A PNG as a `blob:` URL. The bytes move out of wasm memory into the browser's.

@@ -227,11 +227,11 @@ impl PdfCraftApp {
             watch,
         } = services;
         #[cfg(not(target_arch = "wasm32"))]
-        let store = recovery_dir.and_then(|dir| match RecoveryStore::open(dir) {
-            Ok(store) => Some(Arc::new(store)),
+        let (store, pending_recovery_notice) = recovery_dir.map_or((None, None), |dir| match RecoveryStore::open(&dir) {
+            Ok(store) => (Some(Arc::new(store)), None),
             Err(e) => {
                 log::warn!("autosave is off: the recovery folder can't be used: {e}");
-                None
+                (None, Some(e.to_string()))
             }
         });
         #[cfg(not(target_arch = "wasm32"))]
@@ -465,6 +465,8 @@ impl PdfCraftApp {
             form_preview: false,
             #[cfg(not(target_arch = "wasm32"))]
             recovery: store,
+            #[cfg(not(target_arch = "wasm32"))]
+            pending_recovery_notice,
             recovered,
             autosave,
             recovered_paths: Default::default(),
@@ -644,6 +646,17 @@ impl PdfCraftApp {
         self.notify(i18n::fmt(tl!(template), args));
     }
 
+    /// Posts the startup notice when the recovery folder could not be opened.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn flush_pending_recovery_notice(&mut self) {
+        if let Some(e) = self.pending_recovery_notice.take() {
+            self.notify_fmt(
+                "Autosave is off: the recovery folder can't be used ({e}).",
+                &[("e", &e)],
+            );
+        }
+    }
+
     /// `true` while any open document still waits for page renders (used by headless capture).
     pub fn render_pending(&self) -> bool {
         self.views.iter().any(|v| v.render_pending())
@@ -747,6 +760,8 @@ impl PdfCraftApp {
         let lang = i18n::Lang::from_pref(&self.language);
         i18n::set_current(lang);
         self.apply_status_captions(lang);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.flush_pending_recovery_notice();
         // Form date fields name months in the date language (Preferences ▸ Date format), which
         // follows the interface language until one is picked (#5303).
         pdfcraft_engine::dates::use_form_date_language(self.session.date_language().unwrap_or(lang.code()));

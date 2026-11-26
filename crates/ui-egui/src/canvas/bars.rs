@@ -126,6 +126,9 @@ pub(super) fn notices(
     if view.cut_pages().iter().any(|p| !view.cut_notice_dismissed.contains(p)) {
         cut_pages_bar(view, ui);
     }
+    if view.page_fail_pages().iter().any(|p| !view.page_fail_notice_dismissed.contains(p)) {
+        page_fail_bar(view, ui);
+    }
     // A signature just placed with Fill & Sign is a comment others can move (#2149): offer to
     // lock it into the page now. `lock_offer` is false for a digitally signed document.
     if lock_offer && !view.lock_offer_dismissed {
@@ -276,5 +279,29 @@ fn cut_pages_bar(view: &mut DocView, ui: &mut egui::Ui) {
     };
     if bar(Tone::Warn, "triangle-alert", text).dismiss().show(ui).dismissed {
         view.cut_notice_dismissed.extend(cut);
+    }
+}
+
+/// The notice naming pages whose picture failed to render and/or whose text layer failed.
+fn page_fail_bar(view: &mut DocView, ui: &mut egui::Ui) {
+    let failed = view.page_fail_pages();
+    let Some(&first) = failed.first() else {
+        return;
+    };
+    let page = first.saturating_add(1).to_string();
+    let n = failed.len();
+    let text = if n == 1 {
+        crate::i18n::fmt(
+            tl!("Page {page} couldn't be drawn or read for text. Drawing, find and copy may be incomplete on that page."),
+            &[("page", &page)],
+        )
+    } else {
+        crate::i18n::fmt(
+            tl!("{n} pages couldn't be drawn or read for text, page {page} first. Drawing, find and copy may be incomplete on those pages."),
+            &[("n", &n.to_string()), ("page", &page)],
+        )
+    };
+    if bar(Tone::Warn, "triangle-alert", text).dismiss().show(ui).dismissed {
+        view.page_fail_notice_dismissed.extend(failed);
     }
 }

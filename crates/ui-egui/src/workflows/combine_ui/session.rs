@@ -343,7 +343,7 @@ impl PdfCraftApp {
                 Ok(a) => a,
                 Err(AssessError::Unreadable(e)) => unreadable(&e),
                 Err(AssessError::WrongPassword) => {
-                    self.notify_fmt("Couldn't add {name}: {e}", &[("name", &name), ("e", "the password is wrong")]);
+                    self.notify_fmt("Couldn't add {name}: {e}", &[("name", &name), ("e", tl!("Wrong password"))]);
                     continue;
                 }
             };

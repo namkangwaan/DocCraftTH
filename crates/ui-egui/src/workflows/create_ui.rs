@@ -34,12 +34,14 @@ pub enum Clip {
 
 pub(crate) const MAX_IMAGE_SIDE: usize = 16384;
 pub(crate) const MAX_IMAGE_BYTES: usize = 64 * 1024 * 1024;
+/// User notice when a clipboard image cannot be pasted or turned into a new document.
+pub(crate) const CLIPBOARD_IMAGE_INVALID: &str = "The clipboard image is empty, malformed or exceeds size limits";
 
 pub(crate) fn png_from_rgba(width: usize, height: usize, rgba: &[u8]) -> Result<Vec<u8>, String> {
     let (w, h) = (u32::try_from(width).map_err(|e| e.to_string())?, u32::try_from(height).map_err(|e| e.to_string())?);
     let expected = width.checked_mul(height).and_then(|p| p.checked_mul(4));
     if w == 0 || h == 0 || width > MAX_IMAGE_SIDE || height > MAX_IMAGE_SIDE || expected != Some(rgba.len()) || rgba.len() > MAX_IMAGE_BYTES {
-        return Err("the clipboard image is empty, malformed or exceeds size limits".into());
+        return Err(CLIPBOARD_IMAGE_INVALID.into());
     }
     let img = craft_image_codecs::Image::from_u8(w, h, craft_image_codecs::ChannelLayout::Rgba, rgba.to_vec()).map_err(|e| e.to_string())?;
     craft_image_codecs::encode(&img, craft_image_codecs::Format::Png, &craft_image_codecs::EncodeOptions::default()).map_err(|e| e.to_string())
@@ -143,7 +145,12 @@ impl PdfCraftApp {
         match self.read_clipboard() {
             Some(c) => {
                 if let Err(e) = self.create_from_clip(c) {
-                    self.notify_fmt("Couldn't create a PDF: {e}", &[("e", &e.to_string())]);
+                    let detail = if e == CLIPBOARD_IMAGE_INVALID {
+                        tl!(CLIPBOARD_IMAGE_INVALID).to_string()
+                    } else {
+                        e.to_string()
+                    };
+                    self.notify_fmt("Couldn't create a PDF: {e}", &[("e", &detail)]);
                 }
             }
             None => self.notify_tr("The clipboard has no image or text"),
