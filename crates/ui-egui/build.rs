@@ -93,15 +93,22 @@ fn craft_i18n() -> String {
 
 /// `overlay` rows win over `base` when the English source (column 1) matches. Comment and blank
 /// lines from both are kept in order: base first, then overlay-only rows.
+///
+/// Base rows whose translation is still identical to the English source are dropped: craft-i18n's
+/// Thai file still has English stubs for unfinished strings, and keeping them fails
+/// `thai_leaves_no_unapproved_english_fallbacks` once catalogs are merged. Real Thai rows (e.g.
+/// First/Last page) are kept; intentional English in the fork overlay still goes through KEEP_AS_IS.
 fn merge_tsv(base: &str, overlay: &str) -> String {
-    fn source_key(line: &str) -> Option<&str> {
+    fn parts(line: &str) -> Option<(&str, &str, &str)> {
         let line = line.strip_suffix('\r').unwrap_or(line);
         if line.starts_with('#') || line.trim().is_empty() {
             return None;
         }
-        let mut parts = line.split('\t');
-        let _ctx = parts.next()?;
-        parts.next()
+        let mut it = line.splitn(3, '\t');
+        Some((it.next()?, it.next()?, it.next().unwrap_or("")))
+    }
+    fn source_key(line: &str) -> Option<&str> {
+        parts(line).map(|(_, src, _)| src)
     }
     let mut keys = std::collections::HashSet::new();
     for line in overlay.lines() {
@@ -112,8 +119,9 @@ fn merge_tsv(base: &str, overlay: &str) -> String {
     let mut out = String::with_capacity(base.len() + overlay.len());
     for line in base.lines() {
         let line = line.strip_suffix('\r').unwrap_or(line);
-        if source_key(line).is_some_and(|k| keys.contains(k)) {
-            continue;
+        match parts(line) {
+            Some((_, src, tr)) if keys.contains(src) || src == tr => continue,
+            _ => {}
         }
         out.push_str(line);
         out.push('\n');
