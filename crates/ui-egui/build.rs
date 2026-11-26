@@ -61,11 +61,21 @@ fn craft_i18n() -> String {
             Vec::new()
         }
     };
+    // Fork Thai: overlay `src/i18n/th.tsv` on craft-i18n's `pdfcraft.tsv` (fork wins on
+    // duplicate English keys). Replacing the file wholesale dropped upstream rows and broke
+    // thai_covers_* once CRAFT_I18N_DIR was set in CI.
     let th_tsv = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/i18n/th.tsv");
     if th_tsv.is_file() {
         println!("cargo::rerun-if-changed={}", th_tsv.display());
+        let out_dir = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default());
+        let merged = out_dir.join("th-pdfcraft-merged.tsv");
         if let Some(entry) = entries.iter_mut().find(|(code, _, _)| code == "th") {
-            entry.2 = th_tsv;
+            let base = std::fs::read_to_string(&entry.2).unwrap_or_default();
+            let overlay = std::fs::read_to_string(&th_tsv).unwrap_or_default();
+            if let Err(e) = std::fs::write(&merged, merge_tsv(&base, &overlay)) {
+                println!("cargo::error=writing {}: {e}", merged.display());
+            }
+            entry.2 = merged;
         } else {
             entries.push(("th".to_string(), None, th_tsv));
         }
@@ -79,6 +89,40 @@ fn craft_i18n() -> String {
     }
     o.push_str("];\n");
     o
+}
+
+/// `overlay` rows win over `base` when the English source (column 1) matches. Comment and blank
+/// lines from both are kept in order: base first, then overlay-only rows.
+fn merge_tsv(base: &str, overlay: &str) -> String {
+    fn source_key(line: &str) -> Option<&str> {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.starts_with('#') || line.trim().is_empty() {
+            return None;
+        }
+        let mut parts = line.split('\t');
+        let _ctx = parts.next()?;
+        parts.next()
+    }
+    let mut keys = std::collections::HashSet::new();
+    for line in overlay.lines() {
+        if let Some(k) = source_key(line) {
+            keys.insert(k.to_owned());
+        }
+    }
+    let mut out = String::with_capacity(base.len() + overlay.len());
+    for line in base.lines() {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if source_key(line).is_some_and(|k| keys.contains(k)) {
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.push_str(overlay);
+    if !overlay.is_empty() && !overlay.ends_with('\n') {
+        out.push('\n');
+    }
+    out
 }
 
 /// One embedded locale: its code, its `common.tsv` if it has one, and its PdfCraft catalog.

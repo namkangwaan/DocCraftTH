@@ -3255,3 +3255,154 @@ theme	Appearance	ลักษณะที่ปรากฏ
 	No Thai font is built in. Thai text uses a font installed on this computer on screen only.	ไม่มีฟอนต์ไทยติดมากับโปรแกรม ข้อความภาษาไทยจะใช้ฟอนต์ที่ติดตั้งบนเครื่องนี้สำหรับการแสดงผลบนหน้าจอเท่านั้น
 	Files you open in DTHFrame appear here	ไฟล์ที่คุณเปิดใน DTHFrame จะแสดงที่นี่
 	DTHFrame web page	หน้าเว็บ DTHFrame
+
+# Fork UI literals not yet in craft-i18n (thai_covers_ui_literals).
+	A form field has text that can't be kept yet.	ช่องฟอร์มมีข้อความที่ยังเก็บไว้ไม่ได้
+	A placed signature is a comment until it is locked: anyone with a PDF editor can move or remove it. Locking makes your Fill & Sign text, marks and signatures part of the page.	ลายเซ็นที่วางแล้วยังเป็นความคิดเห็นจนกว่าจะล็อก: ใครที่มีตัวแก้ไข PDF ก็ย้ายหรือลบได้ การล็อกจะทำให้ข้อความ Fill & Sign เครื่องหมาย และลายเซ็นกลายเป็นส่วนหนึ่งของหน้า
+	Accessibility results	ผลการตรวจสอบการเข้าถึง
+	Action	การกระทำ
+	Action name	ชื่อการกระทำ
+	Added text frame	เพิ่มกรอบข้อความแล้ว
+	Answer	คำตอบ
+	At most (MB)	ไม่เกิน (MB)
+	Bookmark	บุ๊กมาร์ก
+	Border	เส้นขอบ
+	Bottom margin	ระยะขอบล่าง
+	By name at time, date	ตามชื่อ เวลา วันที่
+	Calculation	การคำนวณ
+	Calculation order links	ลิงก์ลำดับการคำนวณ
+	Camera image	ภาพจากกล้อง
+	Card size	ขนาดการ์ด
+	Category	หมวดหมู่
+	Certificate chain	โซ่ใบรับรอง
+	Certificate details	รายละเอียดใบรับรอง
+	Checking Options ({on} of {all} in all categories)	กำลังตรวจตัวเลือก ({on} จาก {all} ในทุกหมวด)
+	Choices	ตัวเลือก
+	Choose a photo	เลือกภาพถ่าย
+	Cleaning up scans	กำลังจัดระเบียบสแกน
+	Code set	ชุดรหัส
+	Comb characters:	ตัวอักษรแบบช่อง:
+	Comment under the pointer	ความคิดเห็นใต้ตัวชี้
+	Comments of this kind have no tool to set defaults for	ความคิดเห็นชนิดนี้ไม่มีเครื่องมือตั้งค่าเริ่มต้น
+	Comparison	การเปรียบเทียบ
+	Corners	มุม
+	Corrected text	ข้อความที่แก้แล้ว
+	Create PDF from Images	สร้าง PDF จากรูปภาพ
+	Custom properties	คุณสมบัติกำหนดเอง
+	Custom stamp	ตราประทับกำหนดเอง
+	Custom stamps	ตราประทับกำหนดเอง
+	Custom text	ข้อความกำหนดเอง
+	Custom zoom (%)	ซูมกำหนดเอง (%)
+	DPI	DPI
+	Differences	ความแตกต่าง
+	Digital IDs	รหัสดิจิทัล
+	Document view	มุมมองเอกสาร
+	Downloaded measurements.	ดาวน์โหลดการวัดแล้ว
+	Drop to add the files	วางเพื่อเพิ่มไฟล์
+	Drop to open the files	วางเพื่อเปิดไฟล์
+	Edit attachment description	แก้ไขคำอธิบายไฟล์แนบ
+	Edit toolbar	แก้ไขแถบเครื่องมือ
+	Enter valid page numbers	ใส่หมายเลขหน้าให้ถูกต้อง
+	Exporting	กำลังส่งออก
+	Figure	รูปภาพ
+	Filters	ตัวกรอง
+	Find	ค้นหา
+	Form mode	โหมดฟอร์ม
+	Frame	กรอบ
+	From page	จากหน้า
+	Header and footer text	ข้อความหัวกระดาษและท้ายกระดาษ
+	Held for a capture	รอการจับภาพ
+	Highlight Style	สไตล์การเน้น
+	Horizontal offset from centre	ระยะเยื้องแนวนอนจากกึ่งกลาง
+	Image resolution	ความละเอียดภาพ
+	Its {standard} identification couldn't be kept, so the file no longer says it conforms to {standard}.	เก็บการระบุ {standard} ไม่ได้ ไฟล์จึงไม่ระบุว่าเป็นไปตาม {standard} อีกต่อไป
+	Its {standard} identification was written back on its own.	เขียนการระบุ {standard} กลับไปเองแล้ว
+	Layout	เลย์เอาต์
+	Left margin	ระยะขอบซ้าย
+	Limit characters:	จำกัดตัวอักษร:
+	Line Style	สไตล์เส้น
+	Line Thickness	ความหนาเส้น
+	Line ending {n}	ปลายเส้น {n}
+	Link Type	ชนิดลิงก์
+	Links	ลิงก์
+	Look	ลักษณะ
+	Marked content	เนื้อหาที่ทำเครื่องหมาย
+	Modes	โหมด
+	My stamps	ตราประทับของฉัน
+	No free file name for {name}	ไม่มีชื่อไฟล์ว่างสำหรับ {name}
+	OCR options	ตัวเลือก OCR
+	Operation:	การทำงาน:
+	Optimizing	กำลังปรับให้เหมาะสม
+	Original: {n} pages. Replacement: pages {a} to {b} of {m}.	ต้นฉบับ: {n} หน้า แทนที่: หน้า {a} ถึง {b} จาก {m}
+	Overlay text source	แหล่งข้อความซ้อนทับ
+	PDF/A and PDF/UA	PDF/A และ PDF/UA
+	PDF/A problems	ปัญหา PDF/A
+	Page actions	การกระทำของหน้า
+	Page content	เนื้อหาหน้า
+	Page length	ความยาวหน้า
+	Page number format	รูปแบบหมายเลขหน้า
+	Page {page} couldn't be drawn or read for text. Drawing, find and copy may be incomplete on that page.	วาดหรืออ่านข้อความหน้า {page} ไม่ได้ การวาด ค้นหา และคัดลอกอาจไม่ครบบนหน้านั้น
+	Page {page}: {reading} {label}	หน้า {page}: {reading} {label}
+	Page {page}: {reason}	หน้า {page}: {reason}
+	Pages to read	หน้าที่จะอ่าน
+	Paper	กระดาษ
+	Picture	รูปภาพ
+	Pictures	รูปภาพ
+	Real distance	ระยะจริง
+	Recognizing text	กำลังรู้จำข้อความ
+	Redacted area	พื้นที่ที่ปกปิด
+	Replace it	แทนที่
+	Right margin	ระยะขอบขวา
+	Rules	กฎ
+	Save changes to “{name}” before quitting?	บันทึกการเปลี่ยนแปลงใน “{name}” ก่อนออกหรือไม่?
+	Saved measurements: {n}	การวัดที่บันทึก: {n}
+	Saved signatures	ลายเซ็นที่บันทึกไว้
+	Search for	ค้นหา
+	Selected link	ลิงก์ที่เลือก
+	Selected object	วัตถุที่เลือก
+	Selected objects	วัตถุที่เลือก
+	Signature actions	การกระทำลายเซ็น
+	Signature photo	ภาพถ่ายลายเซ็น
+	Signature preview	ตัวอย่างลายเซ็น
+	Skip	ข้าม
+	Snapshot area	พื้นที่สแนปช็อต
+	Special:	พิเศษ:
+	Split by	แบ่งตาม
+	Split view documents	เอกสารมุมมองแยก
+	Step to add	ขั้นที่เพิ่ม
+	Strategy	กลยุทธ์
+	Supported files	ไฟล์ที่รองรับ
+	Switch to List view to change the pages it takes	สลับเป็นมุมมองรายการเพื่อเปลี่ยนหน้าที่ใช้
+	Tab	แท็บ
+	Table cells	เซลล์ตาราง
+	Tag properties	คุณสมบัติแท็ก
+	Text box actions	การกระทำกล่องข้อความ
+	The browser's print dialog decides copies, two-sided printing and colour.	กล่องโต้ตอบพิมพ์ของเบราว์เซอร์เป็นผู้กำหนดจำนวนสำเนา การพิมพ์สองด้าน และสี
+	The date language can't be used.	ใช้ภาษาของวันที่นี้ไม่ได้
+	The date pattern can't be used.	ใช้รูปแบบวันที่นี้ไม่ได้
+	The dock does not allow that change to this panel	ด็อกไม่อนุญาตให้เปลี่ยนแผงนี้แบบนั้น
+	The document refused these properties. Correct them and try again.	เอกสารปฏิเสธคุณสมบัติเหล่านี้ แก้ไขแล้วลองอีกครั้ง
+	The document's XMP metadata held the redacted text and was removed.	เมทาดาทา XMP ของเอกสารมีข้อความที่ปกปิดอยู่ จึงถูกลบออก
+	The field table could not be added.	เพิ่มตารางช่องไม่ได้
+	The page can't be previewed	ดูตัวอย่างหน้าไม่ได้
+	The photo could not be read.	อ่านภาพถ่ายไม่ได้
+	The printer's paper sizes are still being read	กำลังอ่านขนาดกระดาษของเครื่องพิมพ์อยู่
+	There is no document to print.	ไม่มีเอกสารที่จะพิมพ์
+	This document lists no layers to show.	เอกสารนี้ไม่มีเลเยอร์ให้แสดง
+	To page	ถึงหน้า
+	Toolbar	แถบเครื่องมือ
+	Top margin	ระยะขอบบน
+	Unsupported measurements: {n}	การวัดที่ไม่รองรับ: {n}
+	Validation	การตรวจสอบ
+	Vertical offset from centre	ระยะเยื้องแนวตั้งจากกึ่งกลาง
+	Working	กำลังทำงาน
+	X	X
+	Y	Y
+	pt	pt
+	the file has no content	ไฟล์ไม่มีเนื้อหา
+	the new document could not be opened	เปิดเอกสารใหม่ไม่ได้
+	to (of {n})	ถึง (จาก {n})
+	{list} and {last}	{list} และ {last}
+	{n} pages couldn't be drawn or read for text, page {page} first. Drawing, find and copy may be incomplete on those pages.	วาดหรืออ่านข้อความไม่ได้ {n} หน้า เริ่มที่หน้า {page} การวาด ค้นหา และคัดลอกอาจไม่ครบบนหน้าเหล่านั้น
+	First page	หน้าแรก
+	Last page	หน้าสุดท้าย

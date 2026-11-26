@@ -452,11 +452,12 @@ pub const COMMANDS: &[CommandSpec] = &[
     c("page.properties", "Page properties…", PAGES, None, Modification, "info"),
     c("help.user_guide", "User guide", HELP, None, Nothing, "book-open"),
     c("help.shortcuts", "Keyboard shortcuts", HELP, None, Nothing, "circle-help"),
-    c("help.discord", "Join the ArtCraft Discord", HELP, None, Nothing, "messages-square"),
-    c("help.app_page", "PdfCraft web page", HELP, None, Nothing, "globe"),
+    // Chrome / link-row only (not Help menu bar) — same as origin/main.
+    c("help.discord", "Join the ArtCraft Discord", None, None, Nothing, "messages-square"),
+    c("help.app_page", "PdfCraft web page", None, None, Nothing, "globe"),
     c("help.github", "DTHFrame on GitHub", HELP, None, Nothing, "code-xml"),
-    c("help.website", "ArtCraft website", HELP, None, Nothing, "open"),
-    c("help.check_updates", "Check for updates…", HELP, None, Nothing, "cloud"),
+    c("help.website", "ArtCraft website", None, None, Nothing, "open"),
+    c("help.check_updates", "Check for updates…", None, None, Nothing, "cloud"),
     c("help.about", "About DTHFrame", HELP, None, Nothing, "info"),
 ];
 

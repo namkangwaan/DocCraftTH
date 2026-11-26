@@ -200,6 +200,11 @@ fn thai_leaves_no_unapproved_english_fallbacks() {
         "RGB",
         "{why} ({n})",
         "DN: ",
+        "DPI",
+        "PDF/A and PDF/UA",
+        "X",
+        "Y",
+        "pt",
     ];
     const KEY_CAPS: &[&str] = &["Ctrl", "Shift", "Delete", "Esc", "Home", "End", "Space"];
     let app = CRAFT_I18N.iter().find(|(c, ..)| *c == "th").map_or("", |(_, _, app)| *app);
