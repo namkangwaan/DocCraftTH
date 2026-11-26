@@ -18,7 +18,7 @@ use crate::{ShapedScript, embedding};
 pub struct FaceId(u16);
 
 /// Registered faces beyond the bundled ones, so a folder of fonts cannot grow memory without bound.
-const MAX_CUSTOM: usize = 240;
+const MAX_CUSTOM: usize = 16;
 /// Ids 0 and 1 are the bundled primary Thai face and Sarabun; registered faces follow.
 const PRIMARY: u16 = 0;
 const SARABUN: u16 = 1;
