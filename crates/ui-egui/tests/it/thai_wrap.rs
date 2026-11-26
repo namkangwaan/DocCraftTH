@@ -3,16 +3,15 @@
 
 use egui::epaint::text::{Fonts, LayoutJob, TextOptions};
 use egui::{Color32, FontId};
-use pdfcraft_ui_egui::theme;
 
-/// The rows `text` wraps into at `width` points, with the app's fonts and a Thai face: the
-/// craft-fonts one built in, or else the installed one. `None` when this machine has neither.
+/// The rows `text` wraps into at `width` points, with the app's interface fonts. `None` when
+/// that stack cannot draw Thai.
 fn rows(text: &str, width: f32) -> Option<Vec<String>> {
-    let defs = theme::installed_font_definitions(theme::CjkPreference::Default);
-    if pdfcraft_fonts::ui_thai_fonts().is_empty() && !defs.font_data.contains_key(theme::SYSTEM_THAI_FALLBACK) {
+    let defs = pdfcraft_ui_egui::fonts::ui_fonts(pdfcraft_ui_egui::i18n::Lang::EN).stack().flat_definitions();
+    let mut fonts = Fonts::new(TextOptions::default(), defs);
+    if !fonts.has_glyphs(&FontId::proportional(14.0), "ก") {
         return None;
     }
-    let mut fonts = Fonts::new(TextOptions::default(), defs);
     fonts.set_line_breaker(std::sync::Arc::new(pdfcraft_ui_egui::ThaiLineBreaker));
     let mut view = fonts.with_pixels_per_point(1.0);
     let mut job = LayoutJob::simple(text.to_owned(), FontId::proportional(14.0), Color32::WHITE, width);

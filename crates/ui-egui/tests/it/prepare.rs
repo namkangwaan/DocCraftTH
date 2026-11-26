@@ -1776,11 +1776,12 @@ fn prepare_a_form_detects_dot_leader_fields() {
     let text = format!("Name: {dots}\n\nEmail address: {dots}\n\nPlain text with an ellipsis... here.");
     let bytes = pdfcraft_engine::Session::new().create_from_text("t", &text).unwrap().to_vec();
     let mut h = harness_with("dots.pdf", bytes);
-    assert!(h.state_mut().execute("form.prepare"));
+    assert!(h.execute("form.prepare"));
     h.run_steps(3);
     assert_eq!(names(&h), ["Name", "Email address"]);
-    assert_eq!(h.state().toast.as_ref().map(|(m, _)| m.as_str()), Some("Detected 2 form fields"));
-    assert!(h.state_mut().execute("edit.undo"));
+    let said = crate::support::shown_notice(&h);
+    assert!(said.as_deref().is_some_and(|m| m.contains("Detected 2 form fields")), "{said:?}");
+    assert!(h.execute("edit.undo"));
     h.run_steps(2);
     assert!(names(&h).is_empty());
     h.get_by_label("Detect form fields").click();

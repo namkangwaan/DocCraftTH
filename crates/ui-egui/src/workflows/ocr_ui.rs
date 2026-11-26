@@ -20,6 +20,8 @@ use crate::PdfCraftApp;
 use crate::notices::{self, ProgressKey, ProgressNotice};
 use super::ocr_errors::ocr_notice_message;
 
+/// Web-only (and unit tests): sticky flag when English OCR loaded but Thai models failed.
+#[cfg(any(test, target_arch = "wasm32"))]
 mod thai_ocr_notice {
     use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -35,10 +37,12 @@ mod thai_ocr_notice {
 }
 
 /// The web loader kept English OCR but both Thai models failed; post once when models are ready.
+#[cfg(any(test, target_arch = "wasm32"))]
 pub(crate) fn mark_thai_ocr_unavailable() {
     thai_ocr_notice::mark();
 }
 
+#[cfg(any(test, target_arch = "wasm32"))]
 pub(crate) fn take_thai_ocr_unavailable_notice() -> bool {
     thai_ocr_notice::take()
 }

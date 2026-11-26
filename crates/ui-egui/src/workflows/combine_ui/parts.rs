@@ -209,10 +209,16 @@ pub(crate) fn removed_pages(parts: &[Part], removing: &BTreeSet<(u64, usize)>, n
 
 /// `time` as "2026-10-08 14:05 UTC". A file time is hostile input (Windows counts from 1601,
 /// some filesystems hold far-future times): one before 1970 reads as the epoch, and one past
-/// chrono's range as its last moment, on every platform.
+/// chrono's range as its last moment, on every platform. The year is in the interface language's era.
 pub(super) fn utc_stamp(time: SystemTime) -> String {
+    utc_stamp_in(crate::i18n::current(), time)
+}
+
+/// [`utc_stamp`] with the year in `lang`'s era: Buddhist Era for Thai.
+pub(super) fn utc_stamp_in(lang: crate::i18n::Lang, time: SystemTime) -> String {
     let secs = time.duration_since(SystemTime::UNIX_EPOCH).map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
     let at = DateTime::<Utc>::from_timestamp(secs, 0).unwrap_or(DateTime::<Utc>::MAX_UTC);
     // Built from parts rather than `%Y`, which writes a `+` before years past 9999.
-    format!("{:04}-{:02}-{:02} {:02}:{:02} UTC", at.year(), at.month(), at.day(), at.hour(), at.minute())
+    let year = pdfcraft_engine::dates::era_year(lang.code(), i64::from(at.year()));
+    format!("{:04}-{:02}-{:02} {:02}:{:02} UTC", year, at.month(), at.day(), at.hour(), at.minute())
 }
