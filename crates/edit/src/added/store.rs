@@ -179,7 +179,12 @@ fn validate(c: &Content) -> Result<(), EditError> {
             if (r[2] - r[0]).abs() < 1.0 {
                 return Err(EditError::Invalid("the text box is too narrow".into()));
             }
-            if t.text.chars().any(is_thai) && pdfcraft_fonts::document_thai_font().is_none() {
+            if let Family::Thai(id) = t.family {
+                let styled = pdfcraft_fonts::thai_faces::resolve_style(id, t.bold, t.italic);
+                if pdfcraft_fonts::thai_faces::bytes(styled).is_empty() {
+                    return Err(EditError::Invalid("the selected Thai font is not available".into()));
+                }
+            } else if t.text.chars().any(is_thai) && pdfcraft_fonts::document_thai_font().is_none() {
                 return Err(thai_error(GlyphError::NoFont, &t.text));
             }
             // Without the Arabic face, `draw` decides for the Arabic letters themselves (#403): a new

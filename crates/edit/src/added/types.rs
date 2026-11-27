@@ -1,5 +1,6 @@
 use super::layout::norm;
 use super::{Content, MarkKind, ObjRef, Std14, n};
+use pdfcraft_fonts::thai_faces::{self, FaceId};
 
 pub(super) const TAG: &str = "Added";
 
@@ -12,6 +13,7 @@ pub enum Family {
     Helvetica,
     Times,
     Courier,
+    Thai(FaceId),
 }
 
 impl Family {
@@ -20,10 +22,11 @@ impl Family {
             Family::Helvetica => "Helvetica",
             Family::Times => "Times",
             Family::Courier => "Courier",
+            Family::Thai(id) => thai_faces::family(id),
         }
     }
 
-    /// The standard-14 font name for this family and style.
+    /// The standard-14 font name for this family and style (or the Thai family name).
     pub fn base_font(self, bold: bool, italic: bool) -> &'static str {
         match (self, bold, italic) {
             (Family::Helvetica, false, false) => "Helvetica",
@@ -38,26 +41,63 @@ impl Family {
             (Family::Courier, true, false) => "Courier-Bold",
             (Family::Courier, false, true) => "Courier-Oblique",
             (Family::Courier, true, true) => "Courier-BoldOblique",
+            (Family::Thai(id), _, _) => thai_faces::family(id),
+        }
+    }
+
+    /// The `/PCAdded /Font` name for this family and style, preserving bold/italic for `Family::Thai`.
+    pub(super) fn stored_font(self, bold: bool, italic: bool) -> String {
+        match self {
+            Family::Thai(id) => {
+                let fam = thai_faces::family(id);
+                match (bold, italic) {
+                    (false, false) => fam.to_owned(),
+                    (true, false) => format!("{fam}-Bold"),
+                    (false, true) => format!("{fam}-Italic"),
+                    (true, true) => format!("{fam}-BoldItalic"),
+                }
+            }
+            _ => self.base_font(bold, italic).to_owned(),
         }
     }
 
     pub(super) fn from_base(base: &[u8]) -> (Family, bool, bool) {
         let s = String::from_utf8_lossy(base);
+        let bold = s.contains("Bold");
+        let italic = s.contains("Italic") || s.contains("Oblique");
         let family = if s.starts_with("Times") {
             Family::Times
         } else if s.starts_with("Courier") {
             Family::Courier
-        } else {
+        } else if s.starts_with("Helvetica") {
             Family::Helvetica
+        } else {
+            let base_name = s
+                .strip_suffix("-BoldItalic")
+                .or_else(|| s.strip_suffix("-Bold"))
+                .or_else(|| s.strip_suffix("-Italic"))
+                .or_else(|| s.strip_suffix("-Oblique"))
+                .unwrap_or(&s);
+            thai_faces::by_family(base_name).map(Family::Thai).unwrap_or(Family::Helvetica)
         };
-        (family, s.contains("Bold"), s.contains("Italic") || s.contains("Oblique"))
+        (family, bold, italic)
     }
 
-    /// Advance width of `s` at `size` points, from the published standard-14 metrics.
+    /// Advance width of `s` at `size` points, from the published standard-14 metrics or the
+    /// selected Thai face's shaped metrics.
     ///
     /// `italic` matters: the item is written out as the oblique/italic face (see [`Family::base_font`]),
     /// whose published widths differ from the upright face (Times-Italic `A` is 611, Times-Roman 722).
     pub fn width(self, s: &str, size: f64, bold: bool, italic: bool) -> f64 {
+        if let Family::Thai(id) = self {
+            let styled = thai_faces::resolve_style(id, bold, italic);
+            let bytes = thai_faces::bytes(styled);
+            if !bytes.is_empty()
+                && let Ok(run) = pdfcraft_fonts::source_shaping::shape_validated_thai(bytes, s)
+            {
+                return run.advance * size;
+            }
+        }
         self.std14(bold, italic).text_width(s, size)
     }
 
@@ -72,10 +112,10 @@ impl Family {
             (Family::Times, true, false) => Std14::TimesBold,
             (Family::Times, false, true) => Std14::TimesItalic,
             (Family::Times, true, true) => Std14::TimesBoldItalic,
-            (Family::Helvetica, false, false) => Std14::Helvetica,
-            (Family::Helvetica, true, false) => Std14::HelveticaBold,
-            (Family::Helvetica, false, true) => Std14::HelveticaOblique,
-            (Family::Helvetica, true, true) => Std14::HelveticaBoldOblique,
+            (Family::Helvetica | Family::Thai(_), false, false) => Std14::Helvetica,
+            (Family::Helvetica | Family::Thai(_), true, false) => Std14::HelveticaBold,
+            (Family::Helvetica | Family::Thai(_), false, true) => Std14::HelveticaOblique,
+            (Family::Helvetica | Family::Thai(_), true, true) => Std14::HelveticaBoldOblique,
         }
     }
 }
