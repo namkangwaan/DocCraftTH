@@ -63,10 +63,17 @@ pub fn validate_document_input(bytes: &[u8]) -> Result<(), String> {
         return Err("Adobe-authored font assets are excluded by the project's asset policy".into());
     }
     let licences = ["SIL OPEN FONT", "SIL Open Font", "Apache License", "Ubuntu Font Licence", "Bitstream Vera", "MIT License"];
-    if any_name_record(&f, &[StringId::LICENSE_DESCRIPTION], |t| licences.iter().any(|l| t.contains(l))) != Some(true) {
+    if any_name_record(&f, &[StringId::LICENSE_DESCRIPTION], |t| licences.iter().any(|l| t.contains(l)) || is_sipa_nectec_license(t)) != Some(true) {
         return Err("select an openly licensed font whose name table declares its licence (OFL, Apache, Ubuntu, Bitstream Vera or MIT)".into());
     }
     Ok(())
+}
+
+/// Exact SIPA/NECTEC Thai national font (`FontsGOV`) license clauses in `LICENSE_DESCRIPTION`.
+fn is_sipa_nectec_license(text: &str) -> bool {
+    (text.contains("Font Computer Program License Agreement") && text.contains("Reserved Font Names for this Font Computer Program"))
+        || (text.contains("Notification of License Agreement")
+            && (text.contains("NECTEC") || text.contains("SIPA") || text.contains("Software Industry Promotion")))
 }
 
 /// Name-table text one policy check reads in all.
@@ -513,6 +520,91 @@ mod tests {
             assert_eq!(m.decode(&bytes), *expected, "cid {cid_code} ToUnicode");
             assert_eq!(m.cid(code), u32::from(glyph), "cid {cid_code} PCGlyphs mapping");
             assert!((m.width(code) - width / 1000.0).abs() < 1e-8, "cid {cid_code} width");
+        }
+    }
+
+    fn with_name_table(base: &[u8], family: &str, license: &str) -> Vec<u8> {
+        let mut out = base.to_vec();
+        let records = [(1u16, family), (6u16, family), (13u16, license)];
+        let mut storage = Vec::new();
+        let mut entries = Vec::new();
+        for (id, text) in records {
+            let off = u16::try_from(storage.len()).unwrap();
+            for unit in text.encode_utf16() {
+                storage.extend_from_slice(&unit.to_be_bytes());
+            }
+            let len = u16::try_from(storage.len() - usize::from(off)).unwrap();
+            entries.push((id, len, off));
+        }
+        let header_len = 6 + entries.len() * 12;
+        let mut table = Vec::with_capacity(header_len + storage.len());
+        table.extend_from_slice(&0u16.to_be_bytes());
+        table.extend_from_slice(&u16::try_from(entries.len()).unwrap().to_be_bytes());
+        table.extend_from_slice(&u16::try_from(header_len).unwrap().to_be_bytes());
+        for (id, len, off) in entries {
+            table.extend_from_slice(&3u16.to_be_bytes()); // Windows platform
+            table.extend_from_slice(&1u16.to_be_bytes()); // Unicode BMP
+            table.extend_from_slice(&0x0409u16.to_be_bytes()); // en-US
+            table.extend_from_slice(&id.to_be_bytes());
+            table.extend_from_slice(&len.to_be_bytes());
+            table.extend_from_slice(&off.to_be_bytes());
+        }
+        table.extend_from_slice(&storage);
+        while !out.len().is_multiple_of(4) {
+            out.push(0);
+        }
+        let table_offset = u32::try_from(out.len()).unwrap();
+        let table_len = u32::try_from(table.len()).unwrap();
+        out.extend_from_slice(&table);
+        let num_tables = u16::from_be_bytes([out[4], out[5]]) as usize;
+        for i in 0..num_tables {
+            let rec = 12 + i * 16;
+            if &out[rec..rec + 4] == b"name" {
+                out[rec + 8..rec + 12].copy_from_slice(&table_offset.to_be_bytes());
+                out[rec + 12..rec + 16].copy_from_slice(&table_len.to_be_bytes());
+                break;
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn fontsgov_sipa_license_passes_document_validation() {
+        let inter = include_bytes!("../../../assets/fonts/Inter-Regular.ttf");
+        let fcp = with_name_table(
+            inter,
+            "TH SarabunPSK",
+            "Font Computer Program License Agreement\nReserved Font Names for this Font Computer Program:\nTH SarabunPSK",
+        );
+        assert!(validate_document_input(&fcp).is_ok());
+
+        let nla = with_name_table(
+            inter,
+            "TH Charm of AU",
+            "Notification of License Agreement.\n2.2 The Software Industry Promotion Agency (SIPA).",
+        );
+        assert!(validate_document_input(&nla).is_ok());
+    }
+
+    #[test]
+    fn proprietary_th_prefix_without_sipa_license_is_rejected() {
+        let inter = include_bytes!("../../../assets/fonts/Inter-Regular.ttf");
+        let proprietary = with_name_table(inter, "TH Commercial", "Copyright (c) Example Corp. All Rights Reserved.");
+        assert!(validate_document_input(&proprietary).is_err());
+    }
+
+    #[test]
+    fn thsarabun_four_styles_are_bundled() {
+        if !crate::CRAFT_FONTS.iter().any(|f| f.family == "THSarabun") {
+            return;
+        }
+        let styles: Vec<&str> = crate::document_thai_fonts()
+            .into_iter()
+            .filter(|f| f.family == "THSarabun")
+            .map(|f| f.style)
+            .collect();
+        for expected in ["Regular", "Bold", "Italic", "BoldItalic"] {
+            assert!(styles.contains(&expected), "missing THSarabun {expected} in {styles:?}");
         }
     }
 }

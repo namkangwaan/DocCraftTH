@@ -61,7 +61,9 @@ fn style(a: &Args, t: &mut AddedText) -> Result<()> {
             "helvetica" | "sans" | "arial" => FontFamily::Helvetica,
             "times" | "serif" => FontFamily::Times,
             "courier" | "mono" | "monospace" => FontFamily::Courier,
-            other => return Err(bad(format!("unknown font {other:?} (helvetica, times, courier)"))),
+            _ => pdfcraft_fonts::thai_faces::by_family(f)
+                .map(FontFamily::Thai)
+                .ok_or_else(|| bad(format!("unknown font {f:?} (helvetica, times, courier, or a Thai font family)")))?,
         };
     }
     if let Some(b) = a.opt_bool("bold")? {

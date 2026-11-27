@@ -10,6 +10,7 @@ workspace = true
 
 [dependencies]
 pdfcraft-engine = { workspace = true }
+pdfcraft-fonts = { workspace = true }
 # The framework, through its facade: `craft::atomic` for crash-safe writes.
 craft = { workspace = true, features = ["atomic"] }
 pdfcraft-cos = { workspace = true }
@@ -40,7 +41,6 @@ image = { version = "0.25", default-features = false, features = ["jpeg"] }
 # Word exports read back as Word reads them.
 craft-docx = { workspace = true }
 craft-wordmodel = { workspace = true }
-pdfcraft-fonts = { workspace = true }
 flate2.workspace = true
 pdfcraft-model = { workspace = true }
 pdfcraft-xfa = { workspace = true }

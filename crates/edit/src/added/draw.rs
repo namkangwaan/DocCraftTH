@@ -104,6 +104,71 @@ pub(super) fn draw_laid_shaped(
     Ok(())
 }
 
+/// Draw a text item whose family is a validated Thai/FontsGOV face by embedding it as Type0
+/// TrueType (`embedding::embed_mapping`) for both Thai and Latin/digit runs.
+fn draw_thai_embedded(
+    doc: &mut Document,
+    t: &AddedText,
+    id: pdfcraft_fonts::thai_faces::FaceId,
+    fonts: &mut Dict,
+    out: &mut Vec<u8>,
+) -> Result<(), EditError> {
+    let styled = pdfcraft_fonts::thai_faces::resolve_style(id, t.bold, t.italic);
+    let bytes = pdfcraft_fonts::thai_faces::bytes(styled);
+    let family_name = pdfcraft_fonts::thai_faces::family(styled);
+    if bytes.is_empty() {
+        return Err(EditError::Invalid("the selected Thai font is not available".into()));
+    }
+    let all = wrapped(t);
+    let paragraphs: Vec<usize> = all.iter().map(|(_, _, p)| *p).collect();
+    let mut shaped_lines = Vec::with_capacity(all.len());
+    for (line, rtl, _) in &all {
+        let run = pdfcraft_fonts::source_shaping::shape_validated_thai(bytes, line).map_err(EditError::Invalid)?;
+        let w = run.advance * t.size + t.char_spacing * line.chars().count() as f64;
+        shaped_lines.push((line.as_str(), *rtl, run, w));
+    }
+    let mut mappings = Vec::new();
+    let mut cid_of = std::collections::HashMap::new();
+    for (_, _, run, _) in &shaped_lines {
+        for glyph in &run.glyphs {
+            let key = (glyph.id.to_u32(), glyph.text.clone());
+            if let std::collections::hash_map::Entry::Vacant(e) = cid_of.entry(key) {
+                let cid = u16::try_from(mappings.len().saturating_add(1)).map_err(|_| EditError::Invalid("shaped glyph limit".into()))?;
+                e.insert(cid);
+                mappings.push((glyph.text.clone(), glyph.id));
+            }
+        }
+    }
+    if mappings.is_empty() {
+        return Ok(());
+    }
+    let resource = pdfcraft_fonts::embedding::embed_mapping(doc, fonts, bytes, family_name, &mappings).map_err(EditError::Invalid)?;
+    let r = text_rect(t);
+    out.extend(format!("BT /{resource} {} Tf {}\n", n(t.size), t.fill_op()).bytes());
+    if t.char_spacing != 0.0 {
+        out.extend(format!("{} Tc\n", n(t.char_spacing)).bytes());
+    }
+    for (i, (line, rtl, run, w)) in shaped_lines.iter().enumerate() {
+        let logical: String = line.encode_utf16().map(|u| format!("{u:04X}")).collect();
+        out.extend(format!("/Span <</ActualText <FEFF{logical}>>> BDC\n").bytes());
+        let spaces = line.matches(' ').count();
+        let (x, tw) = placed(t, r, &paragraphs, i, *w, spaces, *rtl);
+        let y = r[3] - (i as f64 * 1.2 + 0.95) * t.size;
+        if !run.glyphs.is_empty() {
+            out.extend(format!("1 0 0 1 {} {} Tm {} Tw <", n(x), n(y), n(tw)).bytes());
+            for glyph in &run.glyphs {
+                if let Some(&cid) = cid_of.get(&(glyph.id.to_u32(), glyph.text.clone())) {
+                    out.extend(format!("{cid:04X}").bytes());
+                }
+            }
+            out.extend_from_slice(b"> Tj\n");
+        }
+        out.extend_from_slice(b"EMC\n");
+    }
+    out.extend_from_slice(b"ET\n");
+    Ok(())
+}
+
 /// Content and resources for an item; `view` maps display space to user space. `taken` holds the
 /// page's font names. `existing`: the item is being replaced, so a build without the Arabic or
 /// Hebrew face keeps drawing that text as `?`, as before it was supported, rather than refusing to
@@ -122,6 +187,13 @@ pub(super) fn draw(doc: &mut Document, c: &Content, view: [f64; 6], taken: &Dict
     .into_bytes();
     match c {
         Content::Text(t) => {
+            if let Family::Thai(id) = t.family {
+                let mut fonts = taken.clone();
+                draw_thai_embedded(doc, t, id, &mut fonts, &mut out)?;
+                res.set(b"Font".to_vec(), Object::Dict(fonts));
+                out.extend_from_slice(b"Q\n");
+                return Ok((out, res));
+            }
             let base = t.family.base_font(t.bold, t.italic);
             let name = font_name(base);
             let mut font = Dict::new();
@@ -203,7 +275,7 @@ pub(super) fn params(c: &Content) -> Dict {
         Content::Text(t) => {
             d.set(b"Kind".to_vec(), Object::name("Text"));
             d.set(b"Text".to_vec(), PdfString::text(&t.text));
-            d.set(b"Font".to_vec(), Object::name(t.family.base_font(t.bold, t.italic)));
+            d.set(b"Font".to_vec(), Object::name(&t.family.stored_font(t.bold, t.italic)));
             d.set(b"Size".to_vec(), Object::Real(t.size));
             d.set(b"Color".to_vec(), arr(&t.color));
             // The ink beside its RGB look, which a reader that knows no ink keeps showing.

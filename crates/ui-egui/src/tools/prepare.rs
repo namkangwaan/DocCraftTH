@@ -25,6 +25,7 @@ pub use dialog::FieldPropsDialog;
 
 pub use draft::{ACTION_KINDS, ActionDraft, FieldDraft, FieldTab};
 pub(crate) use draft::{da_font, da_size};
+pub(crate) use font_row::catalog_entries as thai_catalog_entries;
 pub(crate) use font_row::embeddable_entries as embeddable_thai_fonts;
 pub use font_row::show_with_entries as show_font_row_with_entries;
 

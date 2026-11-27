@@ -83,8 +83,12 @@ pub fn installed_catalog() -> Arc<Catalog> {
     Arc::clone(catalog)
 }
 
+fn is_thai_static(face: &FaceInfo) -> bool {
+    face.code_pages[0] & THAI_CODE_PAGE != 0 && face.variations.is_empty()
+}
+
 fn is_thai_regular(face: &FaceInfo) -> bool {
-    face.code_pages[0] & THAI_CODE_PAGE != 0 && !face.italic && face.variations.is_empty() && face.style.eq_ignore_ascii_case("Regular")
+    is_thai_static(face) && !face.italic && face.style.eq_ignore_ascii_case("Regular")
 }
 
 /// The bundled faces a form can embed (used on web and while the system catalogue scans).
@@ -105,11 +109,14 @@ pub fn entries_in_files(files: Vec<PathBuf>) -> Vec<CatalogEntry> {
 const MAX_FONT_BYTES: u64 = 16 << 20;
 
 /// The bundled faces a form can embed, then the Thai faces `catalog` lists (Regular style, by
-/// family). Reads each candidate's file, so call it when the Font list opens, not every frame.
+/// family). Also registers Bold/Italic/BoldItalic variants of embeddable families in `thai_faces`
+/// for style resolution while keeping one entry per family in the returned list.
+/// Reads each candidate's file, so call it when the Font list opens, not every frame.
 pub fn thai_entries(catalog: &Catalog) -> Vec<CatalogEntry> {
     let mut out = bundled_entries();
     let mut seen: HashSet<FaceId> = thai_faces::bundled().into_iter().collect();
     let mut seen_keys: HashSet<String> = HashSet::new();
+    let mut embeddable_keys: HashSet<String> = HashSet::new();
     let sarabun = thai_faces::sarabun();
     let mut faces: Vec<FaceInfo> = catalog.faces().iter().filter(|f| is_thai_regular(f)).cloned().collect();
     faces.sort_by(|a, b| a.family.cmp(&b.family));
@@ -133,7 +140,10 @@ pub fn thai_entries(catalog: &Catalog) -> Vec<CatalogEntry> {
             Ok((fam, id))
         }) {
             Ok((fam, id)) => {
-                if seen.insert(id) && seen_keys.insert(pdfcraft_fonts::embedding::face_key(&fam)) {
+                let fam_key = pdfcraft_fonts::embedding::face_key(&fam);
+                embeddable_keys.insert(key);
+                embeddable_keys.insert(fam_key.clone());
+                if seen.insert(id) && seen_keys.insert(fam_key) {
                     out.push(CatalogEntry { family: fam, font: FieldFont::Thai(id), source: Source::Installed, substituted: false });
                 }
             }
@@ -144,6 +154,18 @@ pub fn thai_entries(catalog: &Catalog) -> Vec<CatalogEntry> {
                     out.push(CatalogEntry { family: face.family, font: FieldFont::Thai(sarabun), source: Source::Installed, substituted: true });
                 }
             }
+        }
+    }
+    for face in catalog.faces().iter().filter(|f| is_thai_static(f) && !is_thai_regular(f)) {
+        if face.file_bytes.is_some_and(|b| b > MAX_FONT_BYTES) {
+            continue;
+        }
+        let key = pdfcraft_fonts::embedding::face_key(&face.family);
+        if !embeddable_keys.contains(&key) {
+            continue;
+        }
+        if let Ok(data) = catalog.load(face) {
+            let _ = thai_faces::register(data.bytes.to_vec());
         }
     }
     out
