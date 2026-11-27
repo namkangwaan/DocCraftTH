@@ -2133,3 +2133,24 @@ fn with_prepare_open_a_double_click_on_a_field_leaves_the_polygon_unfinished() {
     assert_eq!(polygons, 0, "the polygon is not finished");
     assert!(!s.views[0].session.comments.tool.drawing().is_empty(), "it is still being clicked out");
 }
+
+#[test]
+fn prepare_offers_thsarabun_without_substitution_notice() {
+    use pdfcraft_engine::FieldFont;
+    let Some(thsarabun) = pdfcraft_fonts::thai_faces::by_family("THSarabun") else {
+        eprintln!("skipping prepare_offers_thsarabun_without_substitution_notice: built without craft-fonts");
+        return;
+    };
+    let mut h = harness();
+    h.execute("form.prepare");
+    h.run_steps(2);
+    open_props(&mut h, "city");
+    tab(&mut h, "Appearance");
+    pick(&mut h, "Font:", "THSarabun");
+    assert!(h.query_by_label_contains("can't be embedded").is_none(), "bundled THSarabun must not show substitution notice");
+    h.get_by_label("OK").click();
+    h.run_steps(3);
+    let s = h.state();
+    let l = s.session.get(s.views[0].id).unwrap().field_look("city").unwrap();
+    assert_eq!(l.font, FieldFont::Thai(thsarabun));
+}
