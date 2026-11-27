@@ -1,6 +1,17 @@
 # Validate one non-comment manifest row before adding its family notice.
 function Get-CraftFontNoticeRow([string] $rootPath, [string] $manifest, [string] $line) {
   $fields = @($line -split ' \| ' | ForEach-Object { $_.Trim() })
+  if ($fields.Count -ge 6 -and $fields[4] -eq 'SIPA-NECTEC') {
+    $fontPath = $fields[2].Replace('\', '/')
+    if ($fontPath -notmatch '^fonts/FontsGOV/[^/]+\.ttf$') {
+      throw "Invalid SIPA-NECTEC font path in ${manifest}: $fontPath"
+    }
+    $fontFile = Join-Path $rootPath $fontPath
+    if (-not (Test-Path -LiteralPath $fontFile -PathType Leaf) -or (Get-Item -LiteralPath $fontFile).Length -eq 0) {
+      throw "Missing or empty SIPA-NECTEC font for $($fields[0]): $fontFile"
+    }
+    return $null
+  }
   if ($fields.Count -lt 6 -or $fields[4] -ne 'OFL-1.1') { throw "Missing OFL metadata in ${manifest}: $line" }
   # Manifest notice paths must name a family-local file, never escape the font input.
   $relative = $fields[5].Replace('\', '/')
@@ -32,7 +43,9 @@ function Get-CraftFontNotices([string] $FontRoot, [bool] $RequireChinese = $fals
       $line = $line.Trim()
       if (-not $line -or $line.StartsWith('#')) { continue }
       $entry = Get-CraftFontNoticeRow $rootPath $manifest $line
-      $notices[$entry.Family] = $entry.Notice
+      if ($null -ne $entry) {
+        $notices[$entry.Family] = $entry.Notice
+      }
     }
   }
   if ($notices.Count -eq 0) { throw "No declared font notices in $rootPath" }
