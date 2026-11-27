@@ -204,6 +204,7 @@ fn add_header_footer_in_place(doc: &mut Document, pages: &[usize], hf: &HeaderFo
             added::Family::Helvetica => "PCHelv",
             added::Family::Times => "PCTimes",
             added::Family::Courier => "PCCour",
+            added::Family::Thai(_) => "PCThai",
         };
         let base = hf.font.base_font(false, false);
         let resource = free_font_name(doc, &page_fonts(doc, page), preferred, base);

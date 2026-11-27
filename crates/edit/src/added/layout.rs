@@ -83,6 +83,16 @@ pub(super) fn wrapped(t: &AddedText) -> Vec<(String, bool, usize)> {
 /// broken inside, at shaped cluster boundaries, which never detach a tone or vowel mark from its
 /// base.
 fn thai_lines(t: &AddedText, para: &str, width: f64) -> Result<Vec<String>, EditError> {
+    if let super::types::Family::Thai(id) = t.family {
+        let styled = pdfcraft_fonts::thai_faces::resolve_style(id, t.bold, t.italic);
+        let bytes = pdfcraft_fonts::thai_faces::bytes(styled);
+        if bytes.is_empty() {
+            return Err(EditError::Invalid("the selected Thai font is not available".into()));
+        }
+        let run = pdfcraft_fonts::source_shaping::shape_validated_thai(bytes, para).map_err(EditError::Invalid)?;
+        let atoms = shaped_run_atoms(&run, t.size, t.char_spacing);
+        return Ok(wrap_words(thai_words(atoms), width));
+    }
     let (pieces, _) = shaped_layout(t, para, false)?;
     let mut atoms = Vec::new();
     for piece in pieces {
@@ -96,6 +106,23 @@ fn thai_lines(t: &AddedText, para: &str, width: f64) -> Result<Vec<String>, Edit
         }
     }
     Ok(wrap_words(thai_words(atoms), width))
+}
+
+fn shaped_run_atoms(run: &pdfcraft_fonts::source_shaping::ShapedRun, size: f64, char_spacing: f64) -> Vec<(String, f64)> {
+    let glyphs = &run.glyphs;
+    if glyphs.is_empty() {
+        return Vec::new();
+    }
+    let starts: Vec<usize> = (0..glyphs.len()).filter(|&i| i == 0 || !glyphs[i].text.is_empty()).collect();
+    let mut atoms = Vec::with_capacity(starts.len());
+    for (k, &start) in starts.iter().enumerate() {
+        let start_x = if k == 0 { 0.0 } else { glyphs[start].position[0] };
+        let end_x = starts.get(k + 1).map_or(run.advance, |&next| glyphs[next].position[0]);
+        let text = glyphs[start].text.clone();
+        let adv = ((end_x - start_x) * size).max(0.0) + char_spacing * text.chars().count() as f64;
+        atoms.push((text, adv));
+    }
+    atoms
 }
 
 /// `words` (each a list of text and advance, with the spaces that follow it) laid into rows no
@@ -194,6 +221,22 @@ pub(super) fn is_hebrew(c: char) -> bool {
 /// draw (or that has no face to draw it). Page-content tools refuse such text; the Add-text editor
 /// keeps it open.
 pub fn first_undrawable(t: &AddedText) -> Option<char> {
+    if let super::types::Family::Thai(id) = t.family {
+        let styled = pdfcraft_fonts::thai_faces::resolve_style(id, t.bold, t.italic);
+        let bytes = pdfcraft_fonts::thai_faces::bytes(styled);
+        if bytes.is_empty() {
+            return t.text.chars().find(|c| !c.is_control());
+        }
+        for line in t.text.split('\n') {
+            if pdfcraft_fonts::source_shaping::shape_validated_thai(bytes, line).is_err() {
+                return line
+                    .chars()
+                    .find(|c| pdfcraft_fonts::source_shaping::shape_validated_thai(bytes, &c.to_string()).is_err())
+                    .or_else(|| line.chars().next());
+            }
+        }
+        return None;
+    }
     if t.text.chars().any(is_thai) {
         if let Some(c) = t.text.chars().find(|c| is_thai(*c) && !pdfcraft_fonts::thai_has(*c)) {
             return Some(c);
@@ -319,6 +362,9 @@ pub(super) fn shaped_layout(t: &AddedText, line: &str, rtl: bool) -> Result<(Vec
 /// The width of `s` in a shaped-text item; the item's font's estimate if it can't be shaped (drawing
 /// then reports why).
 pub(crate) fn shaped_width(t: &AddedText, s: &str, rtl: bool) -> f64 {
+    if matches!(t.family, super::types::Family::Thai(_)) {
+        return latin_width(t, s);
+    }
     shaped_layout(t, s, rtl).map(|(_, w)| w).unwrap_or_else(|_| latin_width(t, s))
 }
 
