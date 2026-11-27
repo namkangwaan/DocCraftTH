@@ -18,8 +18,8 @@
 >
 > **2. ประกาศสถานะและข้อจำกัดของฟีเจอร์ภาษาไทยตามความเป็นจริง (Current Status & Experimental Limitations):**
 > - ถึงแม้เรามีความประสงค์จะนำ `PdfCraft` มาประยุกต์ใช้งานให้รองรับภาษาไทย แต่ **ณ ปัจจุบัน ระบบยังไม่รองรับอย่างสมบูรณ์ทั้งในส่วนของ:**
->   - ⚠️ **PDFEdit ภาษาไทย (การแก้ไขข้อความและอาร์ตเวิร์กภาษาไทยบน PDF)** — ยังอยู่ระหว่างการศึกษาการจัดวางสระ/วรรณยุกต์และฟอนต์ ยังไม่พร้อมใช้งานสมบูรณ์
->   - ⚠️ **Form ภาษาไทย (แบบฟอร์มและการกรอกข้อมูลภาษาไทย)** — ยังอยู่ในขั้นทดลองเบื้องต้น
+>   - 🧪 **PDFEdit ภาษาไทย (การแก้ไขข้อความและอาร์ตเวิร์กภาษาไทยบน PDF)** — รองรับ `THSarabun` (4 สไตล์) และฟอนต์ราชการ `FontsGOV` แบบ `Type0 TrueType` (ทั้งไทยและละติน/ตัวเลข) เพิ่มเติมจาก `Std14` แล้ว (อยู่ระหว่างทดสอบการใช้งานจริง)
+>   - 🧪 **Form ภาษาไทย (แบบฟอร์มและการกรอกข้อมูลภาษาไทย)** — รองรับฟอนต์ไทย (`Sarabun`, `THSarabun` 4 สไตล์ และ `FontsGOV` บนระบบรวมถึงตระกูล `GPOS=False`) ใน field Appearance แล้ว (อยู่ระหว่างทดสอบการใช้งานจริง)
 >   - ⚠️ **OCR ภาษาไทย (การรู้จำอักขระไทยในเอกสารสแกน)** — เป็นงานวิจัยและทดลองแบบจำลอง ยังมีข้อจำกัดและข้อผิดพลาดในหลายกรณี
 >   - ⚠️ **PDF ที่มี QR Code** — มีฟังก์ชันทดลองสำหรับสแกน/ตรวจจับ QR Code ในหน้าเอกสาร, แสดง preview เมื่อเลื่อนเมาส์ชี้, เมนูคลิกขวาเปิดลิงก์ในเบราว์เซอร์, และหน้าต่าง QR Scanner (ยังไม่รองรับการตรวจสอบลายเซ็นดิจิทัลของ QR)
 > - ฟีเจอร์งานภาษาไทยทั้งหมดในคลังนี้จึงถือเป็น **งานวิจัยเชิงทดลอง (Experimental / Active Research & Development)** ที่ยังพัฒนาไม่เสร็จสมบูรณ์
@@ -43,7 +43,8 @@
 - **Embedded Fonts Auto-Detection**: ระบบคอมไพล์ตรวจจับและฝังแบบอักษรจากคลัง `craft-fonts` เข้าสู่ไบนารีโดยตรง:
   - **Noto Sans Thai**: สำหรับข้อความบนหน้าจอ (UI Face) รองรับสระและวรรณยุกต์ครบถ้วน
   - **Sarabun**: แบบอักษรสารบรรณ (OFL-1.1) สำหรับเนื้อหาเอกสารและตัวอย่างข้อความ
-- **Style Fallback Robustness**: เพิ่มความยืดหยุ่นในการจับคู่ฟอนต์สไตล์ `Regular` เข้ากับอินเทอร์เฟซ `Medium` ทำให้ระบบสามารถแสดงผลภาษาไทยได้ทันทีโดยไม่ต้องพึ่งพาฟอนต์ที่ติดตั้งในระบบปฏิบัติการ
+  - **THSarabun (4 สไตล์) & FontsGOV (13 ตระกูลฟอนต์ราชการ SIPA/NECTEC)**: ฝัง `THSarabun` (`Regular`, `Bold`, `Italic`, `BoldItalic`) ทั้งบน WinApp และ WebApp พร้อมรองรับใบอนุญาต SIPA/NECTEC และการสร้างข้อความ/แบบฟอร์ม (`PDF-Edit` แบบ `Type0 TrueType` และ `PDF Form` Appearance รวมถึงฟอนต์ `GPOS=False`)
+- **Style Fallback Robustness**: เพิ่มความยืดหยุ่นในการจับคู่ฟอนต์สไตล์ `Regular` เข้ากับอินเทอร์เฟซ `Medium` และรองรับการเลือกสไตล์ `Bold`/`Italic`/`BoldItalic` ใน `thai_faces` ทำให้ระบบสามารถแสดงผลภาษาไทยได้ทันทีโดยไม่ต้องพึ่งพาฟอนต์ที่ติดตั้งในระบบปฏิบัติการ
 
 ---
 
@@ -112,6 +113,17 @@
     - ปิด `detect_orientation` เป็นค่าเริ่มต้นใน `DeskewOptions` และเพิ่มเกณฑ์กรองหน้าแทบว่าง/ขอบดำ (ความเร็วเฉลี่ยบน release: `analyze` มัธยฐาน **39 ms**, `straighten` **177 ms** ต่อหน้า A4)
     - เพิ่ม **Context-aware Thai Digit Restoration** (`crates/engine/src/ocr.rs`) แปลงเลขในบริบทไทยกลับเป็น `๐–๙` อัตโนมัติ (คงเลขอารบิกในชื่อรุ่น/เทคโนโลยี เช่น `ISO 9001`, `UTF-8`, `Windows 10`)
     - เพิ่ม **Thai ↔ Arabic Digit Search Folding** (`crates/render/src/text/search.rs`) ให้ค้นหาด้วยเลขอารบิกเจอทั้ง `0–9` และ `๐–๙` ในเอกสาร (และกลับกัน)
+
+---
+
+## 📝 บันทึกการอัปเดตล่าสุด (Recent Updates — 2026-11-27 / v0.22.0)
+
+- **PR #55 (`5a9794f80`) — Thai Form Appearance:** รองรับฟอนต์ไทย (`Sarabun` และฟอนต์ไทยบนระบบ) ในการสร้าง Appearance ของ PDF Form และปรับปรุงชุดข้อความภาษาไทยใน `th.tsv`
+- **PR #56 (`cd1aa3eb1`) — FontsGOV Support for PDF-Edit & PDF Form:**
+  - ฝัง **THSarabun** 4 สไตล์ (`Regular`, `Bold`, `Italic`, `BoldItalic`) จากคลัง `FontsGOV` และรองรับใบอนุญาต SIPA/NECTEC (`validate_document_input`)
+  - รองรับการเลือกสไตล์ `Bold`/`Italic`/`BoldItalic` (`resolve_style`) และ shaping ฟอนต์ `FontsGOV` ที่ไม่มีตาราง `GPOS` (`shape_validated_thai`)
+  - เพิ่ม `Family::Thai(FaceId)` ใน **PDF-Edit** (`crates/edit/src/added/`) เพื่อฝังฟอนต์แบบ `Type0 TrueType` สำหรับทั้งภาษาไทยและละติน/ตัวเลข พร้อมเชื่อมเข้าหน้าจอ Edit Text และ `crates/automation`
+- **Windows Installer (`0.22.0`):** ปรับ `packaging/windows/font-notices.ps1` ให้รองรับแถว `SIPA-NECTEC` ใน `manifest.txt` และแพ็ก `dthframe-0.22.0-windows-x64.msi` / `portable.zip` พร้อม `THSarabun` ครบ 4 สไตล์
 
 ---
 
