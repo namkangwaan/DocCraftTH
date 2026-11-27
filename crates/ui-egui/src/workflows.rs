@@ -7,9 +7,14 @@ pub(super) mod create_multiple_ui;
 pub(super) mod create_ui;
 pub(super) mod export_ui;
 pub(super) mod files;
+pub(crate) mod job_count;
+pub(super) mod js_dialogs;
+#[cfg(target_arch = "wasm32")]
+mod js_value;
 pub(super) mod js_ui;
 #[cfg(any(target_arch = "wasm32", test))]
 pub(super) mod ocr_route;
+mod ocr_errors;
 pub(super) mod ocr_ui;
 pub(super) mod ocr_verify;
 #[cfg(target_arch = "wasm32")]

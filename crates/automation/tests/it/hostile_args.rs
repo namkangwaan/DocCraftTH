@@ -562,3 +562,43 @@ fn no_tool_panics_when_the_viewer_sees_fewer_pages_than_the_file_has() {
     let _ = std::fs::remove_dir_all(&root);
     assert!(failures.is_empty(), "{} failure(s); the first is: {}", failures.len(), failures.first().map_or("", String::as_str));
 }
+
+#[test]
+fn hostile_appearance_font_names_do_not_panic_or_escape_root() {
+    let base = tmp("hostile-font");
+    let root = base.join("root");
+    std::fs::create_dir_all(&root).expect("root");
+    let outside = base.join("outside.ttf");
+    std::fs::write(&outside, b"not a font").expect("outside file");
+    let before = listing(&base);
+
+    let mut a = Automation::new().with_root(&root).expect("root");
+    let doc = blank_doc(&mut a);
+    a.call("form_add_field", &json!({"doc": doc, "page": 1, "type": "text", "name": "f", "rect": [20, 20, 120, 44]})).expect("add field");
+
+    let hostile_fonts = [
+        String::new(),
+        " ".into(),
+        "\0".into(),
+        "\n\r\t\x07\x1b".into(),
+        "\u{202E}ttf.livE".into(),
+        "ก".repeat(100_000),
+        "../outside.ttf".into(),
+        "../../outside.ttf".into(),
+        r"..\..\outside.ttf".into(),
+        outside.to_string_lossy().into_owned(),
+        r"\\.\pipe\pdfcraft-hostile-font.ttf".into(),
+        r"C:\Windows\Fonts\tahoma.ttf".into(),
+    ];
+    for name in &hostile_fonts {
+        let args = json!({"doc": doc, "field": "f", "appearance": {"font": name}});
+        let res = catch_unwind(AssertUnwindSafe(|| a.call("form_set_props", &args)));
+        match res {
+            Ok(Err(ToolError::InvalidArgs(_))) => {}
+            other => panic!("expected InvalidArgs for hostile font {name:?}, got {other:?}"),
+        }
+    }
+    let after = listing(&base);
+    let _ = std::fs::remove_dir_all(&base);
+    assert_eq!(before, after, "hostile font names must not touch files outside the root");
+}

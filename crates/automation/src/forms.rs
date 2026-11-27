@@ -41,9 +41,19 @@ fn format_arg(v: &Value) -> Result<Format> {
     })
 }
 
+/// What `appearance.font` resolved to, so `form_set_props` can report whether the face was
+/// embedded or substituted by Sarabun.
+#[derive(Clone, Debug)]
+struct ChosenFont {
+    font: pdfcraft_engine::FieldFont,
+    family: String,
+    embedded: bool,
+    substituted: bool,
+}
+
 /// `{"border": "#FF0000" | "none", "fill": …, "width": 1-3, "style": "solid"|…, "text_color": …,
-/// "font": "helvetica"|"times"|"courier"}`, changing only what is given.
-fn look_arg(v: &Value) -> Result<pdfcraft_engine::FieldLookPatch> {
+/// "font": "helvetica"|"times"|"courier"|"<Thai family>"}`, changing only what is given.
+fn look_arg(v: &Value, entries: &[pdfcraft_engine::thai_catalog::CatalogEntry]) -> Result<(pdfcraft_engine::FieldLookPatch, Option<ChosenFont>)> {
     use pdfcraft_engine::{BorderStyle, FieldFont, FieldLookPatch};
     let o = v.as_object().ok_or_else(|| bad("appearance must be an object"))?;
     for key in o.keys() {
@@ -61,7 +71,32 @@ fn look_arg(v: &Value) -> Result<pdfcraft_engine::FieldLookPatch> {
     };
     let string =
         |k: &str| -> Result<Option<&str>> { o.get(k).map(|v| v.as_str().ok_or_else(|| bad(format!("appearance.{k} must be a string")))).transpose() };
-    Ok(FieldLookPatch {
+    let chosen_font = string("font")?
+        .map(|s| {
+            let trimmed = s.trim();
+            if trimmed.is_empty() || trimmed.len() > 256 || trimmed.chars().any(char::is_control) {
+                let mut choices = vec!["helvetica", "times", "courier"];
+                choices.extend(entries.iter().map(|e| e.family.as_str()));
+                return Err(bad(format!("unknown font {s:?} ({})", choices.join(", "))));
+            }
+            if trimmed.eq_ignore_ascii_case("helvetica") {
+                return Ok(ChosenFont { font: FieldFont::Helvetica, family: "Helvetica".into(), embedded: false, substituted: false });
+            }
+            if trimmed.eq_ignore_ascii_case("times") || trimmed.eq_ignore_ascii_case("times roman") || trimmed.eq_ignore_ascii_case("times-roman") {
+                return Ok(ChosenFont { font: FieldFont::Times, family: "Times Roman".into(), embedded: false, substituted: false });
+            }
+            if trimmed.eq_ignore_ascii_case("courier") {
+                return Ok(ChosenFont { font: FieldFont::Courier, family: "Courier".into(), embedded: false, substituted: false });
+            }
+            if let Some(entry) = entries.iter().find(|e| e.family.eq_ignore_ascii_case(trimmed)) {
+                return Ok(ChosenFont { font: entry.font, family: entry.font.label().to_string(), embedded: true, substituted: entry.substituted });
+            }
+            let mut choices = vec!["helvetica", "times", "courier"];
+            choices.extend(entries.iter().map(|e| e.family.as_str()));
+            Err(bad(format!("unknown font {s:?} ({})", choices.join(", "))))
+        })
+        .transpose()?;
+    let patch = FieldLookPatch {
         border: colour("border")?,
         fill: colour("fill")?,
         text: colour("text_color")?.map(|c| c.unwrap_or([0.0; 3])),
@@ -83,15 +118,9 @@ fn look_arg(v: &Value) -> Result<pdfcraft_engine::FieldLookPatch> {
                 x => Err(bad(format!("unknown style {x:?}"))),
             })
             .transpose()?,
-        font: string("font")?
-            .map(|s| match s {
-                "helvetica" => Ok(FieldFont::Helvetica),
-                "times" => Ok(FieldFont::Times),
-                "courier" => Ok(FieldFont::Courier),
-                x => Err(bad(format!("unknown font {x:?} (helvetica, times, courier)"))),
-            })
-            .transpose()?,
-    })
+        font: chosen_font.as_ref().map(|c| c.font),
+    };
+    Ok((patch, chosen_font))
 }
 
 /// `{"min": 0, "max": 100}` or `"none"`. A null bound is no bound, as `form_fields` shows it.
@@ -592,14 +621,19 @@ impl Automation {
         } else {
             single.into_iter().map(str::to_owned).collect()
         };
+        let font_entries = self.appearance_font_entries(a)?;
         let mut edits = Vec::with_capacity(names.len());
         let mut new_name = None;
+        let mut reported_font: Option<ChosenFont> = None;
         for name in &names {
             // Merge appearance changes separately for each field: changing just the border
             // must not copy the first field's fill, font or text colour onto the others.
-            let props = self.field_props_arg(a, name)?;
+            let (props, chosen_font) = self.field_props_arg(a, name, &font_entries)?;
             if props == FieldProps::default() {
                 return Err(bad("nothing to change"));
+            }
+            if chosen_font.is_some() {
+                reported_font = chosen_font;
             }
             new_name = Some(props.name.clone().unwrap_or_else(|| name.clone()));
             edits.push(Edit::SetFieldProps { name: name.clone(), props: Box::new(props) });
@@ -617,6 +651,13 @@ impl Automation {
         } else {
             out["field"] = json!(new_name);
         }
+        if let Some(f) = reported_font {
+            out["font"] = json!({
+                "family": f.family,
+                "embedded": f.embedded,
+                "substituted": f.substituted,
+            });
+        }
         if let Some(before) = before {
             let after = &self.doc(a)?.form;
             // The renamed field itself, found by object: the name stored can differ from the
@@ -630,9 +671,67 @@ impl Automation {
         Ok(out)
     }
 
-    fn field_props_arg(&self, a: &Args, name: &str) -> Result<FieldProps> {
+    /// Font files (`.ttf`, `.otf`, `.ttc`, `.otc`) directly inside the configured automation read
+    /// root, resolved through `self.resolve` (skipping symbolic links). Never touches OS or
+    /// application font folders.
+    fn root_font_files(&self) -> Vec<std::path::PathBuf> {
+        let base = if let Some(ref roots) = self.roots { roots.read_root().map(std::path::Path::to_path_buf) } else { self.root.clone() };
+        let Some(base) = base else { return Vec::new() };
+        let Ok(dir) = self.resolve(&base.to_string_lossy(), false) else { return Vec::new() };
+        let Ok(read) = std::fs::read_dir(&dir) else { return Vec::new() };
+        let mut files = Vec::new();
+        for entry in read.flatten().take(256) {
+            let path = entry.path();
+            if !std::fs::symlink_metadata(&path).is_ok_and(|m| !m.file_type().is_symlink() && m.is_file()) {
+                continue;
+            }
+            if path.extension().is_some_and(|x| {
+                x.eq_ignore_ascii_case("ttf") || x.eq_ignore_ascii_case("otf") || x.eq_ignore_ascii_case("ttc") || x.eq_ignore_ascii_case("otc")
+            }) && let Ok(resolved) = self.resolve(&path.to_string_lossy(), false)
+            {
+                files.push(resolved);
+            }
+        }
+        files
+    }
+
+    /// Resolves available Thai font entries once per `form_set_props` call: bundled faces, font files
+    /// inside the read root, and Thai faces already embedded in the document.
+    fn appearance_font_entries(&self, a: &Args) -> Result<Vec<pdfcraft_engine::thai_catalog::CatalogEntry>> {
+        if a.get("appearance").and_then(|v| v.get("font")).is_none() {
+            return Ok(Vec::new());
+        }
+        let mut entries = pdfcraft_engine::thai_catalog::entries_in_files(self.root_font_files());
+        if let Ok(doc) = self.doc(a) {
+            for (family, font) in doc.embedded_thai_fonts() {
+                if !entries.iter().any(|e| !e.substituted && e.family.eq_ignore_ascii_case(&family)) {
+                    entries.push(pdfcraft_engine::thai_catalog::CatalogEntry {
+                        family,
+                        font,
+                        source: pdfcraft_engine::thai_catalog::Source::Bundled,
+                        substituted: false,
+                    });
+                }
+            }
+        }
+        Ok(entries)
+    }
+
+    fn field_props_arg(
+        &self,
+        a: &Args,
+        name: &str,
+        font_entries: &[pdfcraft_engine::thai_catalog::CatalogEntry],
+    ) -> Result<(FieldProps, Option<ChosenFont>)> {
         let doc = self.doc(a)?;
         let f = doc.form.iter().find(|f| f.name == name).ok_or_else(|| failed(format!("there is no field named {name:?} (see form_fields)")))?;
+        let (appearance, chosen_font) = match a.get("appearance") {
+            None => (None, None),
+            Some(v) => {
+                let (patch, chosen) = look_arg(v, font_entries)?;
+                ((patch != pdfcraft_engine::FieldLookPatch::default()).then_some(patch), chosen)
+            }
+        };
         // Position: top-left-origin points on the displayed page → user space.
         let rect = match a.get("rect") {
             None => None,
@@ -645,7 +744,7 @@ impl Automation {
                 Some((0, [u0[0].min(u1[0]) as f64, u0[1].min(u1[1]) as f64, u0[0].max(u1[0]) as f64, u0[1].max(u1[1]) as f64]))
             }
         };
-        Ok(FieldProps {
+        let props = FieldProps {
             rect,
             export_value: a
                 .opt_str("export_value")?
@@ -680,7 +779,7 @@ impl Automation {
             options: a.get("options").map(|_| a.strs("options")).transpose()?.map(|v| v.into_iter().map(str::to_owned).collect()),
             font_size: a.opt_num("font_size")?,
             look: None,
-            appearance: a.get("appearance").map(look_arg).transpose()?.filter(|p| *p != pdfcraft_engine::FieldLookPatch::default()),
+            appearance,
             format: a.get("format").map(format_arg).transpose()?,
             validate: a.get("validate").map(validate_arg).transpose()?,
             calculate: a.get("calculate").map(calculate_arg).transpose()?,
@@ -737,7 +836,8 @@ impl Automation {
                         .ok_or_else(|| bad(format!("unknown check style {s:?} (check, circle, cross, diamond, square, star)")))?,
                 ),
             },
-        })
+        };
+        Ok((props, chosen_font))
     }
 
     pub(crate) fn form_tab_order(&mut self, a: &Args) -> Result<Value> {

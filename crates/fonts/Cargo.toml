@@ -9,6 +9,8 @@ license.workspace = true
 workspace = true
 
 [dependencies]
+# `EmbeddedFace`, the type of the generated `CRAFT_FONTS` table (and the manifest parser `tests/build_input.rs` runs).
+craft-fonts-build = { workspace = true }
 craft-pdf = { workspace = true }
 pdfcraft-cos = { workspace = true }
 # Glyph outlines of the bundled script font (typed signatures); already in the tree via egui.
@@ -18,3 +20,7 @@ harfrust = "0.12"
 unicode-bidi = "0.3"
 # Thai word boundaries (LSTM line segmenter, +0.38 MiB wasm); icu_properties/icu_provider are already in the tree via egui.
 icu_segmenter = { version = "2", default-features = false, features = ["compiled_data", "lstm"] }
+
+[build-dependencies]
+# `build.rs` reads each craft-fonts manifest with its parser, so the table carries the face index and role.
+craft-fonts-build = { workspace = true }

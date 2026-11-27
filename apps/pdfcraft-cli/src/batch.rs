@@ -15,8 +15,6 @@ const OPTIONS: &[OptionSpec] = &[
     OptionSpec { name: "--dpi", takes_value: true },
     OptionSpec { name: "--language", takes_value: true },
     OptionSpec { name: "--ocr-all-pages", takes_value: false },
-    OptionSpec { name: "--ocr-unusable-text", takes_value: false },
-    OptionSpec { name: "--digits", takes_value: true },
 ];
 
 pub(super) fn run(args: &[String]) -> Result<(), CliError> {
@@ -49,16 +47,11 @@ pub(super) fn run(args: &[String]) -> Result<(), CliError> {
             params[key] = serde_json::from_str(v).map_err(|_| format!("batch: {option} needs a number"))?;
         }
     }
-    for (option, key) in [("--language", "language"), ("--digits", "digits")] {
-        if let Some(v) = flag(args, option) {
-            params[key] = json!(v);
-        }
+    if let Some(lang) = flag(args, "--language") {
+        params["language"] = json!(lang);
     }
     if seen.contains("--ocr-all-pages") {
         params["skip_text_pages"] = json!(false);
-    }
-    if seen.contains("--ocr-unusable-text") {
-        params["read_unusable_text"] = json!(true);
     }
     let mut auto = automation(args)?;
     let content = auto.call("doc_batch", &params).map_err(|e| e.to_string())?;

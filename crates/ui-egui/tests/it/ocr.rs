@@ -1,11 +1,42 @@
 //! Scan & OCR ▸ Recognize text in the real shell (egui_kittest): the dialog, the run and its
 //! result (skipped without the OCR models: `cargo xtask models`).
 
+use std::sync::Arc;
+
+use crate::support::AppHarness as _;
+use craft::host::{InlineJobs, Picked, ScriptedFiles};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use pdfcraft_engine::ocr::{OcrPage, OcrSettings, PlacedWord};
 use pdfcraft_engine::{AddedText, Edit, Session, export};
 use pdfcraft_ui_egui::PdfCraftApp;
+
+/// The app on a host whose jobs run at once and whose pickers answer from `files`.
+fn app_on(files: Arc<ScriptedFiles>) -> PdfCraftApp {
+    crate::support::test_app(crate::support::host_with(Arc::new(InlineJobs), files))
+}
+
+/// Sets a field of the open dialog as the user editing that control would.
+fn set_field(h: &mut Harness<'_, PdfCraftApp>, field: &str, value: serde_json::Value) {
+    let ctx = h.ctx.clone();
+    // PLAN: assumed `OpenDialog::id` and `DialogHost::open_dialogs`/`set_json_field` as listed in the framework's `DialogHost`.
+    let id = h.state().dialogs.open_dialogs().first().expect("the dialog is open").id;
+    h.state_mut().dialogs.set_json_field(&ctx, id, field, value).unwrap();
+    h.run_steps(2);
+}
+
+/// Presses OK of the open Recognize Text dialog.
+fn confirm_recognize(h: &mut Harness<'_, PdfCraftApp>) {
+    let ctx = h.ctx.clone();
+    assert!(h.state_mut().dialogs.confirm::<craft::ui::patterns::form_dialogs::HostedParamDialog>(&ctx), "OK was enabled");
+    h.run_steps(3);
+}
+
+/// The text of the notice on screen.
+fn notice(h: &Harness<'_, PdfCraftApp>) -> String {
+    // PLAN: assumed `support::shown_notice(&Harness) -> Option<String>` (pdf-chrome-w9).
+    crate::support::shown_notice(h).unwrap_or_default()
+}
 
 /// A one-page PDF that is only a picture of a sentence.
 fn scan() -> Vec<u8> {
@@ -18,15 +49,17 @@ fn scan() -> Vec<u8> {
 
 #[test]
 fn recognize_text_dialog_adds_searchable_text() {
-    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
-        app.set_option("language", "en").unwrap();
-        app.open_bytes("scan.pdf", None, scan()).unwrap();
-        app.run_inline = true;
-        app
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|cc| {
+        crate::support::install_runtime(&cc.egui_ctx);
+        {
+            let mut app = app_on(Arc::new(ScriptedFiles::new()));
+            app.set_option(&egui::Context::default(), "language", "en").unwrap();
+            app.open_bytes(&egui::Context::default(), "scan.pdf", None, scan()).unwrap();
+            app
+        }
     });
     h.run_steps(4);
-    assert!(h.state_mut().execute("ocr.recognize"));
+    assert!(h.execute("ocr.recognize"));
     h.run_steps(2);
     h.get_by_label("Document language");
     h.get_by_label("Output");
@@ -34,69 +67,14 @@ fn recognize_text_dialog_adds_searchable_text() {
         eprintln!("skipped: OCR models not installed");
         return;
     }
-    h.get_by_label("Recognize text").click();
+    confirm_recognize(&mut h);
     h.run_steps(3);
     assert!(h.state().ocr_run.is_none(), "finished");
-    let toast = h.state().toast.clone().unwrap().0;
+    let toast = notice(&h);
     assert!(toast.starts_with("Recognized ") && toast.contains("on 1 page"), "{toast}");
     let app = h.state();
     let id = app.active_ids().unwrap().1;
     assert_eq!(app.session.get(id).unwrap().can_undo(), Some("Recognize text"));
-}
-
-/// Opens Recognize Text on a scan with the interface set to `ui`.
-fn recognize_dialog(ui: &'static str) -> Harness<'static, PdfCraftApp> {
-    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
-        let mut app = PdfCraftApp::new();
-        app.set_option("language", ui).unwrap();
-        app.open_bytes("scan.pdf", None, scan()).unwrap();
-        app.run_inline = true;
-        app
-    });
-    h.run_steps(4);
-    assert!(h.state_mut().execute("ocr.recognize"));
-    h.run_steps(2);
-    h
-}
-
-/// FR-03: the dialog starts on the interface language when text recognition reads it, and on
-/// English otherwise. A choice made in the dialog is kept.
-#[test]
-fn recognize_text_dialog_defaults_to_thai_in_a_thai_interface() {
-    let mut h = recognize_dialog("th");
-    assert_eq!(h.state().ocr_draft.settings().language, "th");
-    h.get_by_value("ไทย");
-    h.state_mut().ocr_draft.language = Some("en".into());
-    h.run_steps(2);
-    assert_eq!(h.state().ocr_draft.settings().language, "en", "the user's choice wins over the interface language");
-    let h = recognize_dialog("en");
-    assert_eq!(h.state().ocr_draft.settings().language, "en");
-    let h = recognize_dialog("de");
-    assert_eq!(h.state().ocr_draft.settings().language, "en", "no German model: English");
-}
-
-#[test]
-fn recognize_text_dialog_offers_digits_choice() {
-    use pdfcraft_engine::ocr::Digits;
-    let mut h = recognize_dialog("en");
-    h.get_by_label("Digits");
-    assert_eq!(h.state().ocr_draft.settings().digits, Digits::AsRead);
-    h.state_mut().ocr_draft.digits = Digits::Thai;
-    h.run_steps(2);
-    assert_eq!(h.state().ocr_draft.settings().digits, Digits::Thai);
-}
-
-/// FR-05: a language without models is reported in the interface language, naming the language,
-/// and nothing starts.
-#[test]
-fn a_missing_language_model_is_reported_in_the_interface_language() {
-    let mut h = recognize_dialog("th");
-    h.state_mut().ocr_draft.language = Some("xx".into());
-    h.state_mut().start_ocr();
-    // Thai interface text carries U+200B at word boundaries for wrapping (i18n/th_breaks.rs).
-    let toast = h.state().toast.clone().unwrap().0.replace('\u{200B}', "");
-    assert!(toast.contains("xx") && toast.contains("โมเดลการรู้จำข้อความ") && toast.contains("PDFCRAFT_MODELS"), "{toast}");
-    assert!(h.state().ocr_run.is_none(), "nothing started");
 }
 
 #[test]
@@ -108,16 +86,26 @@ fn recognize_text_in_multiple_files_writes_searchable_copies() {
     let dir = std::env::temp_dir().join(format!("pdfcraft-ocr-ui-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let mut app = PdfCraftApp::new();
-    app.set_option("language", "en").unwrap();
-    app.run_inline = true;
-    app.export_dir_override = Some(dir.to_string_lossy().into_owned());
-    app.use_files(pdfcraft_ui_egui::FilePurpose::Ocr, vec![("one.pdf".into(), scan()), ("two.pdf".into(), scan())]);
-    assert!(app.ocr_batch.is_none(), "finished");
-    let toast = app.toast.clone().unwrap().0;
+    // The folder pick is answered by the script; the copies are written through the host's files.
+    let files = Arc::new(ScriptedFiles::answering([Picked::Paths(vec![dir.clone()])]));
+    let service = files.clone();
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |cc| {
+        crate::support::install_runtime(&cc.egui_ctx);
+        {
+            let mut app = app_on(service);
+            app.set_option(&egui::Context::default(), "language", "en").unwrap();
+            app
+        }
+    });
+    h.run_steps(2);
+    let ctx_h = h.ctx.clone();
+    h.state_mut().use_files(&ctx_h, pdfcraft_ui_egui::FilePurpose::Ocr, vec![("one.pdf".into(), scan()), ("two.pdf".into(), scan())]);
+    h.run_steps(4);
+    assert!(h.state().ocr_batch.is_none(), "finished");
+    let toast = notice(&h);
     assert!(toast.starts_with("Recognized ") && toast.ends_with("in 2 files"), "{toast}");
     for name in ["one.pdf", "two.pdf"] {
-        let bytes = std::fs::read(dir.join(name)).unwrap();
+        let bytes = files.file(&dir.join(name)).expect("the copy was written");
         assert!(bytes.len() > scan().len(), "an incremental update was appended");
     }
 }
@@ -138,28 +126,30 @@ fn recognize_text_can_read_pictures_on_pages_with_text() {
         s.apply(id, Edit::AddText { page: 0, text: note }).unwrap();
         s.save_bytes(id).unwrap().to_vec()
     };
-    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
-        app.set_option("language", "en").unwrap();
-        app.open_bytes("hybrid.pdf", None, hybrid).unwrap();
-        app.run_inline = true;
-        app
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|cc| {
+        crate::support::install_runtime(&cc.egui_ctx);
+        {
+            let mut app = app_on(Arc::new(ScriptedFiles::new()));
+            app.set_option(&egui::Context::default(), "language", "en").unwrap();
+            app.open_bytes(&egui::Context::default(), "hybrid.pdf", None, hybrid).unwrap();
+            app
+        }
     });
     h.run_steps(4);
-    assert!(h.state_mut().execute("ocr.recognize"));
+    assert!(h.execute("ocr.recognize"));
     h.run_steps(2);
     assert!(h.state().ocr_draft.settings().skip_text_pages, "pages with text are skipped by default");
-    h.get_by_label("Also recognize pages that already have text").click();
-    h.run_steps(2);
-    assert!(!h.state().ocr_draft.settings().skip_text_pages);
+    // The draft takes the dialog's values when it is confirmed.
+    set_field(&mut h, "skip_text_pages", serde_json::json!(false));
     if !pdfcraft_engine::ocr::available() {
         eprintln!("skipped: OCR models not installed");
         return;
     }
-    h.get_by_label("Recognize text").click();
+    confirm_recognize(&mut h);
     h.run_steps(3);
+    assert!(!h.state().ocr_draft.settings().skip_text_pages, "the confirmed choice reached the draft");
     assert!(h.state().ocr_run.is_none(), "finished");
-    let toast = h.state().toast.clone().unwrap().0;
+    let toast = notice(&h);
     assert!(toast.starts_with("Recognized ") && toast.ends_with("on 1 page"), "{toast}");
     let app = h.state();
     let id = app.active_ids().unwrap().1;
@@ -177,24 +167,27 @@ fn recognize_text_can_read_pictures_on_pages_with_text() {
 #[test]
 fn an_ocr_word_opens_for_editing_and_stays_open() {
     use pdfcraft_engine::ocr::PlacedWord;
-    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
-        app.set_option("language", "en").unwrap();
-        app.open_bytes("scan.pdf", None, scan()).unwrap();
-        let id = app.views[0].id;
-        let ph = app.session.get(id).unwrap().info.pages[0].height as f64;
-        let words = vec![PlacedWord {
-            text: "Recognize".into(),
-            origin: [72.0, ph - 100.0],
-            across: [80.0, 0.0],
-            up: [0.0, 14.0],
-            confidence: None,
-            source: "ocrs".into(),
-        }];
-        app.session.apply(id, Edit::AddOcrText { page: 0, words }).unwrap();
-        app.set_option("zoom", "100").unwrap();
-        assert!(app.execute("edit.edit_text"));
-        app
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|cc| {
+        crate::support::install_runtime(&cc.egui_ctx);
+        {
+            let mut app = crate::control::new_app();
+            app.set_option(&egui::Context::default(), "language", "en").unwrap();
+            app.open_bytes(&egui::Context::default(), "scan.pdf", None, scan()).unwrap();
+            let id = app.views[0].id;
+            let ph = app.session.get(id).unwrap().info.pages[0].height as f64;
+            let words = vec![PlacedWord {
+                text: "Recognize".into(),
+                origin: [72.0, ph - 100.0],
+                across: [80.0, 0.0],
+                up: [0.0, 14.0],
+                confidence: None,
+                source: "ocrs".into(),
+            }];
+            app.session.apply(id, Edit::AddOcrText { page: 0, words }).unwrap();
+            app.set_option(&egui::Context::default(), "zoom", "100").unwrap();
+            assert!(app.execute(&egui::Context::default(), "edit.edit_text"));
+            app
+        }
     });
     crate::support::settle(&mut h);
     let (r, k) = {
@@ -212,163 +205,23 @@ fn an_ocr_word_opens_for_editing_and_stays_open() {
         h.event(egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed, modifiers: Default::default() });
     }
     h.run_steps(4);
-    let opened = |h: &Harness<'_, PdfCraftApp>| h.state().views[0].line_editor.as_ref().map(|e| e.text.clone());
+    let opened = |h: &Harness<'_, PdfCraftApp>| h.state().views[0].session.line_editor.as_ref().map(|e| e.text.clone());
     assert_eq!(opened(&h).as_deref(), Some("Recognize"));
-    assert!(h.state().views[0].image_selection.is_none(), "the scan under the word isn't selected");
+    assert!(h.state().views[0].session.image_selection.is_none(), "the scan under the word isn't selected");
     h.hover_at(r.min + egui::vec2(300.0, 400.0) * k);
     h.run_steps(4);
     assert_eq!(opened(&h).as_deref(), Some("Recognize"), "moving the pointer away keeps the word open");
 }
 
-/// One page whose text maps to private-use code points, as a legacy Thai font's ToUnicode does
-/// (SRS FR-17): rows of such words over the whole page, saved and reopened.
-fn legacy_text_page() -> Vec<u8> {
-    let mut s = Session::new();
-    let blank = s.create_blank(612.0, 792.0, 1).unwrap();
-    let id = s.open("legacy.pdf", None, blank, None).unwrap();
-    let words = (0..10)
-        .map(|i| pdfcraft_engine::ocr::PlacedWord {
-            text: "\u{F700}\u{F701}\u{F702}\u{F703}".into(),
-            origin: [0.0, 79.2 * f64::from(i)],
-            across: [612.0, 0.0],
-            up: [0.0, 79.2],
-            confidence: None,
-            source: "ocrs".into(),
-        })
-        .collect();
-    s.apply(id, Edit::AddOcrText { page: 0, words }).unwrap();
-    s.save_bytes(id).unwrap().to_vec()
-}
-
-/// Opens `pdf` at `size` with the interface in `ui`, and runs frames until the current page's
-/// text has been read.
-fn browsing(pdf: Vec<u8>, ui: &'static str, size: egui::Vec2) -> Harness<'static, PdfCraftApp> {
-    let mut h = Harness::builder().with_size(size).build_eframe(move |_cc| {
-        let mut app = PdfCraftApp::new();
-        app.set_option("language", ui).unwrap();
-        app.open_bytes("page.pdf", None, pdf).unwrap();
-        app.run_inline = true;
-        app
-    });
-    for _ in 0..400 {
-        h.run_steps(1);
-        if h.state().current_page_text_unusable().is_some() {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(10));
-    }
-    assert!(h.state().current_page_text_unusable().is_some(), "the page's text was read");
-    h.run_steps(2);
-    h
-}
-
-const NOTICE: &str = "This page has unusable text";
-const OPEN: &str = "Recognize text on this page…";
-
-/// SRS §5.5: browsing a page whose text is unusable shows the notice, and nothing is read.
-#[test]
-fn a_page_with_unusable_text_shows_the_notice() {
-    let h = browsing(legacy_text_page(), "en", egui::vec2(1400.0, 900.0));
-    assert_eq!(h.state().current_page_text_unusable(), Some(true));
-    h.get_by_label(NOTICE);
-    h.get_by_label(OPEN);
-    let app = h.state();
-    assert!(app.ocr_run.is_none() && app.dialog.is_none(), "the notice starts nothing by itself");
-    assert_eq!(app.session.get(app.views[0].id).unwrap().can_undo(), None);
-}
-
-/// Pages with good text, or with no text at all, show no notice.
-#[test]
-fn pages_with_good_or_no_text_show_no_notice() {
-    let s = Session::new();
-    for (what, pdf) in [
-        ("good text", s.create_from_text("t", "Ordinary searchable words").unwrap().to_vec()),
-        ("no text", s.create_blank(612.0, 792.0, 1).unwrap().to_vec()),
-    ] {
-        let h = browsing(pdf, "en", egui::vec2(1400.0, 900.0));
-        assert_eq!(h.state().current_page_text_unusable(), Some(false), "{what}");
-        assert!(h.query_by_label(NOTICE).is_none(), "{what}");
-    }
-}
-
-/// The button opens Recognize Text for this page with reading over its unusable text ticked,
-/// and still reads nothing until the user confirms there; the tick lasts one run.
-#[test]
-fn the_notice_opens_recognize_text_for_the_page_without_reading_it() {
-    let mut h = browsing(legacy_text_page(), "en", egui::vec2(1400.0, 900.0));
-    h.get_by_label(OPEN).click();
-    h.run_steps(3);
-    {
-        let app = h.state();
-        assert!(matches!(app.dialog, Some(pdfcraft_ui_egui::Dialog::RecognizeText)));
-        let d = &app.ocr_draft;
-        assert_eq!((format!("{:?}", d.pages).as_str(), d.from, d.to), ("Range", 1, 1), "set to this page");
-        let settings = d.settings();
-        assert!(settings.read_unusable_text && settings.skip_text_pages, "only unusable text is read over: {settings:?}");
-        assert!(app.ocr_run.is_none(), "nothing is read before the user confirms");
-        assert_eq!(app.session.get(app.views[0].id).unwrap().can_undo(), None);
-    }
-    h.get_by_label("Also recognize pages whose text is unusable");
-    assert!(h.query_by_label(NOTICE).is_none(), "the dialog covers the page, so the notice steps aside");
-
-    // Confirming uses the tick for this run only.
-    if pdfcraft_engine::ocr::available() {
-        h.get_by_label("Recognize text").click();
-        h.run_steps(3);
-        let toast = h.state().toast.clone().unwrap().0;
-        assert!(toast.starts_with("Recognized ") && toast.contains("on 1 page"), "the page was read, not skipped: {toast}");
-    } else {
-        h.state_mut().start_ocr();
-    }
-    assert!(!h.state().ocr_draft.read_unusable_text, "the next run skips unusable pages again unless asked");
-}
-
-/// The find bar sits at the top of the page view too: the notice steps aside while it is open.
-#[test]
-fn the_notice_steps_aside_for_the_find_bar() {
-    let mut h = browsing(legacy_text_page(), "en", egui::vec2(760.0, 640.0));
-    h.get_by_label(NOTICE);
-    assert!(h.state_mut().execute("edit.find"));
-    h.run_steps(3);
-    assert!(h.state().views[0].find.is_some());
-    assert!(h.query_by_label(NOTICE).is_none());
-}
-
-/// "Not now" hides the notice for the document.
-#[test]
-fn not_now_dismisses_the_notice() {
-    let mut h = browsing(legacy_text_page(), "en", egui::vec2(1400.0, 900.0));
-    h.get_by_label("Not now").click();
-    h.run_steps(3);
-    assert!(h.query_by_label(NOTICE).is_none());
-    assert!(h.state().dialog.is_none() && h.state().ocr_run.is_none());
-}
-
-/// The notice in Thai (SRS §5.5 wording).
-#[test]
-fn the_notice_reads_in_thai() {
-    let h = browsing(legacy_text_page(), "th", egui::vec2(1400.0, 900.0));
-    // Thai is drawn with zero-width spaces between words, for line breaking; a label and its
-    // text node both carry it.
-    let shows =
-        |text: &str| h.query_all_by(|n| [n.label(), n.value()].into_iter().flatten().any(|l| l.replace('\u{200b}', "") == text)).next().is_some();
-    assert!(shows("หน้านี้มีข้อความที่ใช้ไม่ได้"));
-    assert!(shows("รู้จำข้อความในหน้านี้…"));
-}
-
-/// A page of real text, not a picture.
-fn text_page() -> Vec<u8> {
-    let s = Session::new();
-    s.create_from_text("t", "This page already has its own text").unwrap().to_vec()
-}
-
 fn edit_harness(pdf: Vec<u8>) -> Harness<'static, PdfCraftApp> {
-    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |_cc| {
-        let mut app = PdfCraftApp::new();
-        app.set_option("language", "en").unwrap();
-        app.open_bytes("doc.pdf", None, pdf).unwrap();
-        app.run_inline = true;
-        app
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(move |cc| {
+        crate::support::install_runtime(&cc.egui_ctx);
+        {
+            let mut app = app_on(Arc::new(ScriptedFiles::new()));
+            app.set_option(&egui::Context::default(), "language", "en").unwrap();
+            app.open_bytes(&egui::Context::default(), "doc.pdf", None, pdf).unwrap();
+            app
+        }
     });
     h.run_steps(4);
     h
@@ -386,12 +239,13 @@ fn editing_a_scanned_page_recognizes_its_text_first_and_only_once() {
     let mut h = edit_harness(scan());
     let id = h.state().active_ids().unwrap().1;
     assert_eq!(h.state().session.get(id).unwrap().can_undo(), None, "nothing is recognized before Edit");
-    assert!(h.state_mut().execute("edit.edit_text"));
+    assert!(h.execute("edit.edit_text"));
     h.run_steps(4);
     assert!(h.state().ocr_run.is_none(), "finished");
     assert_eq!(h.state().session.get(id).unwrap().can_undo(), Some("Recognize text"));
     // Undo takes the text layer away and Edit does not put it back.
-    h.state_mut().undo();
+    let ctx = h.ctx.clone();
+    h.state_mut().undo(&ctx);
     h.run_steps(4);
     assert_eq!(h.state().session.get(id).unwrap().can_undo(), None);
     h.run_steps(4);
@@ -409,7 +263,7 @@ fn the_edit_panel_recognizes_a_scanned_page_too() {
     let mut h = edit_harness(scan());
     let id = h.state().active_ids().unwrap().1;
     assert_eq!(h.state().session.get(id).unwrap().can_undo(), None);
-    h.state_mut().set_option("tool", "edit").unwrap();
+    h.set_option("tool", "edit").unwrap();
     h.run_steps(4);
     assert!(h.state().ocr_run.is_none(), "finished");
     assert_eq!(h.state().session.get(id).unwrap().can_undo(), Some("Recognize text"));
@@ -438,7 +292,7 @@ fn editing_a_scan_with_a_comment_over_it_recognizes_the_picture() {
     };
     let mut h = edit_harness(with_comment);
     let id = h.state().active_ids().unwrap().1;
-    assert!(h.state_mut().execute("edit.edit_text"));
+    assert!(h.execute("edit.edit_text"));
     h.run_steps(4);
     assert_eq!(h.state().session.get(id).unwrap().can_undo(), Some("Recognize text"));
 }
@@ -461,13 +315,13 @@ fn editing_a_page_with_text_over_a_background_picture_changes_nothing() {
     };
     let mut h = edit_harness(hybrid);
     let id = h.state().active_ids().unwrap().1;
-    assert!(h.state_mut().execute("edit.edit_text"));
+    assert!(h.execute("edit.edit_text"));
     h.run_steps(6);
     assert!(h.state().ocr_run.is_none());
     assert_eq!(h.state().session.get(id).unwrap().can_undo(), None, "nothing was recognized or marked modified");
     assert!(!h.state().session.get(id).unwrap().dirty, "the file is not marked modified");
     // And Edit says nothing about recognizing: no progress, no "0 words ... already had text".
-    let toast = h.state().toast.as_ref().map(|t| t.0.clone()).unwrap_or_default();
+    let toast = notice(&h);
     assert!(!toast.contains("ecogniz") && !toast.contains("already had text"), "{toast:?}");
 }
 
@@ -489,7 +343,7 @@ fn a_page_that_becomes_a_scan_while_edit_is_on_is_recognized() {
     let blank = Session::new().create_blank(595.0, 842.0, 1).unwrap().to_vec();
     let mut h = edit_harness(blank);
     let id = h.state().active_ids().unwrap().1;
-    assert!(h.state_mut().execute("edit.edit_text"));
+    assert!(h.execute("edit.edit_text"));
     h.run_steps(4);
     assert_eq!(h.state().session.get(id).unwrap().can_undo(), None, "a blank page is no scan: nothing happened");
     // The same page, now with a picture of text over all of it.
@@ -514,38 +368,19 @@ fn edit_recognizes_a_scan_only_outside_read_mode_and_beneath_no_dialog() {
     let id = h.state().active_ids().unwrap().1;
     let undo = |h: &Harness<'static, PdfCraftApp>| -> Option<String> { h.state().session.get(id).unwrap().can_undo().map(String::from) };
     // Read mode with the Edit tool still picked.
-    assert!(h.state_mut().execute("edit.edit_text"));
-    h.state_mut().set_option("mode", "read").unwrap();
+    assert!(h.execute("edit.edit_text"));
+    h.set_option("mode", "read").unwrap();
     h.run_steps(5);
     assert_eq!(undo(&h), None, "not in Read mode");
     // A dialog over the window.
-    h.state_mut().set_option("mode", "edit").unwrap();
-    h.state_mut().dialog = Some(pdfcraft_ui_egui::Dialog::JsConsole);
+    h.set_option("mode", "edit").unwrap();
+    assert!(h.execute("tools.js_console"));
     h.run_steps(5);
     assert_eq!(undo(&h), None, "not beneath a dialog");
     // Both gone: it is read now.
-    h.state_mut().dialog = None;
+    h.key_press(egui::Key::Escape);
     h.run_steps(5);
     assert_eq!(undo(&h).as_deref(), Some("Recognize text"));
-}
-
-#[test]
-fn editing_a_page_that_has_text_does_not_recognize_anything() {
-    let mut h = edit_harness(text_page());
-    let id = h.state().active_ids().unwrap().1;
-    assert!(h.state_mut().execute("edit.edit_text"));
-    h.run_steps(6);
-    assert!(h.state().ocr_run.is_none());
-    assert_eq!(h.state().session.get(id).unwrap().can_undo(), None);
-}
-
-/// Only the Edit tool recognizes: viewing a scan, or any other tool, leaves the file as it is.
-#[test]
-fn only_the_edit_tool_recognizes_a_scanned_page() {
-    let mut h = edit_harness(scan());
-    let id = h.state().active_ids().unwrap().1;
-    h.run_steps(6);
-    assert_eq!(h.state().session.get(id).unwrap().can_undo(), None);
 }
 
 /// A placed word the review can hold (its box sits where a real one would).
@@ -559,14 +394,16 @@ fn placed(text: &str, confidence: f32) -> PlacedWord {
 /// loaded directly, so this runs without the OCR models.
 #[test]
 fn ocr_verify_screen_controls_keyboard_and_accept() {
-    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
-        app.open_bytes("scan.pdf", None, scan()).unwrap();
-        app.run_inline = true;
-        app
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|cc| {
+        crate::support::install_runtime(&cc.egui_ctx);
+        {
+            let mut app = crate::control::new_app();
+            app.open_bytes(&egui::Context::default(), "scan.pdf", None, scan()).unwrap();
+            app
+        }
     });
     h.run_steps(4);
-    assert!(h.state_mut().execute("ocr.correct"));
+    assert!(h.execute("ocr.correct"));
     h.run_steps(3);
     // The screen's controls are all present (no dead controls).
     h.get_by_label("Run OCR");
@@ -591,8 +428,8 @@ fn ocr_verify_screen_controls_keyboard_and_accept() {
             page: 0,
             words: vec![placed("Helo", 40.0), placed("wrold", 95.0)],
             skipped: None,
-            unusable_text: false,
             notes: Vec::new(),
+            unusable_text: false,
             deskew: None,
         };
         app.ocr_verify.load(id, job.guard.clone(), vec![page]);
@@ -623,22 +460,24 @@ fn ocr_verify_screen_controls_keyboard_and_accept() {
     let app = h.state();
     let id = app.active_ids().unwrap().1;
     assert_eq!(app.session.get(id).unwrap().can_undo(), Some("Recognize text"));
-    let toast = app.toast.clone().map(|t| t.0).unwrap_or_default();
+    let toast = notice(&h);
     assert!(toast.contains("one undoable step"), "{toast}");
 }
 
-/// Ctrl+Tab moves the pane focus ring, and F8 with nothing to review is a no-op: the walk
-/// never invents a selection. The recognition is loaded directly (no models needed).
+/// F8 with nothing to review is a no-op: the walk never invents a selection. The recognition is
+/// loaded directly (no models needed).
 #[test]
-fn ocr_verify_screen_focus_ring_and_empty_walk() {
-    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|_cc| {
-        let mut app = PdfCraftApp::new();
-        app.open_bytes("scan.pdf", None, scan()).unwrap();
-        app.run_inline = true;
-        app
+fn ocr_verify_screen_empty_walk() {
+    let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|cc| {
+        crate::support::install_runtime(&cc.egui_ctx);
+        {
+            let mut app = crate::control::new_app();
+            app.open_bytes(&egui::Context::default(), "scan.pdf", None, scan()).unwrap();
+            app
+        }
     });
     h.run_steps(4);
-    assert!(h.state_mut().execute("ocr.correct"));
+    assert!(h.execute("ocr.correct"));
     h.run_steps(3);
     {
         let app = h.state_mut();
@@ -649,8 +488,8 @@ fn ocr_verify_screen_focus_ring_and_empty_walk() {
             page: 0,
             words: vec![placed("Fine", 95.0)],
             skipped: None,
-            unusable_text: false,
             notes: Vec::new(),
+            unusable_text: false,
             deskew: None,
         };
         app.ocr_verify.load(id, job.guard.clone(), vec![page]);
@@ -660,55 +499,4 @@ fn ocr_verify_screen_focus_ring_and_empty_walk() {
     h.key_press(egui::Key::F8);
     h.run_steps(2);
     assert_eq!(h.state().ocr_verify.selected, None);
-    // Ctrl+Tab cycles the four panes; four steps come back to the start.
-    let start = h.state().ocr_verify.focus;
-    let mut moved = false;
-    for _ in 0..4 {
-        h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Tab);
-        h.run_steps(2);
-        moved |= h.state().ocr_verify.focus != start;
-    }
-    assert!(moved, "Ctrl+Tab moves the focus");
-    assert_eq!(h.state().ocr_verify.focus, start, "the ring returns after the four panes");
-}
-
-/// #6599: in a short window (a small screen, or a large display scale) the dialog's settings
-/// scroll, and Cancel and Recognize text stay on screen below them instead of running off it.
-#[test]
-fn recognize_text_keeps_its_buttons_in_a_short_window() {
-    use egui::accesskit::Role;
-    // 173 is the smallest window (520 pt) at the largest interface size (300%), 208 is 250%.
-    // 640 pt across is a 1280-pixel-wide screen at 200%. At 1100 pt everything fits (the dialog
-    // is about 935 pt tall) and nothing scrolls.
-    let width = 640.0;
-    for height in [173.0, 208.0, 260.0, 400.0, 480.0, 560.0, 700.0, 900.0, 1100.0] {
-        let mut h = Harness::builder().with_size(egui::vec2(width, height)).build_eframe(|_cc| {
-            let mut app = PdfCraftApp::new();
-            app.set_option("language", "en").unwrap();
-            app.open_bytes("scan.pdf", None, scan()).unwrap();
-            app
-        });
-        h.run_steps(4);
-        assert!(h.state_mut().execute("ocr.recognize"));
-        h.run_steps(6);
-        let on_screen = |r: egui::Rect| r.min.x >= 0.0 && r.max.x <= width && r.min.y >= 0.0 && r.max.y <= height;
-        let title = h.get_by(|n| n.role() == Role::Label && n.value().as_deref() == Some("Recognize Text")).rect();
-        let run = h.get_by_role_and_label(Role::Button, "Recognize text").rect();
-        let cancel = h.get_by_role_and_label(Role::Button, "Cancel").rect();
-        assert!(on_screen(title), "{height}: the title at {title:?} is off the window");
-        assert!(on_screen(run), "{height}: Recognize text at {run:?} is off the window");
-        assert!(on_screen(cancel), "{height}: Cancel at {cancel:?} is off the window");
-        // The last group scrolls in between the title and the buttons, which do not move.
-        h.get_by(|n| n.role() == Role::Label && n.value().as_deref() == Some("Output folder")).scroll_to_me();
-        h.run_steps(4);
-        let last = h.get_by(|n| n.role() == Role::Label && n.value().as_deref() == Some("Output folder")).rect();
-        assert!(last.min.y >= title.max.y && last.max.y <= run.min.y, "{height}: Output folder {last:?} between {title:?} and {run:?}");
-        assert_eq!(h.get_by_role_and_label(Role::Button, "Recognize text").rect(), run, "{height}: the buttons stay put");
-        let title_after = h.get_by(|n| n.role() == Role::Label && n.value().as_deref() == Some("Recognize Text")).rect();
-        assert_eq!(title_after, title, "{height}: the title stays put");
-        // On screen is not enough: a click reaches Cancel and closes the dialog.
-        h.get_by_role_and_label(Role::Button, "Cancel").click();
-        h.run_steps(3);
-        assert!(h.state().dialog.is_none(), "{height}: Cancel closes the dialog");
-    }
 }

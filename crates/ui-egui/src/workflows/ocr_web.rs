@@ -82,8 +82,8 @@ pub fn state() -> State {
     STATE.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
-/// Download and load the models unless that is already happening; repaint when it's done.
-pub fn start(ctx: egui::Context) {
+/// Download and load the models unless that is already happening; `wake` asks for a frame when it's done.
+pub fn start(wake: craft::host::Wake) {
     {
         let mut s = STATE.lock().unwrap_or_else(|e| e.into_inner());
         if *s == State::Loading {
@@ -111,7 +111,7 @@ pub fn start(ctx: egui::Context) {
             Err(e) => State::Failed(e),
         };
         *STATE.lock().unwrap_or_else(|e| e.into_inner()) = next;
-        ctx.request_repaint();
+        wake.wake();
     });
 }
 
@@ -127,6 +127,7 @@ async fn load() -> Result<(Ocr, Option<LoadedThai>, Files), String> {
             Ok((ocr, files)) => (Some(LoadedThai::Legacy(ocr)), Some(files)),
             Err(e) => {
                 log::warn!("Thai text recognition isn't available: {e}");
+                crate::ocr_ui::mark_thai_ocr_unavailable();
                 (None, None)
             }
         },
@@ -159,7 +160,7 @@ async fn load_thai(detection: &js_sys::Uint8Array) -> Result<(Ocr, ThaiFiles), S
 async fn fetch(name: &str) -> Result<js_sys::Uint8Array, String> {
     use wasm_bindgen_futures::JsFuture;
     let url = format!("models/{name}");
-    let failed = |e: JsValue| format!("{url}: {}", e.as_string().unwrap_or_else(|| format!("{e:?}")));
+    let failed = |e: JsValue| format!("{url}: {}", super::js_value::js_error_text(&e));
     let window = web_sys::window().ok_or("no window")?;
     let init = web_sys::RequestInit::new();
     init.set_cache(web_sys::RequestCache::NoCache);
@@ -571,7 +572,7 @@ impl Batch {
 
     /// Advance; `true` once every file is done. A cancel is honoured between files: the file
     /// in flight finishes, the rest are counted as not run.
-    pub fn pump(&mut self, cancel: bool, ctx: &egui::Context) -> bool {
+    pub fn pump(&mut self, cancel: bool, files: &dyn craft::host::Files, ctx: &egui::Context) -> bool {
         let Some((name, _, pages)) = self.current.as_mut() else {
             if cancel && !self.files.is_empty() {
                 self.not_run = Some(self.files.len());
@@ -592,7 +593,7 @@ impl Batch {
         let name = std::mem::take(name);
         let Some((_, file, _)) = self.current.take() else { return false };
         let saved = file.finish(found).and_then(|r| {
-            crate::editing::download(&name, &r.bytes)?;
+            files.write(std::path::Path::new(&name), &r.bytes, craft::host::WriteIntent::SaveAs).map_err(|e| e.to_string())?;
             Ok(r)
         });
         match saved {

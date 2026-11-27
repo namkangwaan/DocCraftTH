@@ -1,48 +1,6 @@
-use super::{Calculate, FieldLook, FieldProps, FormField, FormFieldKind, Format, Validate};
+use super::{Calculate, FieldLook, FieldLookPatch, FieldProps, FormField, FormFieldKind, Format, Validate};
 
-// ───────────────────────────────────────────────────────────────────────── Field Properties
-
-impl crate::PdfCraftApp {
-    /// Open Field Properties for a field of the active document.
-    pub fn open_field_props(&mut self, name: &str, widget: usize) {
-        let Some((index, id)) = self.active_ids() else { return };
-        let names = self.views[index].prepare.names();
-        if names.len() > 1 && names.iter().any(|n| n == name) {
-            let draft = self.session.get(id).map_or(Err("The document is no longer open."), |doc| crate::bulk_fields::Draft::new(doc, names));
-            match draft {
-                Ok(draft) => {
-                    self.field_props = None;
-                    self.bulk_field_props = Some(draft);
-                    self.dialog = Some(crate::Dialog::BulkFieldProps);
-                }
-                Err(why) => self.notify_tr(why),
-            }
-            return;
-        }
-        self.bulk_field_props = None;
-        let Some(f) = self.session.get(id).and_then(|d| d.form.iter().find(|f| f.name == name).cloned()) else { return };
-        let mut d = FieldDraft::new(&f, widget);
-        d.look = self.session.get(id).and_then(|doc| doc.field_look(name));
-        d.check_style = self.session.get(id).and_then(|doc| doc.field_check_style(name));
-        if let Some(o) = d.original.as_mut() {
-            o.look = d.look;
-            o.check_style = d.check_style;
-        }
-        let others: Vec<String> =
-            self.session.get(id).map(|doc| doc.form.iter().filter(|x| x.name != name).map(|x| x.name.clone()).collect()).unwrap_or_default();
-        d.others = others.clone();
-        d.actions = self.session.get(id).map(|doc| doc.field_actions(name)).unwrap_or_default();
-        d.chained = self.session.get(id).map(|doc| doc.field_action_chains(name)).unwrap_or_default();
-        if let Some(o) = d.original.as_mut() {
-            o.others = others;
-            o.actions = d.actions.clone();
-        }
-        self.field_props = Some(d);
-        self.dialog = Some(crate::Dialog::FieldProps);
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FieldTab {
     General,
     Appearance,
@@ -136,6 +94,12 @@ pub struct FieldDraft {
     /// `/MK /R`: 0, 90, 180 or 270 degrees counterclockwise.
     pub rotation: i64,
     pub look: Option<FieldLook>,
+    /// The field's `/DA` font face as read from the document (`Unknown` keeps `/DA`'s font name
+    /// unless the user picks another font).
+    pub face: Option<pdfcraft_engine::FieldFace>,
+    /// Name of a non-embeddable Thai font selected in this dialog session (shown as Sarabun);
+    /// never persisted to the document or across dialog opens.
+    pub substituted_family: Option<String>,
     /// Check boxes and radio buttons: the mark when on (Options tab).
     pub check_style: Option<pdfcraft_engine::CheckStyle>,
     pub format: Format,
@@ -181,7 +145,73 @@ pub(crate) fn da_font(da: &str) -> &str {
     font
 }
 
+/// An empty text-field draft: the value type the form dialog starts from before the dialog's own
+/// draft is bound over it.
+impl Default for FieldDraft {
+    fn default() -> Self {
+        FieldDraft {
+            field: String::new(),
+            kind: FormFieldKind::Text,
+            widget: 0,
+            tab: FieldTab::General,
+            name: String::new(),
+            tooltip: String::new(),
+            caption: String::new(),
+            read_only: false,
+            required: false,
+            multiline: false,
+            limit: false,
+            max_len: 0,
+            options: Vec::new(),
+            new_option: String::new(),
+            flags: 0,
+            locked: false,
+            quadding: 0,
+            default: String::new(),
+            on_state: String::new(),
+            export_value: String::new(),
+            font_size: 0.0,
+            position: [0.0; 4],
+            rotation: 0,
+            look: None,
+            face: None,
+            substituted_family: None,
+            check_style: None,
+            format: Format::default(),
+            validate: Validate::default(),
+            calculate: Calculate::default(),
+            script_refused: false,
+            others: Vec::new(),
+            actions: Vec::new(),
+            new_action: ActionDraft::default(),
+            editing: None,
+            chained: Vec::new(),
+            original: Box::new(None),
+        }
+    }
+}
+
 impl FieldDraft {
+    /// Whether the field was locked when the dialog opened and still is: its properties stay as
+    /// they are until it is unlocked.
+    pub(super) fn is_locked(&self) -> bool {
+        self.original.as_ref().as_ref().is_some_and(|o| o.locked) && self.locked
+    }
+
+    /// The Comb rule, which holds whenever COMB is set: a comb is a limited single line with no
+    /// password or file selection, and its limit is never zero.
+    pub(super) fn settle_comb(&mut self) {
+        use pdfcraft_engine::field_flags as ff;
+        if self.flags & ff::COMB != 0 {
+            self.limit = true;
+            self.multiline = false;
+            self.flags &= !(ff::PASSWORD | ff::FILE_SELECT);
+            if self.max_len == 0 {
+                self.max_len = 10;
+            }
+        }
+    }
+
     pub fn new(f: &FormField, widget: usize) -> Self {
         let r = f.widgets.get(widget).map(|w| w.rect).unwrap_or_default();
         let mut d = FieldDraft {
@@ -210,6 +240,8 @@ impl FieldDraft {
             position: [r[0], r[1], r[2] - r[0], r[3] - r[1]],
             rotation: f.widgets.get(widget).map(|w| w.rotation).unwrap_or(0),
             look: None,
+            face: None,
+            substituted_family: None,
             check_style: None,
             format: f.actions.format.clone(),
             validate: f.actions.validate.clone(),
@@ -276,8 +308,26 @@ impl FieldDraft {
                 (self.widget, [x, y, x + w.max(4.0), y + h.max(4.0)])
             }),
             rotation: (self.rotation != o.rotation).then_some((self.widget, self.rotation)),
-            look: (self.look != o.look).then_some(self.look).flatten(),
-            appearance: None,
+            look: if matches!(o.face, Some(pdfcraft_engine::FieldFace::Unknown(_))) {
+                None
+            } else {
+                (self.look != o.look).then_some(self.look).flatten()
+            },
+            appearance: match (self.look, o.look) {
+                (Some(l), Some(ol)) if matches!(o.face, Some(pdfcraft_engine::FieldFace::Unknown(_))) => {
+                    let font_changed = l.font != ol.font || self.face != o.face;
+                    let patch = FieldLookPatch {
+                        border: (l.border != ol.border).then_some(l.border),
+                        fill: (l.fill != ol.fill).then_some(l.fill),
+                        width: ((l.width - ol.width).abs() > 1e-6).then_some(l.width),
+                        style: (l.style != ol.style).then_some(l.style),
+                        text: (l.text != ol.text).then_some(l.text),
+                        font: font_changed.then_some(l.font),
+                    };
+                    (patch != FieldLookPatch::default()).then_some(patch)
+                }
+                _ => None,
+            },
             check_style: (self.check_style != o.check_style).then_some(self.check_style).flatten(),
             format: (self.format != o.format).then(|| self.format.clone()),
             validate: (self.validate != o.validate).then(|| self.validate.clone()),

@@ -68,7 +68,7 @@ pub(super) fn draw_laid_shaped(
         .map_err(|(e, c)| match c.script {
             ShapedScript::Arabic => arabic_error(e, &c.text),
             ShapedScript::Hebrew => hebrew_error(e, &c.text),
-            ShapedScript::Thai | ShapedScript::ThaiSarabun => thai_error(e, &c.text),
+            ShapedScript::Thai | ShapedScript::ThaiSarabun | ShapedScript::Custom(_) => thai_error(e, &c.text),
             ShapedScript::Latin => EditError::Invalid(pdfcraft_fonts::shaped_text::latin_message(e, &c.text)),
         })?;
     out.extend(format!("BT {}\n", t.fill_op()).bytes());

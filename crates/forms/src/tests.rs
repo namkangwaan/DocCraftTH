@@ -7914,3 +7914,259 @@ fn page_scripts_are_the_pages_own_then_each_annotations_in_order() {
     assert_eq!(got, [(None, "close()"), (Some("anim"), "stop();")], "a URI action is not a script");
     assert!(page_scripts(&doc, 1, PageEvent::Open).is_empty(), "no such page");
 }
+
+/// A one-field form whose default appearance is `da`, with one `/DR` font `/Fx` (a Type0 font
+/// named `dr_font`) when given.
+fn thai_da_form(da: &str, dr_font: Option<&str>) -> Document {
+    let dr = if dr_font.is_some() { "/DR << /Font << /Fx 6 0 R >> >>" } else { "" };
+    let font = dr_font.map_or_else(|| "null".to_string(), |b| format!("<< /Type /Font /Subtype /Type0 /BaseFont /{b} >>"));
+    let objs: Vec<String> = vec![
+        "<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R >>".into(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 600 800] >>".into(),
+        "<< /Type /Page /Parent 2 0 R /Annots [5 0 R] >>".into(),
+        format!("<< /Fields [5 0 R] /DA ({da}) {dr} >>"),
+        format!("<< /Type /Annot /Subtype /Widget /FT /Tx /T (name) /Rect [50 700 250 720] /P 3 0 R /DA ({da}) >>"),
+        font,
+    ];
+    document(&objs)
+}
+
+#[test]
+fn da_with_a_thai_resource_reads_back_as_that_face() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let doc = thai_da_form("/Fx 0 Tf 0 g", Some("ABCDEF+Sarabun"));
+    let f = field(&fields(&doc), "name").clone();
+    assert_eq!(field_face(&doc, &f), FieldFace::Thai(sarabun));
+    assert_eq!(look(&doc, &f).font, FieldFont::Thai(sarabun));
+}
+
+#[test]
+fn an_unknown_da_font_is_reported_by_name_not_as_helvetica() {
+    let doc = thai_da_form("/THSarabunPSK 0 Tf 0 g", None);
+    let f = field(&fields(&doc), "name").clone();
+    assert_eq!(field_face(&doc, &f), FieldFace::Unknown("THSarabunPSK".into()));
+    let standard = thai_da_form("/Helv 0 Tf 0 g", None);
+    assert_eq!(field_face(&standard, field(&fields(&standard), "name")), FieldFace::Standard);
+}
+
+#[test]
+fn a_patch_without_a_font_leaves_an_unknown_da_unchanged() {
+    let mut doc = thai_da_form("/THSarabunPSK 0 Tf 0 g", None);
+    let before = field(&fields(&doc), "name").da.clone();
+    set_props(&mut doc, "name", &FieldProps { appearance: Some(LookPatch { width: Some(2.0), ..Default::default() }), ..FieldProps::default() })
+        .unwrap();
+    assert_eq!(field(&fields(&doc), "name").da, before);
+}
+
+fn text_field_form(names: &[&str]) -> Document {
+    let mut doc = one_page();
+    for (i, name) in names.iter().enumerate() {
+        let y = 20.0 + 30.0 * i as f64;
+        add_field(&mut doc, 0, [20.0, y, 200.0, y + 22.0], &NewField::Text { multiline: false }, Some(name)).unwrap();
+    }
+    doc
+}
+
+fn thai_font(face: pdfcraft_fonts::thai_faces::FaceId) -> FieldProps {
+    FieldProps { appearance: Some(LookPatch { font: Some(FieldFont::Thai(face)), ..Default::default() }), ..FieldProps::default() }
+}
+
+/// The `/DR /Font` dictionary of the form, resolved.
+fn dr_font_dict(doc: &Document) -> pdfcraft_cos::Dict {
+    let af = acroform(doc).expect("a form");
+    let dr = doc.resolve(af.get(b"DR").expect("has /DR")).as_dict().cloned().expect("/DR is a dictionary");
+    doc.resolve(dr.get(b"Font").expect("has /Font")).as_dict().cloned().expect("/Font is a dictionary")
+}
+
+#[test]
+fn choosing_a_thai_face_embeds_its_font_in_dr() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    let doc = reopen(&doc);
+    let f = field(&fields(&doc), "name").clone();
+    assert_eq!(look(&doc, &f).font, FieldFont::Thai(sarabun), "the choice reads back after a save");
+    let resource = appearance::parse_da(&f.da).font;
+    let fonts = dr_font_dict(&doc);
+    let entry = fonts.get(resource.as_bytes()).expect("the /DA's font is in /DR");
+    assert!(matches!(entry, Object::Ref(_)), "Acrobat needs /DR fonts as objects: {entry:?}");
+    let font = doc.resolve(entry).as_dict().cloned().unwrap();
+    assert_eq!(font.name(b"Subtype"), Some(&b"Type0"[..]));
+    assert!(font.get(b"DescendantFonts").is_some() && font.get(b"ToUnicode").is_some());
+}
+
+#[test]
+fn the_same_face_on_many_fields_embeds_once() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let names = ["a", "b", "c", "d", "e"];
+    let mut doc = text_field_form(&names);
+    for name in names {
+        set_props(&mut doc, name, &thai_font(sarabun)).unwrap();
+    }
+    let thai_entries = dr_font_dict(&doc)
+        .iter()
+        .filter(|(_, v)| {
+            doc.resolve(v).as_dict().and_then(|d| d.name(b"BaseFont").map(|b| pdfcraft_fonts::embedding::face_key(&String::from_utf8_lossy(b))))
+                == Some(pdfcraft_fonts::embedding::face_key("Sarabun"))
+        })
+        .count();
+    assert_eq!(thai_entries, 1, "one /DR entry for the face");
+    let size = write_incremental(&doc, &SaveOptions::default()).unwrap().len();
+    assert!(size < 2 * pdfcraft_fonts::thai_faces::bytes(sarabun).len() + 200_000, "the program is stored once: {size} bytes");
+}
+
+#[test]
+fn a_signed_form_refuses_a_font_that_would_change_its_resources() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let objs: Vec<String> = vec![
+        "<< /Type /Catalog /Pages 2 0 R /AcroForm 4 0 R >>".into(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 600 800] >>".into(),
+        "<< /Type /Page /Parent 2 0 R /Annots [5 0 R 6 0 R] >>".into(),
+        "<< /Fields [5 0 R 6 0 R] /DA (/Helv 0 Tf 0 g) /SigFlags 3 >>".into(),
+        "<< /Type /Annot /Subtype /Widget /FT /Tx /T (name) /Rect [50 700 250 720] /P 3 0 R >>".into(),
+        "<< /Type /Annot /Subtype /Widget /FT /Sig /T (sig) /V 7 0 R /Rect [0 0 0 0] /P 3 0 R >>".into(),
+        "<< /Type /Sig /Filter /Adobe.PPKLite /ByteRange [0 0 0 0] /Contents <00> >>".into(),
+    ];
+    let mut doc = document(&objs);
+    assert!(set_props(&mut doc, "name", &thai_font(sarabun)).is_err());
+    assert!(acroform(&doc).is_some_and(|af| !af.contains(b"DR")), "the signed form's resources are untouched");
+}
+
+/// The auto font size an appearance was drawn at (`/Helv <size> Tf`).
+fn drawn_size(ap: &str) -> f64 {
+    ap.split("/Helv ").nth(1).and_then(|s| s.split(' ').next()).and_then(|n| n.parse().ok()).unwrap_or_else(|| panic!("no /Helv size in {ap}"))
+}
+
+#[test]
+fn thai_value_is_drawn_with_the_chosen_face() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = one_page();
+    // A narrow box, so the automatic size is the one that makes the text fit: it follows the
+    // advances of the face that draws it. Field "a" keeps the default Thai face, "b" is Sarabun.
+    for name in ["a", "b"] {
+        add_field(&mut doc, 0, [20.0, 20.0, 140.0, 48.0], &NewField::Text { multiline: false }, Some(name)).unwrap();
+        if name == "b" {
+            set_props(&mut doc, name, &thai_font(sarabun)).unwrap();
+        }
+        set_value(&mut doc, name, &FieldValue::Text("สวัสดีครับพี่น้องทุกท่าน".into())).unwrap();
+    }
+    let size = |name: &str| drawn_size(&ap(&doc, &field(&fields(&doc), name).widgets[0]));
+    let a = ap(&doc, &field(&fields(&doc), "a").widgets[0]);
+    assert!(!a.contains('?'), "Thai is drawn, not replaced: {a}");
+    assert!((size("a") - size("b")).abs() > 0.01, "each face fits the text with its own advances: {} {}", size("a"), size("b"));
+}
+
+#[test]
+fn mixed_thai_latin_and_digits_all_draw_in_a_chosen_face() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    set_value(&mut doc, "name", &FieldValue::Text("ชื่อ Name 123".into())).unwrap();
+    let a = ap(&doc, &field(&fields(&doc), "name").widgets[0]);
+    assert!(a.contains("Name 123") && !a.contains('?'), "{a}");
+}
+
+#[test]
+fn thai_field_with_a_chosen_face_does_not_ask_viewers_to_redraw() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    set_value(&mut doc, "name", &FieldValue::Text("ชื่อ-นามสกุล".into())).unwrap();
+    let af = acroform(&doc).expect("a form");
+    assert!(af.get(b"NeedAppearances").is_none(), "the embedded appearance is kept: {af:?}");
+}
+
+#[test]
+fn a_saved_form_draws_and_reads_back_with_no_font_folder() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    set_value(&mut doc, "name", &FieldValue::Text("สวัสดี".into())).unwrap();
+    let mut doc = reopen(&doc);
+    let f = field(&fields(&doc), "name").clone();
+    assert_eq!(look(&doc, &f).font, FieldFont::Thai(sarabun));
+    redraw_field(&mut doc, "name").unwrap();
+    let a = ap(&doc, &field(&fields(&doc), "name").widgets[0]);
+    assert!(!a.contains('?'), "{a}");
+}
+
+#[test]
+fn the_embedded_font_covers_thai_the_value_never_used() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    set_value(&mut doc, "name", &FieldValue::Text("ก".into())).unwrap();
+    let f = field(&fields(&doc), "name").clone();
+    let resource = appearance::parse_da(&f.da).font;
+    let font = doc.resolve(dr_font_dict(&doc).get(resource.as_bytes()).unwrap()).as_dict().cloned().unwrap();
+    let descendant = doc.resolve(&font.get(b"DescendantFonts").and_then(|a| doc.resolve(a).as_array().and_then(|a| a.first().cloned())).unwrap());
+    let descriptor = doc.resolve(descendant.as_dict().unwrap().get(b"FontDescriptor").unwrap());
+    let program = descriptor.as_dict().unwrap().get(b"FontFile2").or_else(|| descriptor.as_dict().unwrap().get(b"FontFile3")).unwrap().clone();
+    let bytes = match doc.resolve(&program).as_ref() {
+        Object::Stream(s) => s.decoded_within(16 << 20).expect("decodes"),
+        other => panic!("not a stream: {other:?}"),
+    };
+    assert!(pdfcraft_fonts::embedding::covers(&bytes, "ฐานข้อมูลใหม่ ๑๒๓"), "a viewer's later typing finds its glyphs");
+}
+
+#[test]
+fn comb_field_with_chosen_thai_face_draws_clusters_without_question_marks() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = fixture();
+    set_props(&mut doc, "zip", &thai_font(sarabun)).unwrap();
+    set_value(&mut doc, "zip", &FieldValue::Text("ชื่อ".into())).unwrap();
+    let zip = field(&fields(&doc), "zip").clone();
+    let content = ap(&doc, &zip.widgets[0]);
+    assert!(!content.contains('?'), "comb field must not emit '?': {content}");
+    assert!(acroform(&doc).and_then(|af| af.get(b"NeedAppearances").cloned()).is_none(), "comb field must not set /NeedAppearances");
+}
+
+#[test]
+fn auto_size_multiline_and_password_work_with_chosen_thai_face() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = fixture();
+    for name in ["notes", "pin"] {
+        set_props(&mut doc, name, &thai_font(sarabun)).unwrap();
+    }
+    // Multiline wrap under Sarabun
+    set_value(&mut doc, "notes", &FieldValue::Text("ภาษาไทยหลายบรรทัดในช่องฟอร์มที่เลือกฟอนต์สารบรรณ".into())).unwrap();
+    let notes_ap = ap(&doc, &field(&fields(&doc), "notes").widgets[0]);
+    assert!(!notes_ap.contains('?'), "multiline must not emit '?': {notes_ap}");
+    // Password field draws '*' without '?'
+    set_value(&mut doc, "pin", &FieldValue::Text("รหัส".into())).unwrap();
+    let pin_ap = ap(&doc, &field(&fields(&doc), "pin").widgets[0]);
+    assert!(!pin_ap.contains('?') && pin_ap.contains("(****)"), "password must mask as '*': {pin_ap}");
+}
+
+#[test]
+fn non_bundled_embedded_thai_font_preserves_identity_and_face_on_reopen() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    set_props(&mut doc, "name", &thai_font(sarabun)).unwrap();
+    // Simulate a form reopened in a fresh process where the embedded /BaseFont is not in `CUSTOM`.
+    let f = field(&fields(&doc), "name").clone();
+    let res = appearance::parse_da(&f.da).font;
+    let font_ref = dr_font_dict(&doc).get(res.as_bytes()).and_then(Object::as_ref).expect("indirect /DR font");
+    doc.update_dict(font_ref, |d| d.set(b"BaseFont".to_vec(), Object::name("UnregisteredCustomThai"))).unwrap();
+    let doc = reopen(&doc);
+    let f = field(&fields(&doc), "name").clone();
+    assert!(matches!(field_face(&doc, &f), FieldFace::Thai(_)), "must resolve embedded FontFile2, got {:?}", field_face(&doc, &f));
+    assert!(matches!(look(&doc, &f).font, FieldFont::Thai(_)), "look().font must stay Thai");
+}
+
+#[test]
+fn signed_form_is_not_mutated_when_thai_font_refused() {
+    let Some(sarabun) = pdfcraft_fonts::thai_faces::sarabun() else { return };
+    let mut doc = text_field_form(&["name"]);
+    add_field(&mut doc, 0, [20.0, 60.0, 120.0, 90.0], &NewField::Signature, Some("sig")).unwrap();
+    let sig = field(&fields(&doc), "sig").obj;
+    doc.update_dict(sig, |d| d.set(b"V".to_vec(), Object::Dict(Dict::new()))).unwrap();
+    let before = write_incremental(&doc, &SaveOptions::default()).unwrap();
+    let props = FieldProps {
+        tooltip: Some("Should not be written".into()),
+        look: Some(Look { border: None, fill: None, width: 1.0, style: BorderStyle::Solid, text: [0.0; 3], font: FieldFont::Thai(sarabun) }),
+        ..Default::default()
+    };
+    assert!(set_props(&mut doc, "name", &props).is_err(), "signed form must refuse Thai font");
+    assert_eq!(write_incremental(&doc, &SaveOptions::default()).unwrap(), before, "doc must not be partially mutated on refusal");
+}

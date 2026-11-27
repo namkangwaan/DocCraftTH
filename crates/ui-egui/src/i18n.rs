@@ -34,7 +34,7 @@
 
 use std::cell::Cell;
 use std::collections::HashSet;
-use std::sync::{LazyLock, OnceLock};
+use std::sync::{Arc, LazyLock, OnceLock};
 
 use craft_i18n::I18n;
 
@@ -83,15 +83,64 @@ fn process_th_tsv(tsv: &str) -> String {
 
 /// The embedded catalogs, offering exactly the languages in [`LANGUAGES`]. Built on first use; a
 /// locale is parsed on its first lookup.
-static I18N: LazyLock<I18n> = LazyLock::new(|| {
+static I18N: LazyLock<Arc<I18n>> = LazyLock::new(|| {
     let offered: Vec<&str> = LANGUAGES.iter().map(|l| l.code).collect();
     let embedded = prepare_catalogs(CRAFT_I18N);
     let (i18n, problems) = I18n::new(embedded, &offered);
     for problem in problems {
         log::warn!("interface catalogs: {problem}");
     }
-    i18n
+    Arc::new(i18n)
 });
+
+/// The embedded catalogs, shared with the framework's host.
+pub fn shared() -> Arc<I18n> {
+    Arc::clone(&I18N)
+}
+
+/// The English name for a BCP 47 language code, used when a picker's fonts cannot draw the
+/// language's native name (including date-format languages in builds without `craft-i18n`).
+pub fn english_name_for_code(code: &str) -> &str {
+    match code {
+        "en" => "English",
+        "ja" => "Japanese",
+        "zh-hans" => "Simplified Chinese",
+        "zh-hant" => "Traditional Chinese",
+        "cs" => "Czech",
+        "pt-br" => "Portuguese (Brazil)",
+        "de" => "German",
+        "es" => "Spanish",
+        "fr" => "French",
+        "ru" => "Russian",
+        "kk" => "Kazakh",
+        "bg" => "Bulgarian",
+        "te" => "Telugu",
+        "hu" => "Hungarian",
+        "uk" => "Ukrainian",
+        "it" => "Italian",
+        "ar" => "Arabic",
+        "ckb" => "Central Kurdish",
+        "fa" => "Persian",
+        "pl" => "Polish",
+        "sl" => "Slovenian",
+        "bs" => "Bosnian",
+        "el" => "Greek",
+        "tr" => "Turkish",
+        "lt" => "Lithuanian",
+        "id" => "Indonesian",
+        "vi" => "Vietnamese",
+        "fi" => "Finnish",
+        "nb" => "Norwegian Bokmål",
+        "sq" => "Albanian",
+        "th" => "Thai",
+        "ca" => "Catalan",
+        "ro" => "Romanian",
+        "lo" => "Lao",
+        "hi" => "Hindi",
+        "ko" => "Korean",
+        other => other,
+    }
+}
 
 /// The `language` preference value that follows the system locale.
 pub const AUTO: &str = "auto";
@@ -234,7 +283,7 @@ impl Lang {
     pub const EN: Lang = Lang { lang: craft_i18n::Lang::EN, catalogs: None };
 
     fn i18n(self) -> &'static I18n {
-        self.catalogs.unwrap_or_else(|| LazyLock::force(&I18N))
+        self.catalogs.unwrap_or_else(|| &**LazyLock::force(&I18N))
     }
 
     fn info(self) -> Option<&'static LangInfo> {
@@ -292,47 +341,7 @@ impl Lang {
     /// The language's name in English, used by [`picker_name`](Self::picker_name) when this
     /// build's fonts cannot draw [`name`](Self::name).
     pub fn english_name(self) -> &'static str {
-        match self.code() {
-            "en" => "English",
-            "ja" => "Japanese",
-            "zh-hans" => "Simplified Chinese",
-            "zh-hant" => "Traditional Chinese",
-            "cs" => "Czech",
-            "pt-br" => "Portuguese (Brazil)",
-            "de" => "German",
-            "es" => "Spanish",
-            "fr" => "French",
-            "ru" => "Russian",
-            "kk" => "Kazakh",
-            "bg" => "Bulgarian",
-            "te" => "Telugu",
-            "hu" => "Hungarian",
-            "uk" => "Ukrainian",
-            "it" => "Italian",
-            "ar" => "Arabic",
-            "ckb" => "Central Kurdish",
-            "fa" => "Persian",
-            "pl" => "Polish",
-            "sl" => "Slovenian",
-            "bs" => "Bosnian",
-            "el" => "Greek",
-            "tr" => "Turkish",
-            "lt" => "Lithuanian",
-            "id" => "Indonesian",
-            "vi" => "Vietnamese",
-            "fi" => "Finnish",
-            "nb" => "Norwegian Bokmål",
-            "sq" => "Albanian",
-            "th" => "Thai",
-            "ca" => "Catalan",
-            "ro" => "Romanian",
-            "lo" => "Lao",
-            "hi" => "Hindi",
-            "ko" => "Korean",
-            // Only reached if a language is added to `LANGUAGES` without an English name; the
-            // code still tells the reader which entry it is.
-            code => code,
-        }
+        english_name_for_code(self.code())
     }
 
     /// The name to show in the language picker: the native name when the current fonts can draw
@@ -617,6 +626,12 @@ pub fn tr_id<'a>(lang: Lang, id: &str, label: &'a str) -> &'a str {
     if own_id(lang, id, label) { lang.i18n().tid(lang.lang, id, label) } else { tr(lang, label) }
 }
 
+/// A platform service's message in the current language: its catalog id's row, else the translation of its English.
+pub fn platform_text(text: craft::platform::PlatformText) -> String {
+    let lang = current();
+    lang.i18n().tid(lang.lang, text.key(), text.english).to_owned()
+}
+
 /// Whether `lang` has PdfCraft's own `@id` row for `id` ([`Lang::has_own`]: command ids are each
 /// app's own) and it keeps the `{placeholders}` and trailing `…` of the English `label`. craft-i18n
 /// can't check that, because an `@id` row's source is the id, so a row that doesn't is skipped
@@ -641,31 +656,9 @@ fn same_shape(translated: &str, english: &str) -> bool {
 }
 
 /// Fill `{name}` placeholders in one pass. Unknown placeholders are left as written, and inserted
-/// values are never read as templates again, so a file name containing `{n}` stays intact. Unlike
-/// the crate's `fmt` it adds no bidi isolates: the egui fork orders each run for display.
-pub fn fmt(template: &str, args: &[(&str, &str)]) -> String {
-    let mut out = String::with_capacity(template.len());
-    let mut rest = template;
-    while let Some((before, after_open)) = rest.split_once('{') {
-        out.push_str(before);
-        let Some((name, after_close)) = after_open.split_once('}') else {
-            out.push('{');
-            out.push_str(after_open);
-            return out;
-        };
-        match args.iter().find(|(key, _)| *key == name) {
-            Some((_, value)) => out.push_str(value),
-            None => {
-                out.push('{');
-                out.push_str(name);
-                out.push('}');
-            }
-        }
-        rest = after_close;
-    }
-    out.push_str(rest);
-    out
-}
+/// values are never read as templates again. It adds no bidi isolates: the text path orders each
+/// run for display.
+pub use craft_i18n::fmt_plain as fmt;
 
 /// `y` (Common Era) as the current interface language counts years: Buddhist Era for Thai.
 pub fn local_year(y: i64) -> i64 {

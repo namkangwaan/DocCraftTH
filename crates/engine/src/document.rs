@@ -32,9 +32,6 @@ pub struct Document {
     pub dirty: bool,
     /// Bumped on every change to the working file (edit, undo, redo, save); autosave compares it.
     pub(crate) generation: u64,
-    /// The generation last handed out by `autosave_snapshots`, or another one when storing that
-    /// snapshot failed (`autosave_failed`), so it is due again.
-    pub(crate) snapshot_generation: u64,
     /// Why the document cannot be edited (e.g. encryption), if so.
     pub read_only_reason: Option<String>,
     /// Interactive form fields of the current state (empty without a form).
@@ -193,6 +190,21 @@ pub struct TextNotice {
     pub redrawn_elsewhere: bool,
 }
 
+/// A measurement of how the file's bytes are spent, owning what it reads so it can run off the UI thread
+/// ([`Document::space_audit_job`]).
+pub struct SpaceAuditJob {
+    /// The document as the editor holds it; `None` when the document can't be read for editing.
+    cos: Option<pdfcraft_cos::Document>,
+    size: u64,
+}
+
+impl SpaceAuditJob {
+    /// The measurement [`Document::audit_space`] makes; empty when the document can't be read for editing.
+    pub fn run(self) -> Vec<optimize::SpaceUse> {
+        self.cos.map(|cos| optimize::audit_space(&cos, self.size)).unwrap_or_default()
+    }
+}
+
 impl std::fmt::Display for TextNotice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let ch = format!("\"{}\" (U+{:04X})", self.ch.escape_debug(), u32::from(self.ch));
@@ -288,6 +300,11 @@ impl Document {
     /// PDF Optimizer ▸ Audit space usage.
     pub fn audit_space(&self) -> Vec<optimize::SpaceUse> {
         self.editor.as_ref().map(|e| optimize::audit_space(&e.cos, self.bytes.len() as u64)).unwrap_or_default()
+    }
+
+    /// [`Self::audit_space`] as a job over a copy of the document's state, to run in the background.
+    pub fn space_audit_job(&self) -> SpaceAuditJob {
+        SpaceAuditJob { cos: self.editor.as_ref().map(|e| e.cos.clone()), size: self.bytes.len() as u64 }
     }
 
     /// The backdrop `page` (0-based) paints itself, which hides a background (Add Background).
@@ -693,6 +710,22 @@ impl Document {
         let e = self.editor.as_ref()?;
         let f = self.form.iter().find(|f| f.name == name)?;
         Some(pdfcraft_forms::look(&e.cos, f))
+    }
+
+    /// A form field's font face (standard, embedded Thai, or an unknown `/DA` font name).
+    pub fn field_face(&self, name: &str) -> Option<pdfcraft_forms::FieldFace> {
+        let e = self.editor.as_ref()?;
+        let f = self.form.iter().find(|f| f.name == name)?;
+        Some(pdfcraft_forms::field_face(&e.cos, f))
+    }
+
+    /// All embeddable Thai faces already carried in the document's `/AcroForm /DR /Font`.
+    pub fn embedded_thai_fonts(&self) -> Vec<(String, pdfcraft_forms::FieldFont)> {
+        let Some(e) = self.editor.as_ref() else { return Vec::new() };
+        pdfcraft_forms::document_thai_faces(&e.cos)
+            .into_iter()
+            .map(|id| (pdfcraft_fonts::thai_faces::family(id).to_string(), pdfcraft_forms::FieldFont::Thai(id)))
+            .collect()
     }
 
     /// A check box's or radio button's mark (Field Properties ▸ Options), `None` for other fields.

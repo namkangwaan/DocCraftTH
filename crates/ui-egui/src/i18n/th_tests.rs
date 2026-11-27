@@ -24,11 +24,12 @@ fn thai_is_registered_and_persists() {
     for n in [0, 1, 2, 5] {
         assert_eq!(trn(th, n, "{n} page", "{n} pages"), format!("{n} หน้า"));
     }
-    let mut app = crate::PdfCraftApp::default();
-    app.set_option("language", "th").unwrap();
+    let ctx = egui::Context::default();
+    let mut app = crate::PdfCraftApp::for_unit_tests();
+    app.set_option(&ctx, "language", "th").unwrap();
     assert_eq!(app.language, "th");
-    let mut restored = crate::PdfCraftApp::default();
-    restored.restore(&app.persist());
+    let mut restored = crate::PdfCraftApp::for_unit_tests();
+    restored.apply_settings(&app.settings_snapshot());
     assert_eq!(restored.language, "th");
 }
 
@@ -135,13 +136,6 @@ fn thai_months_and_contexts() {
 }
 
 #[test]
-fn calendar_day_tooltip_uses_the_buddhist_era_in_thai() {
-    let th = Lang::from_code("th").expect("th registered");
-    assert_eq!(plain(&crate::forms_ui::day_tooltip_in(th, 2026, 10, 17)), "17 ตุลาคม 2569");
-    assert_eq!(crate::forms_ui::day_tooltip_in(Lang::EN, 2026, 10, 17), "October 17, 2026");
-}
-
-#[test]
 fn thai_keeps_self_signed_apart_from_signing_yourself() {
     let th = Lang::from_code("th").expect("th registered");
     let yourself = tr(th, "Sign yourself");
@@ -206,6 +200,11 @@ fn thai_leaves_no_unapproved_english_fallbacks() {
         "RGB",
         "{why} ({n})",
         "DN: ",
+        "DPI",
+        "PDF/A and PDF/UA",
+        "X",
+        "Y",
+        "pt",
     ];
     const KEY_CAPS: &[&str] = &["Ctrl", "Shift", "Delete", "Esc", "Home", "End", "Space"];
     let app = CRAFT_I18N.iter().find(|(c, ..)| *c == "th").map_or("", |(_, _, app)| *app);

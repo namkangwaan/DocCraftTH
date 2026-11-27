@@ -61,11 +61,21 @@ fn craft_i18n() -> String {
             Vec::new()
         }
     };
+    // Fork Thai: overlay `src/i18n/th.tsv` on craft-i18n's `pdfcraft.tsv` (fork wins on
+    // duplicate English keys). Replacing the file wholesale dropped upstream rows and broke
+    // thai_covers_* once CRAFT_I18N_DIR was set in CI.
     let th_tsv = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/i18n/th.tsv");
     if th_tsv.is_file() {
         println!("cargo::rerun-if-changed={}", th_tsv.display());
+        let out_dir = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap_or_default());
+        let merged = out_dir.join("th-pdfcraft-merged.tsv");
         if let Some(entry) = entries.iter_mut().find(|(code, _, _)| code == "th") {
-            entry.2 = th_tsv;
+            let base = std::fs::read_to_string(&entry.2).unwrap_or_default();
+            let overlay = std::fs::read_to_string(&th_tsv).unwrap_or_default();
+            if let Err(e) = std::fs::write(&merged, merge_tsv(&base, &overlay)) {
+                println!("cargo::error=writing {}: {e}", merged.display());
+            }
+            entry.2 = merged;
         } else {
             entries.push(("th".to_string(), None, th_tsv));
         }
@@ -79,6 +89,48 @@ fn craft_i18n() -> String {
     }
     o.push_str("];\n");
     o
+}
+
+/// `overlay` rows win over `base` when the English source (column 1) matches. Comment and blank
+/// lines from both are kept in order: base first, then overlay-only rows.
+///
+/// Base rows whose translation is still identical to the English source are dropped: craft-i18n's
+/// Thai file still has English stubs for unfinished strings, and keeping them fails
+/// `thai_leaves_no_unapproved_english_fallbacks` once catalogs are merged. Real Thai rows (e.g.
+/// First/Last page) are kept; intentional English in the fork overlay still goes through KEEP_AS_IS.
+fn merge_tsv(base: &str, overlay: &str) -> String {
+    fn parts(line: &str) -> Option<(&str, &str, &str)> {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        if line.starts_with('#') || line.trim().is_empty() {
+            return None;
+        }
+        let mut it = line.splitn(3, '\t');
+        Some((it.next()?, it.next()?, it.next().unwrap_or("")))
+    }
+    fn source_key(line: &str) -> Option<&str> {
+        parts(line).map(|(_, src, _)| src)
+    }
+    let mut keys = std::collections::HashSet::new();
+    for line in overlay.lines() {
+        if let Some(k) = source_key(line) {
+            keys.insert(k.to_owned());
+        }
+    }
+    let mut out = String::with_capacity(base.len() + overlay.len());
+    for line in base.lines() {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        match parts(line) {
+            Some((_, src, tr)) if keys.contains(src) || src == tr => continue,
+            _ => {}
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out.push_str(overlay);
+    if !overlay.is_empty() && !overlay.ends_with('\n') {
+        out.push('\n');
+    }
+    out
 }
 
 /// One embedded locale: its code, its `common.tsv` if it has one, and its PdfCraft catalog.
@@ -126,11 +178,11 @@ fn read<T>(path: &std::path::Path, fallback: &str, parse: impl Fn(&str) -> Resul
     r.ok()
 }
 
-/// A non-empty string field of someone's people.toml entry, as a Rust `Option<&str>` literal.
-fn name(v: Option<&str>) -> String {
+/// A non-empty string field of someone's people.toml entry, as the builder call `.<method>("..")`; nothing when empty.
+fn name(method: &str, v: Option<&str>) -> String {
     match v.map(str::trim).filter(|s| !s.is_empty()) {
-        Some(x) => format!("Some({x:?})"),
-        None => "None".into(),
+        Some(x) => format!(".{method}({x:?})"),
+        None => String::new(),
     }
 }
 
@@ -148,8 +200,9 @@ fn rows(json: &Value, k: &str) -> Vec<Value> {
 
 fn generate(json: &Value, people: &toml::Table) -> String {
     let mut o = String::new();
-    let _ = writeln!(o, "pub static TOTAL_COMMITS: u64 = {};", n(json, "commits"));
-    let _ = writeln!(o, "pub static CONTRIBUTORS: &[Contributor] = &[");
+    let _ = writeln!(o, "/// The credits tables baked from contributors/contributors.json.");
+    let _ = writeln!(o, "pub(crate) fn credits() -> Credits {{");
+    let _ = writeln!(o, "    let contributors: Vec<Contributor> = vec![");
     for c in rows(json, "contributors") {
         let login = c.get("login").and_then(Value::as_str).unwrap_or("");
         if login.is_empty() {
@@ -164,9 +217,10 @@ fn generate(json: &Value, people: &toml::Table) -> String {
             .or_else(|| if synced { c.get("github_name").and_then(Value::as_str) } else { None });
         let _ = writeln!(
             o,
-            "    Contributor {{ login: {login:?}, display_name: {}, real_name: {}, prs: {}, commits: {}, lines_added: {}, lines_deleted: {}, binary_added: {}, binary_deleted: {}, first_commit: {}, last_commit: {} }},",
-            name(display),
-            name(field("real_name")),
+            "        Contributor::new({login:?}){}{}.profile({:?}).counts({}, {}).lines({}, {}).binary({}, {}).active({}, {}),",
+            name("display_name", display),
+            name("real_name", field("real_name")),
+            format!("https://github.com/{login}"),
             n(&c, "prs"),
             n(&c, "commits"),
             n(&c, "lines_added"),
@@ -177,12 +231,12 @@ fn generate(json: &Value, people: &toml::Table) -> String {
             s(&c, "last_commit"),
         );
     }
-    let _ = writeln!(o, "];");
-    let _ = writeln!(o, "pub static MODELS: &[Model] = &[");
+    let _ = writeln!(o, "    ];");
+    let _ = writeln!(o, "    let models: Vec<ModelCredit> = vec![");
     for m in rows(json, "models") {
         let _ = writeln!(
             o,
-            "    Model {{ company: {}, model: {}, version: {}, commits: {}, lines_added: {}, lines_deleted: {} }},",
+            "        ModelCredit::new({}, {}, {}).work({}, {}, {}),",
             s(&m, "company"),
             s(&m, "model"),
             s(&m, "version"),
@@ -191,6 +245,8 @@ fn generate(json: &Value, people: &toml::Table) -> String {
             n(&m, "lines_deleted"),
         );
     }
-    let _ = writeln!(o, "];");
+    let _ = writeln!(o, "    ];");
+    let _ = writeln!(o, "    Credits::new(contributors, models, {})", n(json, "commits"));
+    let _ = writeln!(o, "}}");
     o
 }

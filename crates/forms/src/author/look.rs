@@ -42,7 +42,9 @@ impl LookPatch {
 /// fill colour (`g`, `rg` or `k`), appending one when the string has none. Everything else (a
 /// custom font resource, colour space or other graphics state) is kept, and repeated edits don't
 /// grow the string.
-pub(super) fn patch_da(da: &str, size: Option<f64>, patch: &LookPatch) -> String {
+///
+/// `thai` is the `/DR` resource a Thai font in the patch was embedded under.
+pub(super) fn patch_da_with(da: &str, size: Option<f64>, patch: &LookPatch, thai: Option<&str>) -> String {
     if patch.font.is_none() && size.is_none() && patch.text.is_none() {
         return da.to_string();
     }
@@ -50,7 +52,7 @@ pub(super) fn patch_da(da: &str, size: Option<f64>, patch: &LookPatch) -> String
     let numeric = |s: &str| s.parse::<f64>().is_ok();
     if patch.font.is_some() || size.is_some() {
         let old = appearance::parse_da(da);
-        let font = patch.font.map_or_else(|| old.font.clone(), |f| f.resource().to_string());
+        let font = patch.font.map_or_else(|| old.font.clone(), |f| f.resource_with(thai));
         // `parse_da` reads sizes up to 300 points; keep the same bound when writing.
         let size = appearance::fmt(size.unwrap_or(old.size).clamp(0.0, 300.0));
         let at = toks.iter().enumerate().rev().find(|(i, t)| t.as_str() == "Tf" && *i >= 2).map(|(i, _)| i);
@@ -173,16 +175,29 @@ pub enum FieldFont {
     Helvetica,
     Times,
     Courier,
+    /// An embedded Thai face. Its `/DR` resource name is the one the embedding gives it, so it is
+    /// supplied where the `/DA` is written ([`FieldFont::resource_with`]).
+    Thai(pdfcraft_fonts::thai_faces::FaceId),
 }
 
 impl FieldFont {
+    /// The three standard fonts; Thai faces are listed by the catalogue.
     pub const ALL: [FieldFont; 3] = [FieldFont::Helvetica, FieldFont::Times, FieldFont::Courier];
 
     fn resource(self) -> &'static str {
         match self {
-            FieldFont::Helvetica => "Helv",
+            FieldFont::Helvetica | FieldFont::Thai(_) => "Helv",
             FieldFont::Times => "TiRo",
             FieldFont::Courier => "Cour",
+        }
+    }
+
+    /// The `/DR` resource a `/DA` names for this font; `thai` is the resource a Thai face was
+    /// embedded under.
+    pub(super) fn resource_with(self, thai: Option<&str>) -> String {
+        match (self, thai) {
+            (FieldFont::Thai(_), Some(name)) => name.to_string(),
+            _ => self.resource().to_string(),
         }
     }
 
@@ -191,6 +206,7 @@ impl FieldFont {
             FieldFont::Helvetica => "Helvetica",
             FieldFont::Times => "Times Roman",
             FieldFont::Courier => "Courier",
+            FieldFont::Thai(id) => pdfcraft_fonts::thai_faces::family(id),
         }
     }
 }
@@ -288,18 +304,22 @@ pub fn look(doc: &Document, f: &Field) -> Look {
             _ => BorderStyle::Solid,
         },
         text,
-        font: match parsed.font.as_str() {
-            "TiRo" | "Times-Roman" => FieldFont::Times,
-            "Cour" | "Courier" => FieldFont::Courier,
-            _ => FieldFont::Helvetica,
+        font: match super::face::field_face(doc, f) {
+            super::face::FieldFace::Thai(id) => FieldFont::Thai(id),
+            _ => match parsed.font.as_str() {
+                "TiRo" | "Times-Roman" => FieldFont::Times,
+                "Cour" | "Courier" => FieldFont::Courier,
+                _ => FieldFont::Helvetica,
+            },
         },
     }
 }
 
 /// A `/DA` string with the given font, size and colour.
-pub(super) fn da_string(font: FieldFont, size: f64, c: [f64; 3]) -> String {
+/// `thai` is the `/DR` resource a Thai font was embedded under.
+pub(super) fn da_string_with(font: FieldFont, size: f64, c: [f64; 3], thai: Option<&str>) -> String {
     let f = crate::appearance::fmt;
-    format!("/{} {} Tf {} {} {} rg", font.resource(), f(size.clamp(0.0, 100.0)), f(c[0]), f(c[1]), f(c[2]))
+    format!("/{} {} Tf {} {} {} rg", font.resource_with(thai), f(size.clamp(0.0, 100.0)), f(c[0]), f(c[1]), f(c[2]))
 }
 
 /// Regenerate every widget appearance of a field from its current value and settings. A value or

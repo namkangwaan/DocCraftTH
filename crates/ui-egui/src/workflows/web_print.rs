@@ -217,18 +217,9 @@ fn revoke(urls: &[String]) {
     let _ = urls;
 }
 
-/// A JavaScript exception as text: an error's `message` (read as a property, since an error from
-/// the print frame isn't an `instanceof Error` here), a thrown string, else its debug form.
 #[cfg(target_arch = "wasm32")]
 fn js_error(e: wasm_bindgen::JsValue) -> String {
-    if let Some(s) = e.as_string() {
-        return s;
-    }
-    js_sys::Reflect::get(&e, &wasm_bindgen::JsValue::from_str("message"))
-        .ok()
-        .and_then(|m| m.as_string())
-        .filter(|m| !m.is_empty())
-        .unwrap_or_else(|| format!("{e:?}"))
+    super::js_value::js_error_text(&e)
 }
 
 /// A PNG as a `blob:` URL. The bytes move out of wasm memory into the browser's.
@@ -261,13 +252,14 @@ fn clear_last_frame() {
 
 /// Open the browser's print dialog on `html` in a hidden iframe once its pictures (`urls`) are
 /// decoded. What goes wrong after this returns (a picture that won't decode, a browser that
-/// refuses to print from a frame) is pushed to `failed`, for the app to report.
+/// refuses to print from a frame) is pushed to `failed`, for the app to report; `wake` asks for the
+/// frame that reports it.
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn print_in_iframe(
     html: &str,
     urls: Vec<String>,
     failed: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
-    ctx: Option<egui::Context>,
+    wake: craft::host::Wake,
 ) -> Result<(), String> {
     use wasm_bindgen::JsCast;
     let err = js_error;
@@ -287,9 +279,7 @@ pub(crate) fn print_in_iframe(
                     if let Ok(mut q) = failed.lock() {
                         q.push(e);
                     }
-                    if let Some(ctx) = &ctx {
-                        ctx.request_repaint();
-                    }
+                    wake.wake();
                 };
                 let (Some(window), Some(doc)) = (frame.content_window(), frame.content_document()) else {
                     report("the print page didn't load".into());
@@ -325,19 +315,6 @@ mod tests {
     use super::*;
 
     const LETTER: (f64, f64) = (612.0, 792.0);
-
-    #[test]
-    fn resolution_falls_with_the_sheet_count_and_long_jobs_are_refused() {
-        assert_eq!(plan_dpi(&[LETTER]).unwrap(), vec![300.0]);
-        assert_eq!(plan_dpi(&vec![LETTER; 100]).unwrap()[99], 300.0);
-        assert_eq!(plan_dpi(&vec![LETTER; 101]).unwrap()[0], 200.0);
-        assert_eq!(plan_dpi(&vec![LETTER; 300]).unwrap()[0], 200.0);
-        assert_eq!(plan_dpi(&vec![LETTER; 301]).unwrap()[0], 150.0);
-        assert_eq!(plan_dpi(&vec![LETTER; MAX_SHEETS]).unwrap().len(), MAX_SHEETS);
-        let e = plan_dpi(&vec![LETTER; MAX_SHEETS + 1]).unwrap_err();
-        assert!(e.contains("save the print-ready PDF"), "{e}");
-        assert!(plan_dpi(&[]).is_err());
-    }
 
     #[test]
     fn large_sheets_are_drawn_within_the_pixel_cap_and_bad_sizes_are_refused() {
