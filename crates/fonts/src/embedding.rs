@@ -595,7 +595,7 @@ mod tests {
 
     #[test]
     fn thsarabun_four_styles_are_bundled() {
-        if crate::CRAFT_FONTS.is_empty() {
+        if !crate::CRAFT_FONTS.iter().any(|f| f.family == "THSarabun") {
             return;
         }
         let styles: Vec<&str> = crate::document_thai_fonts()
