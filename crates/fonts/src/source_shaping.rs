@@ -55,6 +55,12 @@ pub fn shape(bytes: &[u8], text: &str) -> Result<ShapedRun, String> {
     shape_inner(bytes, text, false)
 }
 
+/// Shape text with a Thai face already validated via [`crate::thai_faces`], allowing
+/// `FontsGOV` faces that position marks via `GSUB`/metrics without `GPOS` `mark`/`mkmk`.
+pub fn shape_validated_thai(bytes: &[u8], text: &str) -> Result<ShapedRun, String> {
+    shape_inner(bytes, text, true)
+}
+
 /// Only used after the PDF adapter has verified legacy Thai PUA glyph mappings.
 pub(crate) fn shape_legacy_thai(bytes: &[u8], text: &str) -> Result<ShapedRun, String> {
     shape_inner(bytes, text, true)
@@ -246,6 +252,28 @@ mod tests {
         assert!(FontRef::new(&bytes).unwrap().gsub().is_err());
         assert!(has_thai_layout(&bytes));
         let shaped = shape(&bytes, "กิ่ น้ำ").unwrap();
+        assert!(shaped.advance > 0.0);
+        assert!(shaped.glyphs.iter().all(|g| g.position.iter().all(|p| p.is_finite())));
+    }
+
+    #[test]
+    fn shape_validated_thai_accepts_gpos_false_fontsgov_while_shape_keeps_gpos_gate() {
+        let Some(face) = crate::document_thai_font_named("THSarabun").or_else(crate::document_thai_font) else {
+            eprintln!("skipping shape_validated_thai_accepts_gpos_false_fontsgov_while_shape_keeps_gpos_gate: built without craft-fonts");
+            return;
+        };
+        let mut bytes = face.bytes.to_vec();
+        let count = u16::from_be_bytes([bytes[4], bytes[5]]) as usize;
+        let tables: Vec<_> = bytes[12..12 + count * 16].as_chunks::<16>().0.iter().filter(|t| &t[..4] != b"GPOS").map(|t| t.to_vec()).collect();
+        bytes[4..6].copy_from_slice(&(tables.len() as u16).to_be_bytes());
+        for (i, table) in tables.iter().enumerate() {
+            bytes[12 + i * 16..28 + i * 16].copy_from_slice(table);
+        }
+        assert!(FontRef::new(&bytes).unwrap().gpos().is_err());
+        assert!(!has_thai_layout(&bytes));
+        let err = shape(&bytes, "กิ่ น้ำ").unwrap_err();
+        assert!(err.contains("mark positioning"), "{err}");
+        let shaped = shape_validated_thai(&bytes, "กิ่ น้ำ").unwrap();
         assert!(shaped.advance > 0.0);
         assert!(shaped.glyphs.iter().all(|g| g.position.iter().all(|p| p.is_finite())));
     }
