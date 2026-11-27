@@ -68,6 +68,22 @@ pub fn document_thai_fonts() -> Vec<&'static EmbeddedFace> {
     ui_thai_fonts()
 }
 
+/// Find a Thai face matching `family` and requested `bold`/`italic` style, falling back to `Regular`.
+pub fn document_thai_font_for_style(family: &str, bold: bool, italic: bool) -> Option<&'static EmbeddedFace> {
+    let style = match (bold, italic) {
+        (true, true) => "BoldItalic",
+        (true, false) => "Bold",
+        (false, true) => "Italic",
+        (false, false) => "Regular",
+    };
+    let matches_family = |f: &&EmbeddedFace| f.family.eq_ignore_ascii_case(family);
+    ui_thai_fonts()
+        .into_iter()
+        .find(|f| matches_family(f) && f.style.eq_ignore_ascii_case(style))
+        .or_else(|| ui_thai_fonts().into_iter().find(|f| matches_family(f) && f.style.eq_ignore_ascii_case("Regular")))
+        .or_else(|| document_thai_font_named(family))
+}
+
 /// The `Deva` craft-fonts faces for Devanagari interface text (the Hindi catalog, file names,
 /// document titles), in manifest order. Empty when built without craft-fonts or when its revision
 /// has no Devanagari face; a desktop build then falls back to one font already installed on the
