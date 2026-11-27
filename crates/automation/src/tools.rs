@@ -833,7 +833,7 @@ pub fn tools() -> Vec<ToolDef> {
                 "at": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
                 "width": { "type": "number", "exclusiveMinimum": 0 },
                 "rect": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4 },
-                "font": { "type": "string", "enum": ["helvetica", "times", "courier"] }, "size": { "type": "number", "minimum": 1, "maximum": 500 },
+                "font": { "type": "string", "description": "Font family: helvetica, times, courier, or a Thai family such as THSarabun or Sarabun." }, "size": { "type": "number", "minimum": 1, "maximum": 500 },
                 "bold": { "type": "boolean" }, "italic": { "type": "boolean" }, "color": { "type": "string" },
                 "gray": { "type": "number", "minimum": 0, "maximum": 1, "description": "DeviceGray level, 0 black to 1 white (instead of color)." },
                 "cmyk": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "minItems": 4, "maxItems": 4, "description": "DeviceCMYK [c, m, y, k], each 0 to 1 (instead of color); [0, 0, 0, 1] is 100 K black." },
@@ -858,7 +858,7 @@ pub fn tools() -> Vec<ToolDef> {
                 json!({
                     "doc": doc(), "page": { "type": "integer", "minimum": 1 }, "index": { "type": "integer", "minimum": 1 },
                     "rect": { "type": "array", "items": { "type": "number" }, "minItems": 4, "maxItems": 4 }, "text": { "type": "string" },
-                    "font": { "type": "string", "enum": ["helvetica", "times", "courier"] }, "size": { "type": "number", "minimum": 1, "maximum": 500 },
+                    "font": { "type": "string", "description": "Font family: helvetica, times, courier, or a Thai family such as THSarabun or Sarabun." }, "size": { "type": "number", "minimum": 1, "maximum": 500 },
                     "bold": { "type": "boolean" }, "italic": { "type": "boolean" }, "color": { "type": "string" },
                     "gray": { "type": "number", "minimum": 0, "maximum": 1, "description": "DeviceGray level, 0 black to 1 white (instead of color)." },
                     "cmyk": { "type": "array", "items": { "type": "number", "minimum": 0, "maximum": 1 }, "minItems": 4, "maxItems": 4, "description": "DeviceCMYK [c, m, y, k], each 0 to 1 (instead of color); [0, 0, 0, 1] is 100 K black." },

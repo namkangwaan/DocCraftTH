@@ -15294,3 +15294,25 @@ fn ocr_deskew_mode_is_validated_and_persistent_is_refused_where_it_cannot_apply(
     let e = a.call("ocr_recognize", &json!({ "doc": doc, "deskew_mode": "persistent", "output_mode": "editable", "out": "x.pdf" }));
     assert!(matches!(&e, Err(ToolError::InvalidArgs(m)) if m.contains("persistent")), "{e:?}");
 }
+
+#[test]
+fn page_add_text_accepts_thsarabun_family() {
+    if pdfcraft_fonts::thai_faces::by_family("THSarabun").is_none() {
+        eprintln!("skipping page_add_text_accepts_thsarabun_family: built without craft-fonts");
+        return;
+    }
+    let dir = workdir("thsarabun-add-text");
+    let mut a = auto(&dir);
+    let doc = ok(&mut a, "doc_open", json!({ "path": "a.pdf" }))["doc"].as_u64().unwrap();
+    let text = "หนังสือราชการ 2569 ABC";
+    ok(&mut a, "page_add_text", json!({ "doc": doc, "page": 1, "text": text, "font": "THSarabun", "bold": true, "at": [20, 20], "size": 16 }));
+    let list = ok(&mut a, "content_list", json!({ "doc": doc }));
+    assert_eq!(list["items"][0]["font"], "THSarabun");
+    assert_eq!(list["items"][0]["bold"], true);
+    ok(&mut a, "doc_save", json!({ "doc": doc, "path": "thsarabun.pdf" }));
+    let reopened = ok(&mut a, "doc_open", json!({ "path": "thsarabun.pdf" }))["doc"].as_u64().unwrap();
+    let list2 = ok(&mut a, "content_list", json!({ "doc": reopened }));
+    assert_eq!(list2["items"][0]["font"], "THSarabun");
+    assert_eq!(list2["items"][0]["bold"], true);
+    assert!(page_text(&mut a, reopened)[0].contains(text), "{:?}", page_text(&mut a, reopened));
+}

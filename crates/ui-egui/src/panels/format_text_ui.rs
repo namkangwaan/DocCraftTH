@@ -72,7 +72,11 @@ impl FontPick {
                     return Some(FontPick::Resource(resource.to_string()));
                 }
                 let label = key.strip_prefix("std:")?;
-                STANDARD.into_iter().find(|f| f.label() == label).map(FontPick::Family)
+                STANDARD
+                    .into_iter()
+                    .find(|f| f.label() == label)
+                    .or_else(|| pdfcraft_fonts::thai_faces::by_family(label).map(FontFamily::Thai))
+                    .map(FontPick::Family)
             }
         }
     }
@@ -335,7 +339,11 @@ pub(crate) fn values(target: &Target, fmt: Option<&SelectionFormatting>, sources
             } else if let Some((resource, _)) = sources.iter().find(|(_, face)| *face == shown) {
                 Some(FontPick::Resource(resource.clone()))
             } else {
-                STANDARD.into_iter().find(|f| f.label() == shown).map(FontPick::Family)
+                STANDARD
+                    .into_iter()
+                    .find(|f| f.label() == shown)
+                    .or_else(|| pdfcraft_fonts::thai_faces::by_family(&shown).map(FontFamily::Thai))
+                    .map(FontPick::Family)
             }
         }
         (Target::Paragraph(_), None) => None,
@@ -368,12 +376,29 @@ pub(crate) fn unsupported(target: &Target) -> Vec<(FormatControl, Label)> {
     out
 }
 
+/// Embeddable Thai / FontsGOV families for the Format text font list (bundled only on WASM).
+fn thai_families(ctx: &egui::Context) -> Vec<(String, pdfcraft_fonts::thai_faces::FaceId)> {
+    crate::tools::prepare::thai_catalog_entries(Some(ctx))
+        .into_iter()
+        .filter(|e| !e.substituted)
+        .filter_map(|e| match e.font {
+            pdfcraft_engine::FieldFont::Thai(id) => Some((e.family, id)),
+            _ => None,
+        })
+        .collect()
+}
+
 /// The rows the font picker lists above the installed families, as groups of rows: for a paragraph
-/// (`sources` given) `Keep source fonts` and the page's fonts, then the standard three, then
-/// `Load font…`, `Reload` and what the installed-font scan found. Added text lists the standard
-/// three only. The caller borrows each group's rows into a `HostFontGroup`.
+/// (`sources` given) `Keep source fonts` and the page's fonts, then the standard three and
+/// embeddable Thai families, then `Load font…`, `Reload` and what the installed-font scan found.
+/// Added text lists the standard three and Thai families only. The caller borrows each group's rows
+/// into a `HostFontGroup`.
 #[cfg(not(target_arch = "wasm32"))]
-fn font_groups(sources: Option<&[(String, String)]>, installed: Option<&[pdfcraft_engine::text_fonts::FontFile]>) -> Vec<Vec<HostFontRow>> {
+fn font_groups(
+    sources: Option<&[(String, String)]>,
+    installed: Option<&[pdfcraft_engine::text_fonts::FontFile]>,
+    thai: &[(String, pdfcraft_fonts::thai_faces::FaceId)],
+) -> Vec<Vec<HostFontRow>> {
     let mut groups = Vec::new();
     if let Some(sources) = sources {
         let mut page = vec![HostFontRow::action(FontPick::KeepSource.key(), tl!("Keep source fonts").to_string())];
@@ -382,7 +407,11 @@ fn font_groups(sources: Option<&[(String, String)]>, installed: Option<&[pdfcraf
         }
         groups.push(page);
     }
-    groups.push(STANDARD.into_iter().map(|f| HostFontRow::face(FontPick::Family(f).key(), f.label(), None)).collect());
+    let mut std_and_thai: Vec<HostFontRow> = STANDARD.into_iter().map(|f| HostFontRow::face(FontPick::Family(f).key(), f.label(), None)).collect();
+    for (name, id) in thai {
+        std_and_thai.push(HostFontRow::face(FontPick::Family(FontFamily::Thai(*id)).key(), name.clone(), None));
+    }
+    groups.push(std_and_thai);
     if sources.is_some() {
         let mut more = vec![
             HostFontRow::action(FontPick::Load.key(), tl!("Load font…").to_string()),
@@ -460,7 +489,9 @@ fn show(
 ) -> FormatTextOutput {
     let v = values(target, fmt, sources);
     let unsupported = unsupported(target);
-    let families: Vec<String> = STANDARD.iter().map(|f| f.label().to_string()).collect();
+    let thai = thai_families(ui.ctx());
+    let mut families: Vec<String> = STANDARD.iter().map(|f| f.label().to_string()).collect();
+    families.extend(thai.iter().map(|(name, _)| name.clone()));
     let sizes: Vec<f32> = SIZES.iter().map(|v| *v as f32).collect();
     let scales: Vec<f32> = SCALES.iter().map(|v| *v as f32).collect();
     let char_spacings: Vec<f32> = CHAR_SPACINGS.iter().map(|v| *v as f32).collect();
@@ -485,7 +516,7 @@ fn show(
     if matches!(target, Target::Paragraph(_))
         && let Some(installed) = installed
     {
-        let rows = font_groups(Some(sources), Some(&installed.files));
+        let rows = font_groups(Some(sources), Some(&installed.files), &thai);
         let groups: Vec<HostFontGroup<'_>> = rows.iter().map(|rows| HostFontGroup::new(None, rows)).collect();
         let source = FontPickerSource::new(&installed.catalog).host(&groups).current_host(v.font.as_ref().map(FontPick::key));
         return text.font_picker(source).show(ui);
@@ -565,7 +596,10 @@ fn step(look: &mut AddedText, extras: Option<&mut Extras>, paragraphs: Option<&P
             }
             CharacterChange::Family(name) => match STANDARD.into_iter().find(|f| f.label() == name) {
                 Some(family) => Some(Special::Font(FontPick::Family(family))),
-                None => Some(Special::Family(name.clone())),
+                None => match pdfcraft_fonts::thai_faces::by_family(name) {
+                    Some(id) => Some(Special::Font(FontPick::Family(FontFamily::Thai(id)))),
+                    None => Some(Special::Family(name.clone())),
+                },
             },
             CharacterChange::Style(style) => Some(Special::Style(style.clone())),
             _ => None,

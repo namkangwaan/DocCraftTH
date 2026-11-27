@@ -1731,3 +1731,21 @@ fn escape_closing_a_dialog_over_added_text_being_typed_keeps_the_typing() {
     let added = added(&h).iter().any(|a| matches!(&a.content, pdfcraft_engine::AddedContent::Text(t) if t.text.contains("Reviewed")));
     assert!(open || added, "the typing stays");
 }
+
+#[test]
+fn add_text_font_picker_offers_thsarabun_and_persists() {
+    use egui::accesskit::Role;
+    let Some(thsarabun) = pdfcraft_fonts::thai_faces::by_family("THSarabun") else {
+        eprintln!("skipping add_text_font_picker_offers_thsarabun_and_persists: built without craft-fonts");
+        return;
+    };
+    let mut h = harness();
+    assert!(h.execute("edit.text"));
+    h.run_steps(3);
+    let font_node = h.get_by_role_and_label(Role::ComboBox, "Font family");
+    font_node.click();
+    h.run_steps(2);
+    h.query_all_by_label("THSarabun").next().expect("THSarabun in Font family dropdown").click();
+    h.run_steps(3);
+    assert_eq!(h.state().text_style.family, pdfcraft_engine::FontFamily::Thai(thsarabun));
+}
