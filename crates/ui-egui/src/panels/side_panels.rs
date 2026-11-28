@@ -15,7 +15,7 @@ use craft::behavior::dock::{
 use craft::behavior::{Axis, DockSide, IconId};
 use craft::keymap::CommandRef;
 use craft::ui::buttons::IconButton;
-use craft::ui::contract::{Bind, BodyCx, PlainData, Props as _, Show as _};
+use craft::ui::contract::{Bind, BodyCx, PlainData, Props as _, Show as _, ShowContainer as _, clicked};
 use craft::ui::docking::{DockConfig, DockPanels, GroupAt, HidePanels, IconicMode, PanelKey, PanelSpec, PanelSpecs};
 use craft::ui::menu::PanelRow;
 use craft::ui::patterns::dock::DockArea;
@@ -476,6 +476,10 @@ impl DockPanels<PanelId> for Panels<'_> {
                 crate::hotbar::show_rail(self.app, ui);
                 Some(rect.height())
             }
+            GroupAt::Show(rect) if panels.contains(&PanelId::Tools) => {
+                tools_view(self.app, ui);
+                Some(rect.height())
+            }
             GroupAt::Show(rect) if panels.contains(&PanelId::Document) => {
                 document_view(self.app, ui, rect);
                 Some(rect.height())
@@ -530,6 +534,86 @@ impl Panels<'_> {
         if let Some(command) = command {
             self.app.run_command(&ui.ctx().clone(), command);
         }
+    }
+}
+
+/// The Tools panel's view: a full-width header band with left/right padding and top-right action + close buttons
+/// (without `DockGroup`'s 50px right-side grip reservation), or `edit_panel`'s own banded `Panel` when Edit is open.
+fn tools_view(app: &mut PdfCraftApp, ui: &mut Ui) {
+    let organizing = app.active.is_some() && crate::organize_panel::showing(app);
+    if app.left == LeftPanel::Tool("edit") && !organizing {
+        crate::panels::left_panel(app, ui);
+        return;
+    }
+    let calc_order = app.left == LeftPanel::CalculationOrder;
+    let title = if organizing {
+        crate::i18n::t("Organize pages").to_owned()
+    } else if calc_order {
+        crate::i18n::t("Calculation order").to_owned()
+    } else {
+        match app.left {
+            LeftPanel::Tool(id) => super::catalog::group(id).map_or_else(|| crate::i18n::t("All tools"), |g| crate::i18n::t(g.label)).to_owned(),
+            _ => crate::i18n::t("All tools").to_owned(),
+        }
+    };
+    let mut close_tools = false;
+    egui::Frame::NONE
+        .fill(ui.style().visuals.window_fill())
+        .inner_margin(egui::Margin::symmetric(14, 6))
+        .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
+            ui.set_min_height(28.0);
+            ui.horizontal(|ui| {
+                craft::ui::display::Text::new(title.clone())
+                    .role(craft::ui::style::TypeRole::Title)
+                    .show(ui);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if organizing {
+                        IconButton::command(IconSpec::svg(IconId::new("close")), CommandRef::new("page.organize"))
+                            .size(craft::theme::ControlSize::Sm)
+                            .label(tl!("Close panel"))
+                            .show(ui);
+                        IconButton::command(IconSpec::svg(IconId::new("chevron-left")), CommandRef::new("tools.all"))
+                            .size(craft::theme::ControlSize::Sm)
+                            .show(ui);
+                    } else {
+                        if clicked(
+                            &IconButton::new(IconId::new("close"))
+                                .size(craft::theme::ControlSize::Sm)
+                                .label(format!("{} {title}", tl!("Close")))
+                                .show(ui),
+                        ) {
+                            close_tools = true;
+                        }
+                        if calc_order {
+                            crate::calc_order_ui::header(ui);
+                        } else if matches!(app.left, LeftPanel::Tool(_)) {
+                            IconButton::command(IconSpec::svg(IconId::new("chevron-left")), CommandRef::new("tools.all"))
+                                .size(craft::theme::ControlSize::Sm)
+                                .show(ui);
+                        } else if app.left == LeftPanel::AllTools {
+                            IconButton::command(IconSpec::svg(IconId::new("maximize-2")), CommandRef::new("tools.expand"))
+                                .size(craft::theme::ControlSize::Sm)
+                                .show(ui);
+                        }
+                    }
+                });
+            });
+        });
+    let has_footer = !calc_order && super::tools::has_footer(app);
+    {
+        let app_cell = std::cell::RefCell::new(&mut *app);
+        let panel = craft::ui::sections::Panel::new(title).pad(craft::ui::contract::Pad::None);
+        if has_footer {
+            panel
+                .footer(|ui, _| super::tools::footer(&mut app_cell.borrow_mut(), ui))
+                .show(ui, |ui, _| crate::panels::left_panel(&mut app_cell.borrow_mut(), ui));
+        } else {
+            panel.show(ui, |ui, _| crate::panels::left_panel(&mut app_cell.borrow_mut(), ui));
+        }
+    }
+    if close_tools {
+        app.set_left_open(false);
     }
 }
 
@@ -1243,5 +1327,14 @@ mod tests {
         assert_eq!(root.sizes.all.get("size.row.text"), Some(&craft::theme::SizeValue::Number(25.0)));
         assert_eq!(root.sizes.all.get("space.gap.row"), Some(&craft::theme::SizeValue::Number(8.0)));
         assert_eq!(TOOLS_WIDTH, 284.0);
+    }
+
+    #[test]
+    fn all_tools_header_pads_title_and_places_close_at_top_right() {
+        let h = harness(|_| {});
+        let close = h.get_by_label("Close All tools").rect();
+        let expand = h.get_by_label("Expand all tools").rect();
+        assert!(close.right() >= TOOLS_WIDTH - 24.0, "Close button should sit near the right edge of the Tools panel: {close:?}");
+        assert!(expand.right() <= close.left(), "Expand button should sit to the left of Close: expand={expand:?}, close={close:?}");
     }
 }

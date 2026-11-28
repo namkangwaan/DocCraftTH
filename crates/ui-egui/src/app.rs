@@ -853,6 +853,7 @@ impl PdfCraftApp {
         #[cfg(test)]
         self.injected_panic(crate::frame_guard::FramePart::Ui);
         let ctx = ui.ctx().clone();
+        ctx.enable_accesskit();
         // The chosen language becomes the current one; when it changes, its fonts are installed with it (the
         // runtime installed the starting language's fonts at creation, L-227).
         let lang = i18n::Lang::from_pref(&self.language);
@@ -890,6 +891,7 @@ impl PdfCraftApp {
         // Dialogs and notices show in full screen too: a refused field value or a failed save must be seen.
         dialogs::show(self, ui);
         crate::notices::show(self, ui);
+        apply_clickable_hover_cursor(&ctx);
         // A notice or progress change made after the notices' turn (a finished job's result) is posted next pass: ask for it.
         if !self.posted_notices.is_empty() || !self.progress_requests.is_empty() {
             ctx.request_repaint();
@@ -928,5 +930,117 @@ impl PdfCraftApp {
         if self.all_tools_full && self.all_tools_tab != self.shown_tab() {
             self.all_tools_full = false;
         }
+    }
+}
+
+pub(crate) fn apply_clickable_hover_cursor(ctx: &egui::Context) {
+    let Some(pos) = craft::ui::runtime::pointer::with_pass_pointer(ctx, |p| {
+        if p.primary_down { None } else { p.hover }
+    }) else {
+        return;
+    };
+
+    let over_caption_button = craft::ui::runtime::windows::WindowHost::of(ctx)
+        .caption_regions(ctx.viewport_id())
+        .is_some_and(|regions| {
+            matches!(
+                regions.hit(pos),
+                Some(craft::ui::runtime::windows::WindowHit::Caption(_))
+            )
+        });
+
+    fn is_clickable_node(ctx: &egui::Context, id: egui::Id) -> bool {
+        if !ctx.has_accesskit_node(id) {
+            return false;
+        }
+        ctx.accesskit_node_builder(id, |node| {
+            if node.is_disabled() || node.is_hidden() || node.is_read_only() {
+                return false;
+            }
+            use egui::accesskit::{Action, Role};
+            let clickable_role = matches!(
+                node.role(),
+                Role::Button
+                    | Role::Tab
+                    | Role::MenuItem
+                    | Role::MenuItemCheckBox
+                    | Role::MenuItemRadio
+                    | Role::ListBoxOption
+                    | Role::ComboBox
+                    | Role::CheckBox
+                    | Role::RadioButton
+                    | Role::Switch
+                    | Role::Link
+                    | Role::ColorWell
+                    | Role::DisclosureTriangle
+                    | Role::TreeItem
+            );
+            clickable_role && node.supports_action(Action::Click)
+        })
+        .unwrap_or(false)
+    }
+
+    let grip_key = craft::behavior::PartKey::new("grip");
+    let move_band_key = craft::behavior::PartKey::new("move_band");
+    let title_bar_key = craft::behavior::PartKey::new("title_bar");
+    let over_clickable_shape = craft::ui::runtime::pointer::shapes_at(ctx, pos)
+        .into_iter()
+        .any(|(owner, part)| {
+            if !craft::ui::runtime::pointer::hovers(ctx, owner) {
+                return false;
+            }
+            if let Some(part_ref) = part {
+                if part_ref.key == grip_key || part_ref.key == move_band_key || part_ref.key == title_bar_key {
+                    return false;
+                }
+                if craft::ui::runtime::pointer::active_part(ctx, owner) == Some(part_ref) {
+                    let sub_id = craft::ui::runtime::access::sub_node_id(owner, part_ref);
+                    if is_clickable_node(ctx, sub_id) {
+                        return true;
+                    }
+                }
+            }
+            is_clickable_node(ctx, owner)
+        });
+
+    if over_caption_button || over_clickable_shape {
+        craft::ui::runtime::cursor::request(
+            ctx,
+            craft::behavior::Cursor::System(craft::behavior::CursorIcon::PointingHand),
+            craft::behavior::CursorPriority::Part,
+        );
+    }
+}
+
+#[cfg(test)]
+mod cursor_tests {
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
+    use super::*;
+
+    #[test]
+    fn clickable_buttons_and_caption_buttons_show_pointing_hand_cursor() {
+        let mut h = Harness::builder().with_size(egui::vec2(1400.0, 900.0)).build_eframe(|cc| {
+            crate::PdfCraftApp::install_runtime(&cc.egui_ctx);
+            let mut app = PdfCraftApp::for_unit_tests();
+            let _ = app.set_option(&egui::Context::default(), "language", "en");
+            app
+        });
+        h.run_steps(6);
+
+        let expected = Some(craft::behavior::Cursor::System(craft::behavior::CursorIcon::PointingHand));
+
+        h.get_by_label("Discord").hover();
+        h.run_steps(2);
+        assert_eq!(craft::ui::runtime::cursor::current(&h.ctx), expected, "Discord button should show PointingHand cursor");
+
+        h.get_by_label("Close All tools").hover();
+        h.run_steps(2);
+        assert_eq!(craft::ui::runtime::cursor::current(&h.ctx), expected, "Close All tools button should show PointingHand cursor");
+
+        h.get_by_label("Minimize").hover();
+        h.run_steps(2);
+        assert_eq!(craft::ui::runtime::cursor::current(&h.ctx), expected, "Window Minimize caption button should show PointingHand cursor");
     }
 }
