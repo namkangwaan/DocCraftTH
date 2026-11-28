@@ -15,6 +15,10 @@ use egui::Ui;
 
 use crate::PdfCraftApp;
 
+fn rail_box_width(available_width: f32, button_width: f32) -> f32 {
+    (available_width - 8.0).clamp(button_width, 42.0)
+}
+
 /// Shows the rail's view cluster; nothing without an active document or a current page to view.
 pub(crate) fn show(app: &mut PdfCraftApp, ui: &mut Ui) {
     let Some((index, id)) = app.active_ids() else { return };
@@ -28,87 +32,107 @@ pub(crate) fn show(app: &mut PdfCraftApp, ui: &mut Ui) {
     let Some(page) = doc.info.pages.get(current) else { return };
     let page_size = Size::new(f64::from(page.width.max(1.0)), f64::from(page.height.max(1.0)));
 
-    let field_size = {
-        let env = Env::of(ui);
-        egui::vec2(env.tokens.size.rail.button, env.tokens.size.control.md)
-    };
-    // Taken once, in the pass that shows the field, also while the field is not focused.
-    let reselect = std::mem::take(&mut view.page_input_reselect);
-    let input_id = view.page_input_id();
-    let (field_rect, _) = ui.allocate_exact_size(field_size, egui::Sense::hover());
-    let edit = TextField::new("Current page", Bind::bound(&mut view.page_input))
-        .id(input_id)
-        .select_on_focus()
-        .select_all(reselect)
-        .submits()
-        .show_at(ui, field_rect);
-    if !edit.events.is_empty() {
-        view.page_input_draft = true;
-    }
-    if edit.submitted {
-        let typed = view.page_input.clone();
-        view.go_to_typed(&typed, &labels);
-        view.page_input_draft = false;
-    }
-    if edit.escaped {
-        view.page_input_draft = false;
-    }
-    // Navigation updates the box, never text being typed into it: the field keeps the focus after Enter, and its
-    // focus is on its text part, which counts as the field.
-    if !(view.page_input_draft && focus::is_focused(ui.ctx(), edit.response.id)) {
-        view.page_input_draft = false;
-        view.page_input = view.current_page_label(labels.get(view.current()).map(String::as_str));
-    }
+    ui.vertical_centered(|ui| {
+        ui.spacing_mut().item_spacing.y = 6.0;
 
-    let label = labels.get(current).map_or("", String::as_str);
-    // Out of range (an empty document) reads "Page 0 of 0", never past the end.
-    let shown = if current < page_count { current + 1 } else { page_count };
-    let of = crate::i18n::fmt(crate::i18n::t("Page {p} of {n}"), &[("p", &shown.to_string()), ("n", &page_count.to_string())]);
-    Text::new(super::page_position(current, page_count, label)).role(TypeRole::Caption).tooltip(of).show(ui);
+        let field_size = {
+            let env = Env::of(ui);
+            egui::vec2(env.tokens.size.rail.button, env.tokens.size.control.md)
+        };
+        let box_size = egui::vec2(rail_box_width(ui.available_width(), field_size.x), field_size.y);
+        // Taken once, in the pass that shows the field, also while the field is not focused.
+        let reselect = std::mem::take(&mut view.page_input_reselect);
+        let input_id = view.page_input_id();
+        let (field_rect, _) = ui.allocate_exact_size(box_size, egui::Sense::hover());
+        let edit = TextField::new("Current page", Bind::bound(&mut view.page_input))
+            .id(input_id)
+            .select_on_focus()
+            .select_all(reselect)
+            .submits()
+            .show_at(ui, field_rect);
+        if !edit.events.is_empty() {
+            view.page_input_draft = true;
+        }
+        if edit.submitted {
+            let typed = view.page_input.clone();
+            view.go_to_typed(&typed, &labels);
+            view.page_input_draft = false;
+        }
+        if edit.escaped {
+            view.page_input_draft = false;
+        }
+        // Navigation updates the box, never text being typed into it: the field keeps the focus after Enter, and its
+        // focus is on its text part, which counts as the field.
+        if !(view.page_input_draft && focus::is_focused(ui.ctx(), edit.response.id)) {
+            view.page_input_draft = false;
+            view.page_input = view.current_page_label(labels.get(view.current()).map(String::as_str));
+        }
 
-    IconButton::command(IconId::new("chevron_left"), "view.previous_view").show(ui);
-    IconButton::command(IconId::new("chevron_right"), "view.next_view").show(ui);
-    IconButton::command(IconId::new("chevron_up"), "view.previous_page").show(ui);
-    IconButton::command(IconId::new("chevron_down"), "view.next_page").show(ui);
+        let label = labels.get(current).map_or("", String::as_str);
+        // Out of range (an empty document) reads "Page 0 of 0", never past the end.
+        let shown = if current < page_count { current + 1 } else { page_count };
+        let of = crate::i18n::fmt(crate::i18n::t("Page {p} of {n}"), &[("p", &shown.to_string()), ("n", &page_count.to_string())]);
+        Text::new(super::page_position(current, page_count, label)).role(TypeRole::Caption).tooltip(of).show(ui);
 
-    // The percent suffix and three digits need the rail's full width, not an icon button's width.
-    let zoom_size = egui::vec2(ui.available_width(), field_size.y);
-    let (zoom_rect, _) = ui.allocate_exact_size(zoom_size, egui::Sense::hover());
-    let field = ZoomField::new("Zoom", view.canvas_view(), page_size).scale(ZoomScale::Points).show_at(ui, zoom_rect);
-    if let Some(edited) = field.view.committed() {
-        view.apply_canvas_view(edited);
-    }
+        ui.add_space(4.0);
 
-    IconButton::command(IconId::new("zoom_in"), "view.zoom.in").show(ui);
-    IconButton::command(IconId::new("zoom_out"), "view.zoom.out").show(ui);
-    IconButton::command(IconId::new("maximize_2"), "view.fit_toggle").show(ui);
-    IconButton::command(IconId::new("rotate_cw"), "view.rotate.cw").show(ui);
+        IconButton::command(IconId::new("chevron_left"), "view.previous_view").show(ui);
+        IconButton::command(IconId::new("chevron_right"), "view.next_view").show(ui);
+        IconButton::command(IconId::new("chevron_up"), "view.previous_page").show(ui);
+        IconButton::command(IconId::new("chevron_down"), "view.next_page").show(ui);
 
-    // The rows' marks come from the commands' checked state (the catalog), not from here.
-    let display_icon = if view.view.display == PageDisplay::Single { "file-text" } else { "columns-2" };
-    let display = IconButton::new(IconId::new(display_icon)).label("Page display").popup(PopupKind::Menu).show(ui);
-    Menu::new("Page display").opened_by(&display.response, Trigger::Press).show(ui, |ui, _| {
-        for command in [
-            "view.layout.single",
-            "view.layout.two_up",
-            "view.continuous",
-            "view.page_gaps",
-            "view.layout.cover",
-            "view.fit_width_scrolling",
-            "view.fit_one_page",
-            "view.zoom.actual_size",
-            "view.zoom.page_level",
-            "view.fit_visible",
-            "view.read_mode",
-            "view.full_screen",
-        ] {
-            MenuItem::command(command).show(ui);
+        ui.add_space(4.0);
+
+        // The percent suffix and three digits fit inside the centered rail box with symmetric side margins.
+        let zoom_size = egui::vec2(rail_box_width(ui.available_width(), field_size.x), field_size.y);
+        let (zoom_rect, _) = ui.allocate_exact_size(zoom_size, egui::Sense::hover());
+        let field = ZoomField::new("Zoom", view.canvas_view(), page_size).scale(ZoomScale::Points).show_at(ui, zoom_rect);
+        if let Some(edited) = field.view.committed() {
+            view.apply_canvas_view(edited);
+        }
+
+        IconButton::command(IconId::new("zoom_in"), "view.zoom.in").show(ui);
+        IconButton::command(IconId::new("zoom_out"), "view.zoom.out").show(ui);
+        IconButton::command(IconId::new("maximize_2"), "view.fit_toggle").show(ui);
+        IconButton::command(IconId::new("rotate_cw"), "view.rotate.cw").show(ui);
+
+        // The rows' marks come from the commands' checked state (the catalog), not from here.
+        let display_icon = if view.view.display == PageDisplay::Single { "file-text" } else { "columns-2" };
+        let display = IconButton::new(IconId::new(display_icon)).label("Page display").popup(PopupKind::Menu).show(ui);
+        Menu::new("Page display").opened_by(&display.response, Trigger::Press).show(ui, |ui, _| {
+            for command in [
+                "view.layout.single",
+                "view.layout.two_up",
+                "view.continuous",
+                "view.page_gaps",
+                "view.layout.cover",
+                "view.fit_width_scrolling",
+                "view.fit_one_page",
+                "view.zoom.actual_size",
+                "view.zoom.page_level",
+                "view.fit_visible",
+                "view.read_mode",
+                "view.full_screen",
+            ] {
+                MenuItem::command(command).show(ui);
+            }
+        });
+
+        if rail_on_right {
+            IconButton::command(IconId::new("panel_left"), "view.rail.left").show(ui);
+        } else {
+            IconButton::command(IconId::new("panel_right"), "view.rail.right").show(ui);
         }
     });
+}
 
-    if rail_on_right {
-        IconButton::command(IconId::new("panel_left"), "view.rail.left").show(ui);
-    } else {
-        IconButton::command(IconId::new("panel_right"), "view.rail.right").show(ui);
+#[cfg(test)]
+mod tests {
+    use super::rail_box_width;
+
+    #[test]
+    fn rail_box_width_leaves_symmetric_side_margins() {
+        let w = rail_box_width(50.0, 36.0);
+        assert!(w >= 36.0 && w <= 42.0, "expected centered box width with side margins inside 50px rail, got {w}");
     }
 }

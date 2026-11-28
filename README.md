@@ -2,7 +2,8 @@
 
 <p align="center">
   <b>การทดลองและวิจัยเชิงวิศวกรรมสำหรับงานเอกสารภาษาไทย (Thai Document Workbench Research)</b><br>
-  พัฒนาต่อยอดแบบอิสระจากโครงการต้นฉบับโอเพนซอร์ส <a href="https://github.com/storytold/pdfcraft">PdfCraft by Storytold / ArtCraft</a>
+  พัฒนาต่อยอดแบบอิสระจากโครงการต้นฉบับโอเพนซอร์ส <a href="https://github.com/storytold/pdfcraft">PdfCraft by Storytold / ArtCraft</a><br>
+  💬 <a href="https://discord.gg/JsTyFGvNK">เข้าร่วมชุมชน Discord ของ DTHFrame</a>
 </p>
 
 ---
