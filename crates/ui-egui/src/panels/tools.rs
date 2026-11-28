@@ -101,36 +101,39 @@ fn tool_row(g: &'static ToolGroup, pinned: bool) -> ListRow<'static> {
 /// The All tools sidebar body: the tool list, the first few tools until View more shows them all. Its Expand and
 /// Close belong to the dock's group header.
 fn all_tools(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
-    let shown = if app.all_tools_expanded { TOOL_GROUPS.len() } else { COLLAPSED_TOOLS.min(TOOL_GROUPS.len()) };
-    let pins: Vec<bool> = TOOL_GROUPS[..shown].iter().map(|g| app.is_tool_pinned(g.id)).collect();
-    let out = List::<usize>::new(tl!("All tools").to_owned())
-        .natural_height(true)
-        .select(SelectMode::Single)
-        .activate(ActivateOn::Click)
-        .selection(Bind::given(Selection::default()))
-        .show_items(ui, &Rows(shown), &mut |at, _| match (TOOL_GROUPS.get(*at), pins.get(*at)) {
-            (Some(g), Some(pinned)) => tool_row(g, *pinned),
-            _ => ListRow::spacer(),
-        });
-    for event in out.events {
-        match event {
-            CollectionEvent::Activate(at) => {
-                if let Some(g) = TOOL_GROUPS.get(at) {
-                    app.select_tool(ui.ctx(), g.id);
+    egui::Frame::NONE.inner_margin(egui::Margin::symmetric(10, 8)).show(ui, |ui| {
+        let shown = if app.all_tools_expanded { TOOL_GROUPS.len() } else { COLLAPSED_TOOLS.min(TOOL_GROUPS.len()) };
+        let pins: Vec<bool> = TOOL_GROUPS[..shown].iter().map(|g| app.is_tool_pinned(g.id)).collect();
+        let out = List::<usize>::new(tl!("All tools").to_owned())
+            .natural_height(true)
+            .select(SelectMode::Single)
+            .activate(ActivateOn::Click)
+            .selection(Bind::given(Selection::default()))
+            .show_items(ui, &Rows(shown), &mut |at, _| match (TOOL_GROUPS.get(*at), pins.get(*at)) {
+                (Some(g), Some(pinned)) => tool_row(g, *pinned),
+                _ => ListRow::spacer(),
+            });
+        for event in out.events {
+            match event {
+                CollectionEvent::Activate(at) => {
+                    if let Some(g) = TOOL_GROUPS.get(at) {
+                        app.select_tool(ui.ctx(), g.id);
+                    }
                 }
-            }
-            CollectionEvent::Item(at, RowEvent::Trailing { part, .. }) if part == PIN => {
-                if let Some(g) = TOOL_GROUPS.get(at) {
-                    app.toggle_pin_tool(g.id);
+                CollectionEvent::Item(at, RowEvent::Trailing { part, .. }) if part == PIN => {
+                    if let Some(g) = TOOL_GROUPS.get(at) {
+                        app.toggle_pin_tool(g.id);
+                    }
                 }
+                _ => {}
             }
-            _ => {}
         }
-    }
-    let more = if app.all_tools_expanded { "View less" } else { "View more" };
-    if clicked(craft::ui::buttons::Link::new(tl!(more).to_owned()).show(ui).response()) {
-        app.all_tools_expanded = !app.all_tools_expanded;
-    }
+        ui.add_space(6.0);
+        let more = if app.all_tools_expanded { "View less" } else { "View more" };
+        if clicked(craft::ui::buttons::Link::new(tl!(more).to_owned()).show(ui).response()) {
+            app.all_tools_expanded = !app.all_tools_expanded;
+        }
+    });
 }
 
 /// A line of a tool's detail list.
@@ -140,16 +143,23 @@ enum Line {
     Item(&'static ToolItem),
 }
 
-/// One item row: its icon, label and the availability chip.
+/// The availability badge label for a tool item, or `None` when the item is already ready.
+pub(super) fn item_chip(a: Availability) -> Option<&'static str> {
+    match a {
+        Availability::Ready => None,
+        Availability::Planned(m) => Some(m),
+        Availability::Provider => Some("AI"),
+    }
+}
+
+/// One item row: its icon, label and the availability chip (omitted for ready items so labels fit in full).
 fn item_row(g: &'static ToolGroup, item: &'static ToolItem) -> ListRow<'static> {
     let ready = item.availability == Availability::Ready;
-    let chip = match item.availability {
-        Availability::Ready => tl!("Ready"),
-        Availability::Planned(m) => m,
-        Availability::Provider => "AI",
-    };
-    let badge = Badge::new(tl!(chip).to_owned()).variant(Variant::look(Emphasis::Soft, if ready { Tone::Good } else { Tone::Neutral }));
-    let row = ListRow::new(tl!(item.label).to_owned()).icon(IconSpec::svg(IconId::new(item.icon))).trailing_field(badge, |_| {});
+    let mut row = ListRow::new(tl!(item.label).to_owned()).icon(IconSpec::svg(IconId::new(item.icon)));
+    if let Some(chip) = item_chip(item.availability) {
+        let badge = Badge::new(tl!(chip).to_owned()).variant(Variant::look(Emphasis::Soft, Tone::Neutral));
+        row = row.trailing_field(badge, |_| {});
+    }
     if ready {
         row.hue(data_hue(g), HueTarget::Icon).tooltip(format!("{} — {}", tl!(item.label), item.command))
     } else {
@@ -176,81 +186,85 @@ fn tool_detail(app: &mut PdfCraftApp, ui: &mut egui::Ui, g: &'static ToolGroup) 
         stamp_palette(app, ui);
         return;
     }
-    // Prepare a form: Preview fills the form as a reader would; Edit goes back.
-    if g.id == "form" {
-        if let Some(view) = app.active.and_then(|i| app.views.get_mut(i)) {
-            Checkbox::new(Bind::bound(&mut view.session.prepare.show_tab_numbers)).label(tl!("Show tab numbers").to_owned()).show(ui);
+    egui::Frame::NONE.inner_margin(egui::Margin::symmetric(10, 8)).show(ui, |ui| {
+        // Prepare a form: Preview fills the form as a reader would; Edit goes back.
+        if g.id == "form" {
+            if let Some(view) = app.active.and_then(|i| app.views.get_mut(i)) {
+                Checkbox::new(Bind::bound(&mut view.session.prepare.show_tab_numbers)).label(tl!("Show tab numbers").to_owned()).show(ui);
+                ui.add_space(6.0);
+            }
+            let entries = [Entry::new(false, tl!("Edit fields").to_owned()), Entry::new(true, tl!("Preview").to_owned())];
+            let landed = Segmented::new(tl!("Form mode").to_owned(), Bind::given(app.form_preview), &entries)
+                .tooltip(tl!("Try the form as people filling it in will see it").to_owned())
+                .show(ui)
+                .events
+                .landed()
+                .cloned();
+            if let Some(preview) = landed {
+                app.form_preview = preview;
+                if preview {
+                    app.quick_tool = crate::QuickTool::Select;
+                }
+            }
+            ui.add_space(6.0);
         }
-        let entries = [Entry::new(false, tl!("Edit fields").to_owned()), Entry::new(true, tl!("Preview").to_owned())];
-        let landed = Segmented::new(tl!("Form mode").to_owned(), Bind::given(app.form_preview), &entries)
-            .tooltip(tl!("Try the form as people filling it in will see it").to_owned())
-            .show(ui)
-            .events
-            .landed()
-            .cloned();
-        if let Some(preview) = landed {
-            app.form_preview = preview;
-            if preview {
-                app.quick_tool = crate::QuickTool::Select;
+        let mut run = None;
+        let mut lines = Vec::new();
+        for s in g.sections {
+            lines.push(Line::Heading(s.title));
+            for item in s.items {
+                if g.id == "fill_sign" && (item.command.starts_with("sign.fill.signature") || item.command.starts_with("sign.fill.initials")) {
+                    continue;
+                }
+                lines.push(Line::Item(item));
             }
         }
-    }
-    let mut run = None;
-    let mut lines = Vec::new();
-    for s in g.sections {
-        lines.push(Line::Heading(s.title));
-        for item in s.items {
-            if g.id == "fill_sign" && (item.command.starts_with("sign.fill.signature") || item.command.starts_with("sign.fill.initials")) {
-                continue;
-            }
-            lines.push(Line::Item(item));
+        let mut list = List::<usize>::new(tl!(g.label).to_owned());
+        if g.id == "fill_sign" {
+            list = list.sizing(Sizing::Content).natural_height(true);
         }
-    }
-    let mut list = List::<usize>::new(tl!(g.label).to_owned());
-    if g.id == "fill_sign" {
-        list = list.sizing(Sizing::Content).natural_height(true);
-    }
-    let out = list.select(SelectMode::Single).activate(ActivateOn::Click).selection(Bind::given(Selection::default())).show_items(
-        ui,
-        &Rows(lines.len()),
-        &mut |at, _| match lines.get(*at) {
-            Some(Line::Heading(title)) => ListRow::new(tl!(title).to_owned()).heading().ink(RowInk::Dimmed),
-            Some(Line::Item(item)) => item_row(g, item),
-            None => ListRow::spacer(),
-        },
-    );
-    let opener = out.response.clone();
-    let mut menu = None;
-    for event in out.events {
-        if let CollectionEvent::Activate(at) = event
-            && let Some(Line::Item(item)) = lines.get(at)
+        let out = list.select(SelectMode::Single).activate(ActivateOn::Click).selection(Bind::given(Selection::default())).show_items(
+            ui,
+            &Rows(lines.len()),
+            &mut |at, _| match lines.get(*at) {
+                Some(Line::Heading(title)) => ListRow::new(tl!(title).to_owned()).heading().ink(RowInk::Dimmed),
+                Some(Line::Item(item)) => item_row(g, item),
+                None => ListRow::spacer(),
+            },
+        );
+        let opener = out.response.clone();
+        let mut menu = None;
+        for event in out.events {
+            if let CollectionEvent::Activate(at) = event
+                && let Some(Line::Item(item)) = lines.get(at)
+            {
+                if item.actions.is_empty() {
+                    run = Some(item.command);
+                } else {
+                    menu = Some(*item);
+                }
+            }
+        }
+        // An entry with further commands opens a menu from its row.
+        // PLAN: assumed actions_menu(app, ui, opener: &Response, item: &'static ToolItem) -> Option<&'static str> (pdf-edit-w6); it keeps its own open state.
+        if let Some(item) = menu
+            && let Some(cmd) = actions_menu(app, ui, &opener, item)
         {
-            if item.actions.is_empty() {
-                run = Some(item.command);
-            } else {
-                menu = Some(*item);
-            }
-        }
-    }
-    // An entry with further commands opens a menu from its row.
-    // PLAN: assumed actions_menu(app, ui, opener: &Response, item: &'static ToolItem) -> Option<&'static str> (pdf-edit-w6); it keeps its own open state.
-    if let Some(item) = menu
-        && let Some(cmd) = actions_menu(app, ui, &opener, item)
-    {
-        run = Some(cmd);
-    }
-    if g.id == "fill_sign" {
-        caption_row(ui, tl!("Sign yourself"), true);
-        if let Some(cmd) = crate::fill_sign::signature_entries(ui, app) {
             run = Some(cmd);
         }
-        // Where the signing happens, not only in Preferences, and once: not also in the Sign
-        // menu over the page, where it was easy to miss (#2149).
-        Checkbox::new(Bind::bound(&mut app.flatten_fill_sign_on_save)).label(tl!("Lock into the page when saving").to_owned()).show(ui);
-    }
-    if let Some(cmd) = run {
-        app.run_command(ui.ctx(), cmd);
-    }
+        if g.id == "fill_sign" {
+            caption_row(ui, tl!("Sign yourself"), true);
+            if let Some(cmd) = crate::fill_sign::signature_entries(ui, app) {
+                run = Some(cmd);
+            }
+            // Where the signing happens, not only in Preferences, and once: not also in the Sign
+            // menu over the page, where it was easy to miss (#2149).
+            Checkbox::new(Bind::bound(&mut app.flatten_fill_sign_on_save)).label(tl!("Lock into the page when saving").to_owned()).show(ui);
+        }
+        if let Some(cmd) = run {
+            app.run_command(ui.ctx(), cmd);
+        }
+    });
 }
 
 /// Whether the Tools panel shows a tool whose actions sit in a footer pinned under the body: Redact a PDF's.
@@ -281,5 +295,17 @@ pub(crate) fn footer(app: &mut PdfCraftApp, ui: &mut egui::Ui) {
     }
     if let Some(cmd) = run {
         app.run_command(ui.ctx(), cmd);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ready_items_omit_redundant_badge_while_planned_keep_theirs() {
+        assert_eq!(item_chip(Availability::Ready), None);
+        assert_eq!(item_chip(Availability::Planned("M4")), Some("M4"));
+        assert_eq!(item_chip(Availability::Provider), Some("AI"));
     }
 }

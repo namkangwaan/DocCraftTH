@@ -169,11 +169,11 @@ const START_SHARE: f32 = 0.2;
 /// Share of the rest the page area takes beside the end dock.
 const PAGE_SHARE: f32 = 0.8;
 
-/// The Tools pane's default width: production's 272 points at every window width (the framework's Format text row keeps the
-/// size field readable in it).
-const TOOLS_WIDTH: f32 = 272.0;
+/// The Tools pane's default width: 284 points at every window width (room for tool labels and the framework's Format
+/// text row).
+const TOOLS_WIDTH: f32 = 284.0;
 /// The Tools pane's width in a narrow window, as production opened it.
-const TOOLS_WIDTH_NARROW: f32 = 272.0;
+const TOOLS_WIDTH_NARROW: f32 = 284.0;
 /// How far past the Tools pane the floating toolbar starts. Production's quick bar stood 14 points into a narrow margin
 /// and was 46 points wide, so its page-side edge was 60 points into the page area (which starts 3 points past the pane,
 /// after the splitter); the rail is 52 points wide, so it starts 10 points past the pane to end just inside that edge
@@ -494,6 +494,8 @@ impl DockPanels<PanelId> for Panels<'_> {
                 } else if crate::organize_panel::showing(self.app) {
                     IconButton::command(IconSpec::svg(IconId::new("chevron-left")), CommandRef::new("tools.all")).show(ui);
                     IconButton::command(IconSpec::svg(IconId::new("close")), CommandRef::new("page.organize")).label(tl!("Close panel")).show(ui);
+                } else if matches!(self.app.left, LeftPanel::Tool(_)) {
+                    IconButton::command(IconSpec::svg(IconId::new("chevron-left")), CommandRef::new("tools.all")).show(ui);
                 } else if self.app.left == LeftPanel::AllTools {
                     IconButton::command(IconSpec::svg(IconId::new("maximize-2")), CommandRef::new("tools.expand")).show(ui);
                 }
@@ -1231,5 +1233,15 @@ mod tests {
         let snapshot = moved.state().settings_snapshot();
         let restored = harness(move |app| app.apply_settings(&snapshot));
         assert!(tools_x(&restored) > 700.0);
+    }
+
+    #[test]
+    fn root_env_applies_roomier_row_and_gap_tokens() {
+        let app = PdfCraftApp::for_unit_tests();
+        let root = app.root_env(&egui::Context::default());
+        assert_eq!(root.sizes.all.get("size.control.md"), Some(&craft::theme::SizeValue::Number(35.0)));
+        assert_eq!(root.sizes.all.get("size.row.text"), Some(&craft::theme::SizeValue::Number(25.0)));
+        assert_eq!(root.sizes.all.get("space.gap.row"), Some(&craft::theme::SizeValue::Number(8.0)));
+        assert_eq!(TOOLS_WIDTH, 284.0);
     }
 }

@@ -551,6 +551,12 @@ impl PdfCraftApp {
             let mut sizes = craft::theme::AppSizes::default();
             sizes.all.insert("typography.display.size".into(), craft::theme::SizeValue::Number(24.0));
             sizes.all.insert("typography.display.line_height".into(), craft::theme::SizeValue::Number(29.0));
+            sizes.all.insert("size.control.md".into(), craft::theme::SizeValue::Number(35.0));
+            sizes.all.insert("size.row.text".into(), craft::theme::SizeValue::Number(25.0));
+            sizes.all.insert("typography.body.line_height".into(), craft::theme::SizeValue::Number(20.0));
+            sizes.all.insert("space.gap.row".into(), craft::theme::SizeValue::Number(8.0));
+            sizes.all.insert("space.gap.stack".into(), craft::theme::SizeValue::Number(10.0));
+            sizes.all.insert("space.pad.regular".into(), craft::theme::SizeValue::Number(14.0));
             Arc::new(sizes)
         });
         let lang = i18n::Lang::from_pref(&self.language);
